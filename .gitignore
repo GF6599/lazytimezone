@@ -1,0 +1,27 @@
+# Build artifacts
+/target/
+/dist/
+
+# Cargo lock (binary project - include it; remove this line if you prefer not to)
+# Cargo.lock is committed for binary projects per Cargo convention
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+._*
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vim/
+
+# Claude Code
+.claude/
+
+# Environment
+.env
+.env.*
