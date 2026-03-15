@@ -1,0 +1,15 @@
+[package]
+name = "lazytimezone"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "lazytimezone"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.30"
+crossterm = "0.29"
+chrono = { version = "0.4", features = ["clock"] }
+chrono-tz = "0.10"
+tui-big-text = "0.8"
