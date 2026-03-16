@@ -13,6 +13,7 @@ dist:
   cross build --release --target x86_64-unknown-linux-gnu
   mkdir -p dist
   cp target/release/lazytimezone dist/
+  codesign --force --sign - dist/lazytimezone
   cp target/x86_64-unknown-linux-gnu/release/lazytimezone dist/lazytimezone-linux-amd64
 
 # Install the dist binary to the home directory
