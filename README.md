@@ -81,7 +81,7 @@ Search is case-insensitive with AND logic across whitespace-separated terms. You
 
 ## Themes
 
-Cycle through themes with `t`. Your selection is saved to `~/.config/lazytimezone/theme`. Favorites are saved to `~/.config/lazytimezone/favorites`.
+Cycle through themes with `t`. Theme and favorites are saved to `~/.config/lazytimezone/config.toml`.
 
 - **Default** — terminal colors with cyan accents
 - **Dracula** — purple/blue dark theme
@@ -98,7 +98,8 @@ src/
 ├── app.rs        Core state: selection, search, favorites, theme
 ├── events.rs     Keyboard input → App mutations
 ├── ui.rs         App state → ratatui Frame rendering
-├── theme.rs      Colour palettes with persistence (~/.config)
+├── config.rs     TOML persistence (~/.config/lazytimezone/config.toml)
+├── theme.rs      Colour palettes
 └── timezone.rs   Static catalogue of 50+ world cities
 ```
 
