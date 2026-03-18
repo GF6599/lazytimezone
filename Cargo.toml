@@ -13,3 +13,5 @@ crossterm = "0.29"
 chrono = { version = "0.4", features = ["clock"] }
 chrono-tz = "0.10"
 tui-big-text = "0.8"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
