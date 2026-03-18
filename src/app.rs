@@ -11,19 +11,18 @@
 //! | Navigation | `selected_row`, `filtered_indices` | No |
 //! | Selection | `selected_timezone`, `selected_city_name` | No |
 //! | Search | `input_mode`, `search_query`, `cursor_position` | No |
-//! | Theme | `theme` | Yes (`~/.config/lazytimezone/theme`) |
-//! | Favorites | `favorites`, `show_favorites_only` | Yes (`~/.config/lazytimezone/favorites`) |
+//! | Theme | `theme` | Yes (`~/.config/lazytimezone/config.toml`) |
+//! | Favorites | `favorites`, `show_favorites_only` | Yes (`~/.config/lazytimezone/config.toml`) |
 //! | Feedback | `copied_flash` | No |
 
-use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
 use std::time::Instant;
 
 use chrono::Utc;
 use chrono::offset::Offset;
 
-use crate::theme::{Theme, dirs_fallback};
+use crate::config;
+use crate::theme::Theme;
 use crate::timezone::{TimezoneEntry, all_timezones};
 use crate::ui::format_utc_offset;
 
@@ -76,8 +75,9 @@ pub struct App {
 impl App {
     pub fn new() -> Self {
         let timezones = all_timezones();
-        let theme = Theme::load();
-        let favorites = Self::load_favorites();
+        let cfg = config::load();
+        let theme = Theme::from_label(&cfg.theme);
+        let favorites = cfg.favorites;
         let mut filtered_indices: Vec<usize> = (0..timezones.len()).collect();
         Self::sort_indices(&mut filtered_indices, &timezones, &favorites);
         Self {
@@ -280,7 +280,7 @@ impl App {
 
     pub fn cycle_theme(&mut self) {
         self.theme = self.theme.next();
-        self.theme.save();
+        self.save_config();
     }
 
     pub fn toggle_favorites_filter(&mut self) {
@@ -296,7 +296,7 @@ impl App {
             } else {
                 self.favorites.push(tz_name);
             }
-            self.save_favorites();
+            self.save_config();
             self.apply_filter();
         }
     }
@@ -307,7 +307,7 @@ impl App {
             if let Some(pos) = self.favorites.iter().position(|n| n == &tz_name) {
                 if pos > 0 {
                     self.favorites.swap(pos, pos - 1);
-                    self.save_favorites();
+                    self.save_config();
                     self.apply_filter();
                     self.selected_row = self.selected_row.saturating_sub(1);
                 }
@@ -321,7 +321,7 @@ impl App {
             if let Some(pos) = self.favorites.iter().position(|n| n == &tz_name) {
                 if pos + 1 < self.favorites.len() {
                     self.favorites.swap(pos, pos + 1);
-                    self.save_favorites();
+                    self.save_config();
                     self.apply_filter();
                     if self.selected_row + 1 < self.filtered_indices.len() {
                         self.selected_row += 1;
@@ -366,31 +366,11 @@ impl App {
         });
     }
 
-    fn favorites_path() -> Option<PathBuf> {
-        dirs_fallback().map(|d| d.join("lazytimezone").join("favorites"))
-    }
-
-    fn load_favorites() -> Vec<String> {
-        Self::favorites_path()
-            .and_then(|path| fs::read_to_string(path).ok())
-            .map(|contents| {
-                contents
-                    .lines()
-                    .map(|line| line.trim().to_string())
-                    .filter(|line| !line.is_empty())
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    fn save_favorites(&self) {
-        if let Some(path) = Self::favorites_path() {
-            if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            let contents = self.favorites.join("\n");
-            let _ = fs::write(&path, contents);
-        }
+    fn save_config(&self) {
+        config::save(&config::Config {
+            theme: self.theme.label().to_string(),
+            favorites: self.favorites.clone(),
+        });
     }
 
     /// Copies the selected timezone's current time to the system

@@ -10,7 +10,8 @@
 //!              ├── app       Core state: selection, search, favorites, theme
 //!              ├── events    Keyboard input → App mutations
 //!              ├── ui        App state → ratatui Frame rendering
-//!              ├── theme     Color palettes with persistence (~/.config)
+//!              ├── config    TOML persistence (~/.config/lazytimezone/config.toml)
+//!              ├── theme     Color palettes
 //!              └── timezone  Static catalogue of 50+ world cities
 //! ```
 //!
@@ -19,6 +20,7 @@
 //! state — everything lives in the single [`app::App`] instance.
 
 mod app;
+mod config;
 mod events;
 mod theme;
 mod timezone;

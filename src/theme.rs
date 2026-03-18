@@ -1,6 +1,4 @@
-//! # Theme system — six colour palettes with disk persistence.
-//!
-//! ## Design
+//! # Theme system — six colour palettes.
 //!
 //! Each theme is a flat [`ThemeColors`] struct with semantic colour
 //! slots (`accent`, `good`, `warning`, …) rather than component-
@@ -8,15 +6,9 @@
 //! [`Style`](ratatui::style::Style) values, keeping theme definitions
 //! decoupled from widget details.
 //!
-//! ## Persistence
-//!
-//! The active theme is saved as a plain-text label (e.g. `"Nord"`)
-//! to `~/.config/lazytimezone/theme`. Loading falls back to
-//! [`Theme::Default`] if the file is missing or unrecognised.
+//! Persistence is handled by the [`config`](crate::config) module.
 
 use ratatui::style::Color;
-use std::fs;
-use std::path::PathBuf;
 
 /// Available colour themes, cycled with the `t` key.
 ///
@@ -65,27 +57,7 @@ impl Theme {
         }
     }
 
-    fn config_path() -> Option<PathBuf> {
-        dirs_fallback().map(|d| d.join("lazytimezone").join("theme"))
-    }
-
-    pub fn save(&self) {
-        if let Some(path) = Self::config_path() {
-            if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            let _ = fs::write(&path, self.label());
-        }
-    }
-
-    pub fn load() -> Self {
-        Self::config_path()
-            .and_then(|path| fs::read_to_string(path).ok())
-            .map(|s| Self::from_label(s.trim()))
-            .unwrap_or(Theme::Default)
-    }
-
-    fn from_label(s: &str) -> Self {
+    pub fn from_label(s: &str) -> Self {
         match s {
             "Dracula" => Theme::Dracula,
             "Solarized" => Theme::Solarized,
@@ -97,24 +69,15 @@ impl Theme {
     }
 }
 
-/// Returns `~/.config` by reading `$HOME`. Used by both theme and
-/// favorites persistence. Avoids pulling in the `dirs` crate for a
-/// single path lookup.
-pub(crate) fn dirs_fallback() -> Option<PathBuf> {
-    std::env::var("HOME")
-        .ok()
-        .map(|h| PathBuf::from(h).join(".config"))
-}
-
 // ============================================================================
 // Colour palette
 // ============================================================================
 
 /// Semantic colour slots consumed by the UI layer.
 ///
-/// Colours use `Color::Reset` for the terminal's own foreground/background
-/// where possible, so the Default theme works on both light and dark
-/// terminals. Named themes override with explicit RGB values.
+/// All themes use hardcoded RGB values for consistent rendering across
+/// terminals. Only `bg` uses `Color::Reset` for terminal background
+/// transparency.
 #[allow(dead_code)]
 pub struct ThemeColors {
     pub bg: Color,
