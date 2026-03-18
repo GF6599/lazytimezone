@@ -88,6 +88,8 @@ pub struct ThemeColors {
     pub title: Color,
     /// Row highlight in the timezone table.
     pub highlight_bg: Color,
+    /// Forced foreground for highlighted rows (overrides per-cell fg).
+    pub highlight_fg: Color,
     /// Primary accent — daytime clock digits, search-active border.
     pub accent: Color,
     /// Secondary accent — nighttime clock digits.
@@ -106,19 +108,20 @@ pub struct ThemeColors {
 fn default_colors() -> ThemeColors {
     ThemeColors {
         bg: Color::Reset,
-        fg: Color::Reset,
-        muted: Color::DarkGray,
-        border: Color::DarkGray,
-        title: Color::Green,
-        highlight_bg: Color::DarkGray,
-        accent: Color::Cyan,
-        accent_secondary: Color::Yellow,
-        good: Color::Green,
-        warning: Color::Yellow,
-        info: Color::Cyan,
-        status_bg: Color::Blue,
-        status_fg: Color::White,
-        star: Color::Yellow,
+        fg: Color::Rgb(200, 204, 212),
+        muted: Color::Rgb(108, 115, 128),
+        border: Color::Rgb(68, 74, 87),
+        title: Color::Rgb(126, 207, 154),
+        highlight_bg: Color::Rgb(55, 60, 72),
+        highlight_fg: Color::White,
+        accent: Color::Rgb(100, 200, 220),
+        accent_secondary: Color::Rgb(228, 196, 108),
+        good: Color::Rgb(126, 207, 154),
+        warning: Color::Rgb(228, 196, 108),
+        info: Color::Rgb(100, 200, 220),
+        status_bg: Color::Rgb(90, 130, 180),
+        status_fg: Color::Rgb(235, 238, 245),
+        star: Color::Rgb(228, 196, 108),
     }
 }
 
@@ -130,6 +133,7 @@ fn dracula_colors() -> ThemeColors {
         border: Color::Rgb(68, 71, 90),
         title: Color::Rgb(80, 250, 123),
         highlight_bg: Color::Rgb(68, 71, 90),
+        highlight_fg: Color::Rgb(248, 248, 242),
         accent: Color::Rgb(139, 233, 253),
         accent_secondary: Color::Rgb(241, 250, 140),
         good: Color::Rgb(80, 250, 123),
@@ -149,6 +153,7 @@ fn solarized_colors() -> ThemeColors {
         border: Color::Rgb(7, 54, 66),
         title: Color::Rgb(133, 153, 0),
         highlight_bg: Color::Rgb(7, 54, 66),
+        highlight_fg: Color::Rgb(131, 148, 150),
         accent: Color::Rgb(38, 139, 210),
         accent_secondary: Color::Rgb(181, 137, 0),
         good: Color::Rgb(133, 153, 0),
@@ -168,6 +173,7 @@ fn nord_colors() -> ThemeColors {
         border: Color::Rgb(59, 66, 82),
         title: Color::Rgb(163, 190, 140),
         highlight_bg: Color::Rgb(59, 66, 82),
+        highlight_fg: Color::Rgb(216, 222, 233),
         accent: Color::Rgb(136, 192, 208),
         accent_secondary: Color::Rgb(235, 203, 139),
         good: Color::Rgb(163, 190, 140),
@@ -187,6 +193,7 @@ fn monokai_colors() -> ThemeColors {
         border: Color::Rgb(73, 72, 62),
         title: Color::Rgb(166, 226, 46),
         highlight_bg: Color::Rgb(73, 72, 62),
+        highlight_fg: Color::Rgb(248, 248, 242),
         accent: Color::Rgb(102, 217, 239),
         accent_secondary: Color::Rgb(253, 151, 31),
         good: Color::Rgb(166, 226, 46),
@@ -206,6 +213,7 @@ fn gruvbox_colors() -> ThemeColors {
         border: Color::Rgb(80, 73, 69),
         title: Color::Rgb(184, 187, 38),
         highlight_bg: Color::Rgb(80, 73, 69),
+        highlight_fg: Color::Rgb(235, 219, 178),
         accent: Color::Rgb(131, 165, 152),
         accent_secondary: Color::Rgb(250, 189, 47),
         good: Color::Rgb(184, 187, 38),

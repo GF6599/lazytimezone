@@ -417,6 +417,7 @@ fn draw_table(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect, tc:
         )
         .row_highlight_style(
             Style::default()
+                .fg(tc.highlight_fg)
                 .bg(tc.highlight_bg)
                 .add_modifier(Modifier::BOLD),
         )
