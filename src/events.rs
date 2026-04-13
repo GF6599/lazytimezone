@@ -27,6 +27,10 @@ pub fn handle_events(app: &mut App) -> std::io::Result<()> {
         if key.kind != KeyEventKind::Press {
             return Ok(());
         }
+        if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+            app.should_quit = true;
+            return Ok(());
+        }
         match app.input_mode {
             InputMode::Normal => handle_normal_mode(app, key),
             InputMode::Search => handle_search_mode(app, key),
@@ -52,7 +56,7 @@ fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::PageUp => app.page_up(),
         KeyCode::Char('/') => app.enter_search(),
         KeyCode::Char('t') => app.cycle_theme(),
-        KeyCode::Char('c') => app.copy_time(),
+        KeyCode::Char('c') if !key.modifiers.contains(KeyModifiers::CONTROL) => app.copy_time(),
         KeyCode::Char('f') => app.toggle_favorite(),
         KeyCode::Char('F') => app.toggle_favorites_filter(),
         KeyCode::Char('J') => app.move_favorite_down(),
