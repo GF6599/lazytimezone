@@ -234,13 +234,19 @@ impl App {
                     let city = entry.city.to_lowercase();
                     let country = entry.country.to_lowercase();
                     let region = entry.region.to_lowercase();
+                    let aliases_lower: Vec<String> =
+                        entry.aliases.iter().map(|a| a.to_lowercase()).collect();
                     let offset_secs = now
                         .with_timezone(&entry.tz)
                         .offset()
                         .fix()
                         .local_minus_utc();
                     let offset_str = format_utc_offset(offset_secs).to_lowercase();
-                    let haystack = format!("{} {} {} {}", city, country, region, offset_str);
+                    let aliases_str = aliases_lower.join(" ");
+                    let haystack = format!(
+                        "{} {} {} {} {}",
+                        city, country, region, offset_str, aliases_str
+                    );
                     let all_match = filter_terms.iter().all(|t| haystack.contains(t.as_str()));
                     if !all_match {
                         return None;
@@ -253,6 +259,10 @@ impl App {
                             score += 75;
                         } else if city.contains(term.as_str()) {
                             score += 50;
+                        } else if aliases_lower.iter().any(|a| a == term) {
+                            score += 45;
+                        } else if aliases_lower.iter().any(|a| a.contains(term.as_str())) {
+                            score += 40;
                         } else if country.contains(term.as_str()) {
                             score += 30;
                         } else if region.contains(term.as_str()) {
