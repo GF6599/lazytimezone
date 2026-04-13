@@ -376,19 +376,59 @@ impl App {
     /// Copies the selected timezone's current time to the system
     /// clipboard in compact ISO-ish format (`YYYYMMDDTHHMMTz`).
     ///
-    /// Uses macOS `pbcopy` — will silently fail on other platforms.
+    /// Uses platform-specific clipboard tools:
+    /// - macOS: `pbcopy`
+    /// - Windows: `clip`
+    /// - Linux: `wl-copy` (Wayland) with `xclip` fallback (X11)
     pub fn copy_time(&mut self) {
         let now = Utc::now().with_timezone(&self.selected_timezone);
         let formatted = now.format("%Y%m%dT%H%M%Z").to_string();
-        if let Ok(mut child) = std::process::Command::new("pbcopy")
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-        {
-            if let Some(ref mut stdin) = child.stdin {
-                let _ = stdin.write_all(formatted.as_bytes());
+        for (cmd, args) in clipboard_commands() {
+            if pipe_to_command(cmd, args, &formatted) {
+                self.copied_flash = Some(Instant::now());
+                return;
             }
-            let _ = child.wait();
-            self.copied_flash = Some(Instant::now());
         }
     }
+}
+
+/// Pipes `text` into a command's stdin and returns `true` if it succeeds.
+fn pipe_to_command(cmd: &str, args: &[&str], text: &str) -> bool {
+    let Ok(mut child) = std::process::Command::new(cmd)
+        .args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    else {
+        return false;
+    };
+    if let Some(ref mut stdin) = child.stdin {
+        let _ = stdin.write_all(text.as_bytes());
+    }
+    child.wait().is_ok_and(|s| s.success())
+}
+
+/// Returns the platform-appropriate clipboard command(s) to try, in priority order.
+#[cfg(target_os = "macos")]
+fn clipboard_commands() -> Vec<(&'static str, &'static [&'static str])> {
+    vec![("pbcopy", &[])]
+}
+
+#[cfg(target_os = "windows")]
+fn clipboard_commands() -> Vec<(&'static str, &'static [&'static str])> {
+    vec![("clip", &[])]
+}
+
+#[cfg(target_os = "linux")]
+fn clipboard_commands() -> Vec<(&'static str, &'static [&'static str])> {
+    vec![
+        ("wl-copy", &[]),
+        ("xclip", &["-selection", "clipboard"] as &[&str]),
+    ]
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+fn clipboard_commands() -> Vec<(&'static str, &'static [&'static str])> {
+    vec![]
 }
