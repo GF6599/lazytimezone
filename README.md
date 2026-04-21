@@ -69,14 +69,24 @@ lazytimezone
 | `Ctrl-u` | Clear search |
 | `Esc` / `Enter` | Exit search |
 
-Search is case-insensitive with AND logic across whitespace-separated terms. You can search by city name, region, or UTC offset:
+Search is case-insensitive with AND logic across whitespace-separated terms. It ignores punctuation, understands IANA timezone IDs, and also indexes common area keywords such as state names and timezone-family labels. Offset searches use each timezone's current UTC offset, so DST-aware cities move seasonally.
+
+When a search hits an alias city or a displayable geographic keyword, the table shows that matched label even if the underlying timezone entry is grouped under a representative city.
 
 | Query | Matches |
 |---|---|
 | `london` | London |
 | `asia` | All Asian timezones |
+| `america/new_york` | New York |
+| `boston` | Boston (America/New_York) |
+| `st johns` | `St. John's` entries |
+| `texas` | Texas (mapped to U.S. Central Time) |
+| `eastern time` | New York / Toronto |
 | `+5:30` | UTC+5:30 (Mumbai) |
-| `UTC-8` | UTC-8 timezones (Los Angeles, etc.) |
+| `+0530` | UTC+5:30 (Mumbai, Colombo) |
+| `UTC-10` | UTC-10 timezones (Honolulu) |
+| `GMT-10:00` | UTC-10 timezones (Honolulu) |
+| `united states` | USA timezones |
 | `asia +9` | Asian cities at UTC+9 (Tokyo, Seoul) |
 
 ## Themes

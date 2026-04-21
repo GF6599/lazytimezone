@@ -349,7 +349,8 @@ fn draw_table(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect, tc:
 
     let rows: Vec<Row> = app.filtered_indices[viewport_start..viewport_end]
         .iter()
-        .map(|&idx| {
+        .zip(app.filtered_display_names[viewport_start..viewport_end].iter())
+        .map(|(&idx, &display_name)| {
             let entry = &app.timezones[idx];
             let local = now.with_timezone(&entry.tz);
             let offset_secs = local.offset().fix().local_minus_utc();
@@ -366,10 +367,10 @@ fn draw_table(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect, tc:
             let city_cell = if is_fav {
                 Cell::from(Line::from(vec![
                     Span::styled("\u{2605} ", Style::default().fg(tc.star)),
-                    Span::styled(entry.city, Style::default().fg(tc.fg)),
+                    Span::styled(display_name, Style::default().fg(tc.fg)),
                 ]))
             } else {
-                Cell::from(entry.city).style(Style::default().fg(tc.fg))
+                Cell::from(display_name).style(Style::default().fg(tc.fg))
             };
 
             Row::new(vec![
