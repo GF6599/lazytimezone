@@ -15,6 +15,7 @@
 //! | Favorites | `favorites`, `show_favorites_only` | Yes (`~/.config/lazytimezone/config.toml`) |
 //! | Feedback | `copied_flash` | No |
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::time::Instant;
 
@@ -24,7 +25,10 @@ use chrono_tz::Tz;
 
 use crate::config;
 use crate::theme::Theme;
-use crate::timezone::{TimezoneEntry, all_timezones};
+use crate::timezone::{
+    SupplementalSearchTerm, TimezoneEntry, all_timezones, country_search_aliases,
+    supplemental_search_terms,
+};
 use crate::ui::format_utc_offset;
 
 /// Whether the app is accepting navigation keys or search text input.
@@ -76,6 +80,10 @@ pub struct App {
     /// Order determines display priority and side-clock slots.
     pub favorites: Vec<String>,
     pub show_favorites_only: bool,
+    /// Maps each favorite `Tz` to its position in `favorites` for
+    /// O(1) membership checks and order-preserving sorts. Rebuilt
+    /// whenever `favorites` changes.
+    favorites_order: HashMap<Tz, usize>,
     /// Set to `Some(Instant::now())` after a clipboard copy; the UI
     /// shows "Copied!" for 2 seconds then clears it.
     pub copied_flash: Option<Instant>,
@@ -93,12 +101,6 @@ impl SearchText {
             normalized: normalize_search_text(raw),
         }
     }
-}
-
-#[derive(Clone, Copy)]
-struct SupplementalSearchTerm {
-    raw: &'static str,
-    display_in_results: bool,
 }
 
 struct SearchKeyword {
@@ -176,8 +178,9 @@ impl App {
         let cfg = config::load();
         let theme = Theme::from_label(&cfg.theme);
         let favorites = cfg.favorites;
+        let favorites_order = Self::build_favorites_order(&favorites);
         let mut filtered_indices: Vec<usize> = (0..timezones.len()).collect();
-        Self::sort_indices(&mut filtered_indices, &timezones, &favorites);
+        Self::sort_indices(&mut filtered_indices, &timezones, &favorites_order);
         let filtered_display_names = filtered_indices
             .iter()
             .map(|&idx| timezones[idx].city)
@@ -196,9 +199,22 @@ impl App {
             search_index,
             theme,
             favorites,
+            favorites_order,
             show_favorites_only: false,
             copied_flash: None,
         }
+    }
+
+    fn build_favorites_order(favorites: &[String]) -> HashMap<Tz, usize> {
+        favorites
+            .iter()
+            .enumerate()
+            .filter_map(|(i, s)| s.parse::<Tz>().ok().map(|tz| (tz, i)))
+            .collect()
+    }
+
+    fn rebuild_favorites_order(&mut self) {
+        self.favorites_order = Self::build_favorites_order(&self.favorites);
     }
 
     pub fn move_up(&mut self) {
@@ -229,9 +245,7 @@ impl App {
     }
 
     pub fn end(&mut self) {
-        if !self.filtered_indices.is_empty() {
-            self.selected_row = self.filtered_indices.len() - 1;
-        }
+        self.selected_row = self.filtered_indices.len().saturating_sub(1);
     }
 
     pub fn select_timezone(&mut self) {
@@ -304,6 +318,7 @@ impl App {
                 return;
             }
             let now = Utc::now();
+            let mut offset_cache: HashMap<i32, Vec<String>> = HashMap::new();
             let mut scored: Vec<(usize, &'static str, u32)> = base_indices
                 .into_iter()
                 .filter_map(|i| {
@@ -313,7 +328,9 @@ impl App {
                         .offset()
                         .fix()
                         .local_minus_utc();
-                    let offset_terms = offset_search_terms(offset_secs);
+                    let offset_terms = offset_cache
+                        .entry(offset_secs)
+                        .or_insert_with(|| offset_search_terms(offset_secs));
                     let mut score =
                         score_phrase_match(&query, &self.search_index[i], offset_terms.as_slice());
                     for term in &query.terms {
@@ -324,7 +341,7 @@ impl App {
                         }
                         score += term_score;
                     }
-                    if self.favorites.iter().any(|n| n == &entry.tz.to_string()) {
+                    if self.favorites_order.contains_key(&entry.tz) {
                         score += 10;
                     }
                     let display_name = best_display_name(entry, &self.search_index[i], &query);
@@ -357,43 +374,42 @@ impl App {
 
     pub fn toggle_favorite(&mut self) {
         if let Some((idx, _)) = self.current_result() {
-            let tz_name = self.timezones[idx].tz.to_string();
-            if let Some(pos) = self.favorites.iter().position(|n| n == &tz_name) {
+            let tz = self.timezones[idx].tz;
+            if let Some(&pos) = self.favorites_order.get(&tz) {
                 self.favorites.remove(pos);
             } else {
-                self.favorites.push(tz_name);
+                self.favorites.push(tz.to_string());
             }
+            self.rebuild_favorites_order();
             self.save_config();
             self.apply_filter();
         }
     }
 
     pub fn move_favorite_up(&mut self) {
-        if let Some((idx, _)) = self.current_result() {
-            let tz_name = self.timezones[idx].tz.to_string();
-            if let Some(pos) = self.favorites.iter().position(|n| n == &tz_name) {
-                if pos > 0 {
-                    self.favorites.swap(pos, pos - 1);
-                    self.save_config();
-                    self.apply_filter();
-                    self.selected_row = self.selected_row.saturating_sub(1);
-                }
-            }
+        if let Some((idx, _)) = self.current_result()
+            && let Some(&pos) = self.favorites_order.get(&self.timezones[idx].tz)
+            && pos > 0
+        {
+            self.favorites.swap(pos, pos - 1);
+            self.rebuild_favorites_order();
+            self.save_config();
+            self.apply_filter();
+            self.selected_row = self.selected_row.saturating_sub(1);
         }
     }
 
     pub fn move_favorite_down(&mut self) {
-        if let Some((idx, _)) = self.current_result() {
-            let tz_name = self.timezones[idx].tz.to_string();
-            if let Some(pos) = self.favorites.iter().position(|n| n == &tz_name) {
-                if pos + 1 < self.favorites.len() {
-                    self.favorites.swap(pos, pos + 1);
-                    self.save_config();
-                    self.apply_filter();
-                    if self.selected_row + 1 < self.filtered_indices.len() {
-                        self.selected_row += 1;
-                    }
-                }
+        if let Some((idx, _)) = self.current_result()
+            && let Some(&pos) = self.favorites_order.get(&self.timezones[idx].tz)
+            && pos + 1 < self.favorites.len()
+        {
+            self.favorites.swap(pos, pos + 1);
+            self.rebuild_favorites_order();
+            self.save_config();
+            self.apply_filter();
+            if self.selected_row + 1 < self.filtered_indices.len() {
+                self.selected_row += 1;
             }
         }
     }
@@ -403,17 +419,18 @@ impl App {
             .iter()
             .take(count)
             .filter_map(|name| {
+                let tz: Tz = name.parse().ok()?;
                 self.timezones
                     .iter()
-                    .find(|e| e.tz.to_string() == *name)
+                    .find(|e| e.tz == tz)
                     .map(|e| (e.tz, e.city))
             })
             .collect()
     }
 
     pub fn is_favorite(&self, tz_index: usize) -> bool {
-        let tz_name = self.timezones[tz_index].tz.to_string();
-        self.favorites.iter().any(|n| n == &tz_name)
+        self.favorites_order
+            .contains_key(&self.timezones[tz_index].tz)
     }
 
     fn current_result(&self) -> Option<(usize, &'static str)> {
@@ -429,11 +446,7 @@ impl App {
     fn base_indices(&self) -> Vec<usize> {
         if self.show_favorites_only {
             (0..self.timezones.len())
-                .filter(|&i| {
-                    self.favorites
-                        .iter()
-                        .any(|n| n == &self.timezones[i].tz.to_string())
-                })
+                .filter(|&i| self.favorites_order.contains_key(&self.timezones[i].tz))
                 .collect()
         } else {
             (0..self.timezones.len()).collect()
@@ -441,7 +454,7 @@ impl App {
     }
 
     fn set_sorted_results(&mut self, mut indices: Vec<usize>) {
-        Self::sort_indices(&mut indices, &self.timezones, &self.favorites);
+        Self::sort_indices(&mut indices, &self.timezones, &self.favorites_order);
         let results: Vec<_> = indices
             .into_iter()
             .map(|idx| (idx, self.timezones[idx].city))
@@ -472,14 +485,16 @@ impl App {
 
     /// Sorts indices so favourites appear first (in user-defined order),
     /// followed by non-favourites sorted alphabetically by city name.
-    fn sort_indices(indices: &mut Vec<usize>, timezones: &[TimezoneEntry], favorites: &[String]) {
+    fn sort_indices(
+        indices: &mut [usize],
+        timezones: &[TimezoneEntry],
+        favorites_order: &HashMap<Tz, usize>,
+    ) {
         indices.sort_by(|&a, &b| {
-            let a_name = timezones[a].tz.to_string();
-            let b_name = timezones[b].tz.to_string();
-            let a_fav = favorites.iter().position(|n| n == &a_name);
-            let b_fav = favorites.iter().position(|n| n == &b_name);
-            match (a_fav, b_fav) {
-                (Some(ai), Some(bi)) => ai.cmp(&bi),
+            let a_pos = favorites_order.get(&timezones[a].tz);
+            let b_pos = favorites_order.get(&timezones[b].tz);
+            match (a_pos, b_pos) {
+                (Some(ai), Some(bi)) => ai.cmp(bi),
                 (Some(_), None) => std::cmp::Ordering::Less,
                 (None, Some(_)) => std::cmp::Ordering::Greater,
                 (None, None) => timezones[a].city.cmp(timezones[b].city),
@@ -631,7 +646,6 @@ fn best_display_name(
 
     match best_non_city {
         Some((label, score)) if score > city_score && score > 0 => label,
-        _ if city_score > 0 => entry.city,
         _ => entry.city,
     }
 }
@@ -750,633 +764,6 @@ fn push_unique(values: &mut Vec<String>, value: String) {
     }
 }
 
-fn country_search_aliases(country: &str) -> &'static [&'static str] {
-    match country {
-        "USA" => &["US", "United States", "United States of America", "America"],
-        "UK" => &["United Kingdom", "Britain", "Great Britain", "England"],
-        "UAE" => &["United Arab Emirates", "Emirates"],
-        _ => &[],
-    }
-}
-
-fn supplemental_search_terms(entry: &TimezoneEntry) -> &'static [SupplementalSearchTerm] {
-    match entry.tz {
-        Tz::Pacific__Honolulu => &[
-            SupplementalSearchTerm {
-                raw: "Hawaii",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Hawaii Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Hawaii-Aleutian Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "HST",
-                display_in_results: false,
-            },
-        ],
-        Tz::America__Anchorage => &[
-            SupplementalSearchTerm {
-                raw: "Alaska",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Alaska Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "AKST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "AKDT",
-                display_in_results: false,
-            },
-        ],
-        Tz::America__Los_Angeles => &[
-            SupplementalSearchTerm {
-                raw: "Pacific Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Pacific",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "PT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "PST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "PDT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "California",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Oregon",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Washington State",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Nevada",
-                display_in_results: true,
-            },
-        ],
-        Tz::America__Vancouver => &[
-            SupplementalSearchTerm {
-                raw: "Pacific Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Pacific",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "PT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "PST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "PDT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "British Columbia",
-                display_in_results: true,
-            },
-        ],
-        Tz::America__Denver => &[
-            SupplementalSearchTerm {
-                raw: "Mountain Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Mountain",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "MT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "MST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "MDT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Colorado",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Utah",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "New Mexico",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Wyoming",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Montana",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Idaho",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "West Texas",
-                display_in_results: true,
-            },
-        ],
-        Tz::America__Phoenix => &[
-            SupplementalSearchTerm {
-                raw: "Arizona",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Mountain Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Mountain",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "MT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "MST",
-                display_in_results: false,
-            },
-        ],
-        Tz::America__Chicago => &[
-            SupplementalSearchTerm {
-                raw: "Central Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Central",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "CT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "CST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "CDT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Texas",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Illinois",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Minnesota",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Wisconsin",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Missouri",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Louisiana",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Oklahoma",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Kansas",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Nebraska",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Iowa",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Arkansas",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Mississippi",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Alabama",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Tennessee",
-                display_in_results: true,
-            },
-        ],
-        Tz::America__Mexico_City => &[
-            SupplementalSearchTerm {
-                raw: "Central Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Central",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "CT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "CST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "CDT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "CDMX",
-                display_in_results: true,
-            },
-        ],
-        Tz::America__New_York => &[
-            SupplementalSearchTerm {
-                raw: "Eastern Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Eastern",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "ET",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "EST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "EDT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Florida",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Georgia",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Massachusetts",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Pennsylvania",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Virginia",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "New Jersey",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Maryland",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Connecticut",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Maine",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Ohio",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Michigan",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "North Carolina",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "South Carolina",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "District of Columbia",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "DC",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Delaware",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "New Hampshire",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Vermont",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "West Virginia",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Rhode Island",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Kentucky",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Indiana",
-                display_in_results: true,
-            },
-        ],
-        Tz::America__Toronto => &[
-            SupplementalSearchTerm {
-                raw: "Eastern Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Eastern",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "ET",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "EST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "EDT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Ontario",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Quebec",
-                display_in_results: true,
-            },
-        ],
-        Tz::America__Halifax => &[
-            SupplementalSearchTerm {
-                raw: "Atlantic Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Atlantic",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "AT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "AST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "ADT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Nova Scotia",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "New Brunswick",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Prince Edward Island",
-                display_in_results: true,
-            },
-        ],
-        Tz::America__St_Johns => &[
-            SupplementalSearchTerm {
-                raw: "Newfoundland",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Newfoundland Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "NST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "NDT",
-                display_in_results: false,
-            },
-        ],
-        Tz::Europe__London => &[
-            SupplementalSearchTerm {
-                raw: "Greenwich Mean Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "British Summer Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "GMT",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "BST",
-                display_in_results: false,
-            },
-        ],
-        Tz::Europe__Paris | Tz::Europe__Berlin => &[
-            SupplementalSearchTerm {
-                raw: "Central European Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Central Europe",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "CET",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "CEST",
-                display_in_results: false,
-            },
-        ],
-        Tz::Europe__Athens | Tz::Africa__Cairo => &[
-            SupplementalSearchTerm {
-                raw: "Eastern European Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Eastern Europe",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "EET",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "EEST",
-                display_in_results: false,
-            },
-        ],
-        Tz::Asia__Kolkata => &[
-            SupplementalSearchTerm {
-                raw: "India Standard Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "IST",
-                display_in_results: false,
-            },
-        ],
-        Tz::Asia__Tokyo => &[
-            SupplementalSearchTerm {
-                raw: "Japan Standard Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "JST",
-                display_in_results: false,
-            },
-        ],
-        Tz::Australia__Perth => &[
-            SupplementalSearchTerm {
-                raw: "Western Australia",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Australian Western Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "AWST",
-                display_in_results: false,
-            },
-        ],
-        Tz::Australia__Adelaide => &[
-            SupplementalSearchTerm {
-                raw: "South Australia",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Northern Territory",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Australian Central Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "Central Australia",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "ACST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "ACDT",
-                display_in_results: false,
-            },
-        ],
-        Tz::Australia__Sydney => &[
-            SupplementalSearchTerm {
-                raw: "New South Wales",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Victoria",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Queensland",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Tasmania",
-                display_in_results: true,
-            },
-            SupplementalSearchTerm {
-                raw: "Australian Eastern Time",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "AEST",
-                display_in_results: false,
-            },
-            SupplementalSearchTerm {
-                raw: "AEDT",
-                display_in_results: false,
-            },
-        ],
-        _ => &[],
-    }
-}
-
 fn normalize_search_text(value: &str) -> String {
     let mut normalized = String::with_capacity(value.len());
     let mut last_was_space = true;
@@ -1405,7 +792,10 @@ fn normalize_search_text(value: &str) -> String {
         }
     }
 
-    normalized.trim().to_string()
+    while normalized.ends_with(' ') {
+        normalized.pop();
+    }
+    normalized
 }
 
 #[cfg(test)]
@@ -1416,8 +806,9 @@ mod tests {
         let timezones = all_timezones();
         let search_index = timezones.iter().map(TimezoneSearchData::new).collect();
         let favorites = Vec::new();
+        let favorites_order = App::build_favorites_order(&favorites);
         let mut filtered_indices: Vec<usize> = (0..timezones.len()).collect();
-        App::sort_indices(&mut filtered_indices, &timezones, &favorites);
+        App::sort_indices(&mut filtered_indices, &timezones, &favorites_order);
         let filtered_display_names = filtered_indices
             .iter()
             .map(|&idx| timezones[idx].city)
@@ -1436,6 +827,7 @@ mod tests {
             selected_city_name: "UTC".to_string(),
             theme: Theme::Default,
             favorites,
+            favorites_order,
             show_favorites_only: false,
             copied_flash: None,
         }
@@ -1538,6 +930,201 @@ mod tests {
 
         assert_eq!(app.selected_row, 0);
     }
+
+    // ── Navigation ──────────────────────────────────────────────────
+
+    #[test]
+    fn move_up_at_top_stays_at_zero() {
+        let mut app = test_app();
+        app.selected_row = 0;
+        app.move_up();
+        assert_eq!(app.selected_row, 0);
+    }
+
+    #[test]
+    fn move_down_at_bottom_stays_at_last() {
+        let mut app = test_app();
+        let last = app.filtered_indices.len() - 1;
+        app.selected_row = last;
+        app.move_down();
+        assert_eq!(app.selected_row, last);
+    }
+
+    #[test]
+    fn page_up_saturates_at_zero() {
+        let mut app = test_app();
+        app.selected_row = 3;
+        app.page_up();
+        assert_eq!(app.selected_row, 0);
+    }
+
+    #[test]
+    fn page_down_clamps_to_last() {
+        let mut app = test_app();
+        let last = app.filtered_indices.len() - 1;
+        app.selected_row = last - 2;
+        app.page_down();
+        assert_eq!(app.selected_row, last);
+    }
+
+    #[test]
+    fn home_and_end() {
+        let mut app = test_app();
+        app.selected_row = 50;
+        app.home();
+        assert_eq!(app.selected_row, 0);
+
+        app.end();
+        assert_eq!(app.selected_row, app.filtered_indices.len() - 1);
+    }
+
+    #[test]
+    fn end_on_empty_list_is_safe() {
+        let mut app = test_app();
+        // Force an empty filter result
+        apply_query(&mut app, "zzzzzznotaquery");
+        assert!(app.filtered_indices.is_empty());
+
+        app.end();
+        assert_eq!(app.selected_row, 0);
+    }
+
+    #[test]
+    fn navigation_on_empty_list_is_safe() {
+        let mut app = test_app();
+        apply_query(&mut app, "zzzzzznotaquery");
+        assert!(app.filtered_indices.is_empty());
+
+        app.move_up();
+        app.move_down();
+        app.page_up();
+        app.page_down();
+        app.home();
+        app.end();
+        assert_eq!(app.selected_row, 0);
+    }
+
+    // ── Favorites ───────────────────────────────────────────────────
+
+    #[test]
+    fn toggle_favorite_adds_and_removes() {
+        let mut app = test_app();
+        app.selected_row = 0;
+        app.select_timezone();
+        let tz_name = app.selected_timezone.to_string();
+
+        assert!(!app.favorites.contains(&tz_name));
+        app.toggle_favorite();
+        assert!(app.favorites.contains(&tz_name));
+        assert!(app.favorites_order.contains_key(&app.selected_timezone));
+
+        app.toggle_favorite();
+        assert!(!app.favorites.contains(&tz_name));
+        assert!(!app.favorites_order.contains_key(&app.selected_timezone));
+    }
+
+    #[test]
+    fn favorites_filter_shows_only_favorites() {
+        let mut app = test_app();
+        let total = app.filtered_indices.len();
+
+        // Add one favorite
+        app.selected_row = 0;
+        app.select_timezone();
+        app.toggle_favorite();
+        assert_eq!(app.filtered_indices.len(), total);
+
+        // Toggle favorites-only mode
+        app.toggle_favorites_filter();
+        assert_eq!(app.filtered_indices.len(), 1);
+
+        // Toggle back
+        app.toggle_favorites_filter();
+        assert_eq!(app.filtered_indices.len(), total);
+    }
+
+    #[test]
+    fn favorites_appear_first_in_sort_order() {
+        let mut app = test_app();
+        // Navigate to a city that wouldn't normally be first alphabetically
+        apply_query(&mut app, "tokyo");
+        app.select_timezone();
+        let tokyo_idx = app.filtered_indices[0];
+
+        // Clear search and toggle favorite
+        app.enter_search();
+        app.exit_search();
+        app.apply_filter();
+
+        // Find Tokyo in the unfiltered list — shouldn't be first
+        let pos_before = app
+            .filtered_indices
+            .iter()
+            .position(|&i| i == tokyo_idx)
+            .unwrap();
+        assert!(pos_before > 0);
+
+        // Favorite it
+        app.selected_row = pos_before;
+        app.toggle_favorite();
+
+        // Now Tokyo should be first
+        assert_eq!(app.filtered_indices[0], tokyo_idx);
+    }
+
+    // ── Theme ───────────────────────────────────────────────────────
+
+    #[test]
+    fn cycle_theme_wraps_around() {
+        let mut app = test_app();
+        assert_eq!(app.theme, Theme::Default);
+
+        let themes = [
+            Theme::Dracula,
+            Theme::Solarized,
+            Theme::Nord,
+            Theme::Monokai,
+            Theme::Gruvbox,
+            Theme::Default,
+        ];
+        for expected in themes {
+            app.theme = app.theme.next();
+            assert_eq!(app.theme, expected);
+        }
+    }
+
+    #[test]
+    fn theme_from_label_round_trips() {
+        for theme in [
+            Theme::Default,
+            Theme::Dracula,
+            Theme::Solarized,
+            Theme::Nord,
+            Theme::Monokai,
+            Theme::Gruvbox,
+        ] {
+            assert_eq!(Theme::from_label(theme.label()), theme);
+        }
+    }
+
+    #[test]
+    fn theme_from_label_unknown_defaults() {
+        assert_eq!(Theme::from_label("NonExistent"), Theme::Default);
+        assert_eq!(Theme::from_label(""), Theme::Default);
+    }
+
+    // ── Select timezone ─────────────────────────────────────────────
+
+    #[test]
+    fn select_timezone_updates_state() {
+        let mut app = test_app();
+        assert_eq!(app.selected_timezone, chrono_tz::Tz::UTC);
+
+        apply_query(&mut app, "tokyo");
+        app.select_timezone();
+        assert_eq!(app.selected_timezone, chrono_tz::Tz::Asia__Tokyo);
+        assert_eq!(app.selected_city_name, "Tokyo");
+    }
 }
 
 /// Pipes `text` into a command's stdin and returns `true` if it succeeds.
@@ -1559,24 +1146,21 @@ fn pipe_to_command(cmd: &str, args: &[&str], text: &str) -> bool {
 
 /// Returns the platform-appropriate clipboard command(s) to try, in priority order.
 #[cfg(target_os = "macos")]
-fn clipboard_commands() -> Vec<(&'static str, &'static [&'static str])> {
-    vec![("pbcopy", &[])]
+fn clipboard_commands() -> &'static [(&'static str, &'static [&'static str])] {
+    &[("pbcopy", &[])]
 }
 
 #[cfg(target_os = "windows")]
-fn clipboard_commands() -> Vec<(&'static str, &'static [&'static str])> {
-    vec![("clip", &[])]
+fn clipboard_commands() -> &'static [(&'static str, &'static [&'static str])] {
+    &[("clip", &[])]
 }
 
 #[cfg(target_os = "linux")]
-fn clipboard_commands() -> Vec<(&'static str, &'static [&'static str])> {
-    vec![
-        ("wl-copy", &[]),
-        ("xclip", &["-selection", "clipboard"] as &[&str]),
-    ]
+fn clipboard_commands() -> &'static [(&'static str, &'static [&'static str])] {
+    &[("wl-copy", &[]), ("xclip", &["-selection", "clipboard"])]
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-fn clipboard_commands() -> Vec<(&'static str, &'static [&'static str])> {
-    vec![]
+fn clipboard_commands() -> &'static [(&'static str, &'static [&'static str])] {
+    &[]
 }

@@ -1841,3 +1841,638 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
         },
     ]
 }
+
+#[derive(Clone, Copy)]
+pub(crate) struct SupplementalSearchTerm {
+    pub raw: &'static str,
+    pub display_in_results: bool,
+}
+
+pub(crate) fn country_search_aliases(country: &str) -> &'static [&'static str] {
+    match country {
+        "USA" => &["US", "United States", "United States of America", "America"],
+        "UK" => &["United Kingdom", "Britain", "Great Britain", "England"],
+        "UAE" => &["United Arab Emirates", "Emirates"],
+        _ => &[],
+    }
+}
+
+pub(crate) fn supplemental_search_terms(
+    entry: &TimezoneEntry,
+) -> &'static [SupplementalSearchTerm] {
+    match entry.tz {
+        Tz::Pacific__Honolulu => &[
+            SupplementalSearchTerm {
+                raw: "Hawaii",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Hawaii Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Hawaii-Aleutian Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "HST",
+                display_in_results: false,
+            },
+        ],
+        Tz::America__Anchorage => &[
+            SupplementalSearchTerm {
+                raw: "Alaska",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Alaska Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "AKST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "AKDT",
+                display_in_results: false,
+            },
+        ],
+        Tz::America__Los_Angeles => &[
+            SupplementalSearchTerm {
+                raw: "Pacific Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Pacific",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "PT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "PST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "PDT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "California",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Oregon",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Washington State",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Nevada",
+                display_in_results: true,
+            },
+        ],
+        Tz::America__Vancouver => &[
+            SupplementalSearchTerm {
+                raw: "Pacific Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Pacific",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "PT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "PST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "PDT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "British Columbia",
+                display_in_results: true,
+            },
+        ],
+        Tz::America__Denver => &[
+            SupplementalSearchTerm {
+                raw: "Mountain Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Mountain",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "MT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "MST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "MDT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Colorado",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Utah",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "New Mexico",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Wyoming",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Montana",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Idaho",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "West Texas",
+                display_in_results: true,
+            },
+        ],
+        Tz::America__Phoenix => &[
+            SupplementalSearchTerm {
+                raw: "Arizona",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Mountain Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Mountain",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "MT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "MST",
+                display_in_results: false,
+            },
+        ],
+        Tz::America__Chicago => &[
+            SupplementalSearchTerm {
+                raw: "Central Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Central",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CDT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Texas",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Illinois",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Minnesota",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Wisconsin",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Missouri",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Louisiana",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Oklahoma",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Kansas",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Nebraska",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Iowa",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Arkansas",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Mississippi",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Alabama",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Tennessee",
+                display_in_results: true,
+            },
+        ],
+        Tz::America__Mexico_City => &[
+            SupplementalSearchTerm {
+                raw: "Central Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Central",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CDT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CDMX",
+                display_in_results: true,
+            },
+        ],
+        Tz::America__New_York => &[
+            SupplementalSearchTerm {
+                raw: "Eastern Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Eastern",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "ET",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "EST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "EDT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Florida",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Georgia",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Massachusetts",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Pennsylvania",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Virginia",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "New Jersey",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Maryland",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Connecticut",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Maine",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Ohio",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Michigan",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "North Carolina",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "South Carolina",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "District of Columbia",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "DC",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Delaware",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "New Hampshire",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Vermont",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "West Virginia",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Rhode Island",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Kentucky",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Indiana",
+                display_in_results: true,
+            },
+        ],
+        Tz::America__Toronto => &[
+            SupplementalSearchTerm {
+                raw: "Eastern Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Eastern",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "ET",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "EST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "EDT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Ontario",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Quebec",
+                display_in_results: true,
+            },
+        ],
+        Tz::America__Halifax => &[
+            SupplementalSearchTerm {
+                raw: "Atlantic Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Atlantic",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "AT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "AST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "ADT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Nova Scotia",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "New Brunswick",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Prince Edward Island",
+                display_in_results: true,
+            },
+        ],
+        Tz::America__St_Johns => &[
+            SupplementalSearchTerm {
+                raw: "Newfoundland",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Newfoundland Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "NST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "NDT",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__London => &[
+            SupplementalSearchTerm {
+                raw: "Greenwich Mean Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "British Summer Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "GMT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "BST",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__Paris | Tz::Europe__Berlin => &[
+            SupplementalSearchTerm {
+                raw: "Central European Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Central Europe",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CET",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CEST",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__Athens | Tz::Africa__Cairo => &[
+            SupplementalSearchTerm {
+                raw: "Eastern European Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Eastern Europe",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "EET",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "EEST",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Kolkata => &[
+            SupplementalSearchTerm {
+                raw: "India Standard Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "IST",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Tokyo => &[
+            SupplementalSearchTerm {
+                raw: "Japan Standard Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "JST",
+                display_in_results: false,
+            },
+        ],
+        Tz::Australia__Perth => &[
+            SupplementalSearchTerm {
+                raw: "Western Australia",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Australian Western Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "AWST",
+                display_in_results: false,
+            },
+        ],
+        Tz::Australia__Adelaide => &[
+            SupplementalSearchTerm {
+                raw: "South Australia",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Northern Territory",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Australian Central Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Central Australia",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "ACST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "ACDT",
+                display_in_results: false,
+            },
+        ],
+        Tz::Australia__Sydney => &[
+            SupplementalSearchTerm {
+                raw: "New South Wales",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Victoria",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Queensland",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Tasmania",
+                display_in_results: true,
+            },
+            SupplementalSearchTerm {
+                raw: "Australian Eastern Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "AEST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "AEDT",
+                display_in_results: false,
+            },
+        ],
+        _ => &[],
+    }
+}
