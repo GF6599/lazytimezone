@@ -35,11 +35,17 @@ impl Default for Config {
     }
 }
 
-/// Returns `~/.config` by reading `$HOME`.
+/// Returns the base config directory, respecting `$XDG_CONFIG_HOME`
+/// with a fallback to `$HOME/.config`.
 fn config_dir() -> Option<PathBuf> {
-    std::env::var("HOME")
+    std::env::var("XDG_CONFIG_HOME")
         .ok()
-        .map(|h| PathBuf::from(h).join(".config"))
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .map(|h| PathBuf::from(h).join(".config"))
+        })
 }
 
 fn config_path() -> Option<PathBuf> {
@@ -65,11 +71,19 @@ pub fn load() -> Config {
 
 pub fn save(config: &Config) {
     let Some(path) = config_path() else { return };
-    if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+    if let Some(parent) = path.parent()
+        && let Err(e) = fs::create_dir_all(parent)
+    {
+        eprintln!("lazytimezone: failed to create config dir: {e}");
+        return;
     }
-    if let Ok(contents) = toml::to_string_pretty(config) {
-        let _ = fs::write(&path, contents);
+    match toml::to_string_pretty(config) {
+        Ok(contents) => {
+            if let Err(e) = fs::write(&path, contents) {
+                eprintln!("lazytimezone: failed to write config: {e}");
+            }
+        }
+        Err(e) => eprintln!("lazytimezone: failed to serialize config: {e}"),
     }
 }
 

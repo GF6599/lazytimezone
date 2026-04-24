@@ -42,6 +42,8 @@ use ratatui::{
 
 use tui_big_text::{BigText, PixelSize};
 
+use unicode_width::UnicodeWidthStr;
+
 use crate::app::{App, InputMode};
 use crate::theme::ThemeColors;
 
@@ -303,7 +305,8 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc
     frame.render_widget(p, area);
 
     if app.input_mode == InputMode::Search {
-        let x = area.x + app.cursor_position as u16 + 1;
+        let display_width = app.search_query[..app.cursor_position].width() as u16;
+        let x = area.x.saturating_add(display_width).saturating_add(1);
         let y = area.y + 1;
         frame.set_cursor_position((x, y));
     }

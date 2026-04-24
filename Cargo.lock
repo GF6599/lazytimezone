@@ -686,6 +686,7 @@ dependencies = [
  "serde",
  "toml",
  "tui-big-text",
+ "unicode-width",
 ]
 
 [[package]]

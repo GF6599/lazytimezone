@@ -78,7 +78,6 @@ impl Theme {
 /// All themes use hardcoded RGB values for consistent rendering across
 /// terminals. Only `bg` uses `Color::Reset` for terminal background
 /// transparency.
-#[allow(dead_code)]
 pub struct ThemeColors {
     pub bg: Color,
     pub fg: Color,
@@ -96,6 +95,7 @@ pub struct ThemeColors {
     pub accent_secondary: Color,
     /// Positive semantic colour (daytime local times, "Copied!" flash).
     pub good: Color,
+    #[allow(dead_code)]
     pub warning: Color,
     /// Informational colour (diff column, UTC offset).
     pub info: Color,
