@@ -375,7 +375,11 @@ fn draw_table(
             let time_color = if is_day { tc.good } else { tc.muted };
 
             let utc_offset = format_utc_offset(offset_secs);
-            let diff = format_diff(offset_secs, selected_offset_secs);
+            let diff = if entry.tz == app.selected_timezone {
+                "---".to_string()
+            } else {
+                format_diff(offset_secs, selected_offset_secs)
+            };
 
             let is_fav = app.is_favorite(idx);
             let city_cell = if is_fav {
@@ -502,12 +506,15 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc
 // ============================================================================
 
 /// Formats the hour difference between two UTC offsets.
-/// Returns `"---"` when both offsets are identical (same zone),
-/// otherwise `"+Nh"` / `"-N:MM"` etc.
+///
+/// Returns `"0h"` when offsets are identical but timezones differ
+/// (e.g. London/Lisbon both at UTC+0 in winter — distinct DST rules,
+/// same current offset). The caller is responsible for substituting
+/// `"---"` when the row IS the selected timezone.
 fn format_diff(offset_secs: i32, selected_offset_secs: i32) -> String {
     let diff_secs = offset_secs - selected_offset_secs;
     if diff_secs == 0 {
-        return "---".to_string();
+        return "0h".to_string();
     }
     let sign = if diff_secs > 0 { '+' } else { '-' };
     let abs = diff_secs.unsigned_abs();
