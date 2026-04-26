@@ -89,6 +89,9 @@ pub struct App {
     /// Set to `Some(Instant::now())` after a clipboard copy; the UI
     /// shows "Copied!" for 2 seconds then clears it.
     pub copied_flash: Option<Instant>,
+    /// When true, the UI renders a help popup over the main view.
+    /// Toggled by `?` and dismissed by any key while open.
+    pub show_help: bool,
 }
 
 struct SearchText {
@@ -213,7 +216,16 @@ impl App {
             favorites_order,
             show_favorites_only: false,
             copied_flash: None,
+            show_help: false,
         }
+    }
+
+    pub fn toggle_help(&mut self) {
+        self.show_help = !self.show_help;
+    }
+
+    pub fn close_help(&mut self) {
+        self.show_help = false;
     }
 
     fn build_favorites_order(favorites: &[String]) -> HashMap<Tz, usize> {

@@ -31,12 +31,12 @@ use chrono::offset::Offset;
 use chrono::{Timelike, Utc};
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{
-        Block, Borders, Cell, Paragraph, Row, Scrollbar, ScrollbarOrientation, ScrollbarState,
-        Table, TableState,
+        Block, Borders, Cell, Clear, Paragraph, Row, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Table, TableState,
     },
 };
 
@@ -72,6 +72,98 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     draw_search_bar(frame, app, outer[2], &tc);
     draw_table(frame, app, &now, outer[3], &tc);
     draw_status_bar(frame, app, outer[4], &tc);
+
+    if app.show_help {
+        draw_help_popup(frame, frame.area(), &tc);
+    }
+}
+
+/// Renders a centered help popup listing every keybinding, grouped
+/// by mode. Dismissed by any keypress (handled in `events.rs`).
+///
+/// Uses [`Clear`] to wipe the underlying cells before drawing, so
+/// the popup's transparent borders don't bleed background through.
+fn draw_help_popup(frame: &mut Frame, area: Rect, tc: &ThemeColors) {
+    let lines: Vec<Line> = vec![
+        Line::from(Span::styled(
+            "Normal mode",
+            Style::default().fg(tc.accent).add_modifier(Modifier::BOLD),
+        )),
+        help_row("j / k / ↑ ↓", "Move up / down", tc),
+        help_row("g / G", "Jump to top / bottom", tc),
+        help_row("Ctrl-d / Ctrl-u", "Page down / up", tc),
+        help_row("Enter", "Select timezone (set as main clock)", tc),
+        help_row("/", "Enter search mode", tc),
+        help_row("f", "Toggle favorite on selected row", tc),
+        help_row("F", "Toggle favorites-only filter", tc),
+        help_row("J / K", "Move favorite down / up in order", tc),
+        help_row("t", "Cycle theme", tc),
+        help_row("c", "Copy selected time to clipboard", tc),
+        help_row("?", "Toggle this help", tc),
+        help_row("q / Ctrl-c", "Quit", tc),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Search mode",
+            Style::default().fg(tc.accent).add_modifier(Modifier::BOLD),
+        )),
+        help_row("Type", "Filter timezones (AND across terms)", tc),
+        help_row("← / →", "Move cursor", tc),
+        help_row(
+            "Home / End",
+            "Jump to start / end (also Ctrl-a / Ctrl-e)",
+            tc,
+        ),
+        help_row("Backspace / Delete", "Delete previous / next char", tc),
+        help_row("Ctrl-u", "Clear search", tc),
+        help_row("Esc / Enter", "Exit search", tc),
+        Line::from(""),
+        Line::from(Span::styled(
+            "Press any key to dismiss",
+            Style::default().fg(tc.muted).add_modifier(Modifier::ITALIC),
+        )),
+    ];
+
+    let popup_height = (lines.len() as u16 + 2).min(area.height.saturating_sub(2));
+    let popup_width: u16 = 64;
+    let popup = centered_rect(popup_width, popup_height, area);
+
+    frame.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(tc.accent))
+        .title(" Help ")
+        .title_style(Style::default().fg(tc.title).add_modifier(Modifier::BOLD));
+
+    let paragraph = Paragraph::new(lines)
+        .block(block)
+        .style(Style::default().fg(tc.fg).bg(tc.bg));
+    frame.render_widget(paragraph, popup);
+}
+
+/// Two-column help row: key on the left (fixed-width, bold), description on the right (muted).
+fn help_row(key: &'static str, desc: &'static str, tc: &ThemeColors) -> Line<'static> {
+    Line::from(vec![
+        Span::raw("  "),
+        Span::styled(
+            format!("{:<20}", key),
+            Style::default().fg(tc.good).add_modifier(Modifier::BOLD),
+        ),
+        Span::raw("  "),
+        Span::styled(desc.to_string(), Style::default().fg(tc.muted)),
+    ])
+}
+
+/// Centers a rect of `(w, h)` inside `area`, clamping to fit.
+fn centered_rect(w: u16, h: u16, area: Rect) -> Rect {
+    let w = w.min(area.width);
+    let h = h.min(area.height);
+    Rect {
+        x: area.x + (area.width - w) / 2,
+        y: area.y + (area.height - h) / 2,
+        width: w,
+        height: h,
+    }
 }
 
 fn draw_title_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc: &ThemeColors) {
@@ -490,9 +582,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc
     );
 
     let hints = match app.input_mode {
-        InputMode::Normal => {
-            " q:quit  j/k:nav  Enter:select  /:search  f:fav  F:fav-only  J/K:reorder  t:theme  c:copy"
-        }
+        InputMode::Normal => " q:quit  /:search  f:fav  t:theme  c:copy  ?:help",
         InputMode::Search => " Esc/Enter:close  Ctrl-u:clear",
     };
     let hint_span = Span::styled(hints, Style::default().fg(tc.muted));

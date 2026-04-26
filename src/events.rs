@@ -33,6 +33,12 @@ pub fn handle_events(app: &mut App, timeout: Duration) -> std::io::Result<()> {
             app.should_quit = true;
             return Ok(());
         }
+        // Help is modal: any key dismisses it before reaching the
+        // mode-specific handlers below.
+        if app.show_help {
+            app.close_help();
+            return Ok(());
+        }
         match app.input_mode {
             InputMode::Normal => handle_normal_mode(app, key),
             InputMode::Search => handle_search_mode(app, key),
@@ -64,6 +70,7 @@ fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Char('J') => app.move_favorite_down(),
         KeyCode::Char('K') => app.move_favorite_up(),
         KeyCode::Enter => app.select_timezone(),
+        KeyCode::Char('?') => app.toggle_help(),
         _ => {}
     }
 }
