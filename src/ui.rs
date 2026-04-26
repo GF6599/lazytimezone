@@ -52,11 +52,6 @@ use crate::theme::ThemeColors;
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let tc = app.theme.colors();
 
-    if tc.bg != ratatui::style::Color::Reset {
-        let bg_block = Block::default().style(Style::default().bg(tc.bg));
-        frame.render_widget(bg_block, frame.area());
-    }
-
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
