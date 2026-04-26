@@ -1122,6 +1122,46 @@ mod tests {
         assert_eq!(app.selected_timezone, chrono_tz::Tz::Asia__Tokyo);
         assert_eq!(app.selected_city_name, "Tokyo");
     }
+
+    /// Regression test: prior to commit b4b2ccf, `move_favorite_up`
+    /// and `move_favorite_down` swapped entries in `favorites` but did
+    /// not rebuild `favorites_order`, so the next sort used stale
+    /// positions and the visual reorder did not take effect.
+    #[test]
+    fn reorder_favorites_updates_sort_order_immediately() {
+        let mut app = test_app();
+
+        let favs = [
+            ("tokyo", chrono_tz::Tz::Asia__Tokyo),
+            ("london", chrono_tz::Tz::Europe__London),
+            ("paris", chrono_tz::Tz::Europe__Paris),
+        ];
+        for (query, _) in favs {
+            apply_query(&mut app, query);
+            app.toggle_favorite();
+        }
+
+        apply_query(&mut app, "");
+        assert_eq!(app.timezones[app.filtered_indices[0]].tz, favs[0].1);
+        assert_eq!(app.timezones[app.filtered_indices[1]].tz, favs[1].1);
+        assert_eq!(app.timezones[app.filtered_indices[2]].tz, favs[2].1);
+
+        app.selected_row = 0;
+        app.move_favorite_down();
+
+        assert_eq!(app.timezones[app.filtered_indices[0]].tz, favs[1].1);
+        assert_eq!(app.timezones[app.filtered_indices[1]].tz, favs[0].1);
+        assert_eq!(app.timezones[app.filtered_indices[2]].tz, favs[2].1);
+        assert_eq!(app.favorites_order[&favs[0].1], 1);
+        assert_eq!(app.favorites_order[&favs[1].1], 0);
+
+        app.selected_row = 2;
+        app.move_favorite_up();
+
+        assert_eq!(app.timezones[app.filtered_indices[0]].tz, favs[1].1);
+        assert_eq!(app.timezones[app.filtered_indices[1]].tz, favs[2].1);
+        assert_eq!(app.timezones[app.filtered_indices[2]].tz, favs[0].1);
+    }
 }
 
 /// Pipes `text` into a command's stdin and returns `true` if it succeeds.
