@@ -52,12 +52,24 @@ fn run_tui() -> std::io::Result<()> {
 
     let mut app = app::App::new();
 
+    // Tick rate matches the clock's display granularity (1 s).
+    // Idle iterations sleep until the next second boundary instead of
+    // polling at 20 Hz, which keeps battery usage low. Key events
+    // wake the loop immediately so input feels instant.
+    let tick_rate = std::time::Duration::from_secs(1);
+    let mut last_tick = std::time::Instant::now();
+
     loop {
         terminal.draw(|frame| {
             ui::draw(frame, &mut app);
         })?;
 
-        events::handle_events(&mut app)?;
+        let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+        events::handle_events(&mut app, timeout)?;
+
+        if last_tick.elapsed() >= tick_rate {
+            last_tick = std::time::Instant::now();
+        }
 
         if app.should_quit {
             break;

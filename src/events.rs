@@ -14,14 +14,16 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 
 use crate::app::{App, InputMode};
 
-/// Polls for a key event with a 50 ms timeout.
+/// Polls for a key event for at most `timeout`.
 ///
-/// The short timeout keeps the UI responsive (clocks update roughly
-/// every 50 ms) without busy-spinning. Only `KeyEventKind::Press`
-/// is handled — release and repeat events are ignored to prevent
-/// duplicate actions on platforms that emit them.
-pub fn handle_events(app: &mut App) -> std::io::Result<()> {
-    if event::poll(Duration::from_millis(50))?
+/// The caller (the event loop in `main`) computes `timeout` so the
+/// poll wakes at the next tick boundary, keeping clock updates tight
+/// (≤ tick) while drawing only once per tick when idle.
+///
+/// Only `KeyEventKind::Press` is handled — release and repeat events
+/// are ignored to prevent duplicate actions on platforms that emit them.
+pub fn handle_events(app: &mut App, timeout: Duration) -> std::io::Result<()> {
+    if event::poll(timeout)?
         && let Event::Key(key) = event::read()?
     {
         if key.kind != KeyEventKind::Press {
