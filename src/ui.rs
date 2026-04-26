@@ -49,8 +49,12 @@ use crate::theme::ThemeColors;
 
 /// Top-level render entry point — splits the frame into five vertical
 /// zones and delegates to specialised draw functions.
+///
+/// `Utc::now()` is sampled once at the start of the frame and threaded
+/// through to all child draws so every part of the UI agrees on "now".
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let tc = app.theme.colors();
+    let now = Utc::now();
 
     let outer = Layout::default()
         .direction(Direction::Vertical)
@@ -64,9 +68,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         .split(frame.area());
 
     draw_title_bar(frame, app, outer[0], &tc);
-    draw_big_clock(frame, app, outer[1], &tc);
+    draw_big_clock(frame, app, &now, outer[1], &tc);
     draw_search_bar(frame, app, outer[2], &tc);
-    draw_table(frame, app, outer[3], &tc);
+    draw_table(frame, app, &now, outer[3], &tc);
     draw_status_bar(frame, app, outer[4], &tc);
 }
 
@@ -109,8 +113,13 @@ fn draw_title_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc:
 /// When the terminal is wide enough (>60 + 24n cols), up to 2
 /// favourite timezones are shown as smaller Quadrant-pixel clocks
 /// beside the main HalfHeight clock.
-fn draw_big_clock(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc: &ThemeColors) {
-    let utc_now = Utc::now();
+fn draw_big_clock(
+    frame: &mut Frame,
+    app: &App,
+    utc_now: &chrono::DateTime<Utc>,
+    area: ratatui::layout::Rect,
+    tc: &ThemeColors,
+) {
     let now = utc_now.with_timezone(&app.selected_timezone);
     let hour = now.hour();
     let is_day = (6..18).contains(&hour);
@@ -208,7 +217,7 @@ fn draw_big_clock(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc:
             .split(side_area);
 
         for (i, &&(tz, city)) in side_tzs.iter().take(num_sides).enumerate() {
-            draw_side_clock(frame, &utc_now, tz, city, side_chunks[i], tc);
+            draw_side_clock(frame, utc_now, tz, city, side_chunks[i], tc);
         }
     }
 }
@@ -318,8 +327,13 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc
 /// `filtered_indices`, keeping render cost O(visible) rather than
 /// O(total). The `TableState` selection index is then offset by
 /// `viewport_start` so the highlight tracks correctly.
-fn draw_table(frame: &mut Frame, app: &mut App, area: ratatui::layout::Rect, tc: &ThemeColors) {
-    let now = Utc::now();
+fn draw_table(
+    frame: &mut Frame,
+    app: &mut App,
+    now: &chrono::DateTime<Utc>,
+    area: ratatui::layout::Rect,
+    tc: &ThemeColors,
+) {
     let selected_offset_secs = now
         .with_timezone(&app.selected_timezone)
         .offset()
