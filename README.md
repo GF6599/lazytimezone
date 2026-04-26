@@ -58,7 +58,7 @@ lazytimezone
 | `/` | Enter search mode |
 | `t` | Cycle theme |
 | `c` | Copy time to clipboard |
-| `q` / `Esc` | Quit |
+| `q` / `Ctrl-c` | Quit |
 
 #### Search mode
 

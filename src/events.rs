@@ -43,7 +43,7 @@ pub fn handle_events(app: &mut App) -> std::io::Result<()> {
 /// favorites, `J/K` reorder favorites, `t` cycles themes, `c` copies.
 fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
     match key.code {
-        KeyCode::Char('q') | KeyCode::Esc => {
+        KeyCode::Char('q') => {
             app.should_quit = true;
         }
         KeyCode::Char('j') | KeyCode::Down => app.move_down(),
