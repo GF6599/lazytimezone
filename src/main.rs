@@ -42,11 +42,10 @@ fn main() -> std::io::Result<()> {
 fn run_tui() -> std::io::Result<()> {
     crossterm::terminal::enable_raw_mode()?;
     let mut stdout = std::io::stdout();
-    crossterm::execute!(
-        stdout,
-        crossterm::terminal::EnterAlternateScreen,
-        crossterm::event::EnableMouseCapture
-    )?;
+    // Mouse capture is intentionally NOT enabled: we have no mouse
+    // handlers, and enabling it would break native terminal text
+    // selection (users would have to hold Shift/Option to select).
+    crossterm::execute!(stdout, crossterm::terminal::EnterAlternateScreen)?;
 
     let backend = ratatui::backend::CrosstermBackend::new(stdout);
     let mut terminal = ratatui::Terminal::new(backend)?;
@@ -69,8 +68,7 @@ fn run_tui() -> std::io::Result<()> {
     crossterm::terminal::disable_raw_mode()?;
     crossterm::execute!(
         terminal.backend_mut(),
-        crossterm::terminal::LeaveAlternateScreen,
-        crossterm::event::DisableMouseCapture
+        crossterm::terminal::LeaveAlternateScreen
     )?;
     terminal.show_cursor()?;
 
