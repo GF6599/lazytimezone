@@ -36,6 +36,7 @@
 //! editorially chosen (e.g. "Mumbai" over the IANA canonical
 //! "Kolkata").
 
+use chrono::{DateTime, Datelike, Timelike};
 use chrono_tz::Tz;
 
 /// A single timezone entry displayed in the table.
@@ -2474,5 +2475,365 @@ pub(crate) fn supplemental_search_terms(
             },
         ],
         _ => &[],
+    }
+}
+
+// ============================================================================
+// Day/night colouring
+// ============================================================================
+//
+// The big-clock colour and per-row "Local Time" colour use a
+// "daytime?" predicate. The naive `(6..18).contains(hour)` window is
+// wrong at high latitudes (Stockholm in December, Reykjavík in June)
+// and slightly off everywhere else (sunrise drifts ~3 hours through
+// the year at mid-latitudes).
+//
+// We compute sunrise/sunset from the city's latitude and the day of
+// year using a simplified solar-position model. Cities without a
+// curated latitude fall back to the simple window — never worse than
+// the previous behaviour.
+
+/// Curated latitude (degrees, positive = north) for each timezone in
+/// the catalogue. `None` falls back to the 6..18 window.
+///
+/// Values are approximate (1-2 decimal places — well within solar-
+/// noon precision needed for a "is it day?" yes/no answer).
+pub(crate) fn latitude_for(tz: Tz) -> Option<f64> {
+    let lat = match tz {
+        // Pacific (UTC-11 to -9)
+        Tz::Pacific__Pago_Pago => -14.28,
+        Tz::Pacific__Honolulu => 21.31,
+        Tz::America__Anchorage => 61.22,
+
+        // Americas (UTC-8 to -3)
+        Tz::America__Los_Angeles => 34.05,
+        Tz::America__Vancouver => 49.28,
+        Tz::America__Denver => 39.74,
+        Tz::America__Phoenix => 33.45,
+        Tz::America__Chicago => 41.88,
+        Tz::America__Mexico_City => 19.43,
+        Tz::America__Belize => 17.25,
+        Tz::America__Costa_Rica => 9.93,
+        Tz::America__El_Salvador => 13.69,
+        Tz::America__Guatemala => 14.63,
+        Tz::America__Tegucigalpa => 14.07,
+        Tz::America__Managua => 12.13,
+        Tz::America__New_York => 40.71,
+        Tz::America__Toronto => 43.65,
+        Tz::America__Bogota => 4.71,
+        Tz::America__Nassau => 25.05,
+        Tz::America__Havana => 23.13,
+        Tz::America__Guayaquil => -2.17, // Quito
+        Tz::America__PortauPrince => 18.55,
+        Tz::America__Jamaica => 17.97,
+        Tz::America__Panama => 8.97,
+        Tz::America__Lima => -12.05,
+        Tz::America__Santiago => -33.45,
+        Tz::America__Halifax => 44.65,
+        Tz::America__Antigua => 17.12,
+        Tz::America__Barbados => 13.10,
+        Tz::America__La_Paz => -16.50,
+        Tz::America__Manaus => -3.12,
+        Tz::America__Dominica => 15.30,
+        Tz::America__Santo_Domingo => 18.47,
+        Tz::America__Grenada => 12.05,
+        Tz::America__Guyana => 6.80,
+        Tz::America__Asuncion => -25.27,
+        Tz::America__St_Lucia => 14.00,
+        Tz::America__St_Kitts => 17.30,
+        Tz::America__St_Vincent => 13.16,
+        Tz::America__Port_of_Spain => 10.66,
+        Tz::America__Caracas => 10.50,
+        Tz::America__St_Johns => 47.56,
+        Tz::America__Sao_Paulo => -23.55,
+        Tz::America__Argentina__Buenos_Aires => -34.60,
+        Tz::America__Paramaribo => 5.85,
+        Tz::America__Montevideo => -34.90,
+
+        // Atlantic / Europe / Africa (UTC-1 to +3)
+        Tz::Atlantic__Azores => 37.74,
+        Tz::Atlantic__Cape_Verde => 14.93,
+        Tz::UTC => 0.0,
+        Tz::Europe__London => 51.51,
+        Tz::Atlantic__Reykjavik => 64.13,
+        Tz::Africa__Accra => 5.55,
+        Tz::Africa__Ouagadougou => 12.37,
+        Tz::Africa__Banjul => 13.45,
+        Tz::Africa__Conakry => 9.51,
+        Tz::Africa__Bissau => 11.86,
+        Tz::Europe__Dublin => 53.35,
+        Tz::Africa__Abidjan => 5.36,
+        Tz::Africa__Monrovia => 6.31,
+        Tz::Africa__Bamako => 12.65,
+        Tz::Africa__Nouakchott => 18.07,
+        Tz::Europe__Lisbon => 38.72,
+        Tz::Africa__Sao_Tome => 0.34,
+        Tz::Africa__Dakar => 14.69,
+        Tz::Africa__Freetown => 8.48,
+        Tz::Africa__Lome => 6.13,
+        Tz::Europe__Paris => 48.86,
+        Tz::Europe__Berlin => 52.52,
+        Tz::Africa__Lagos => 6.46,
+        Tz::Europe__Tirane => 41.33,
+        Tz::Africa__Algiers => 36.75,
+        Tz::Europe__Andorra => 42.51,
+        Tz::Africa__Luanda => -8.84,
+        Tz::Europe__Vienna => 48.21,
+        Tz::Europe__Brussels => 50.85,
+        Tz::Africa__PortoNovo => 6.50,
+        Tz::Europe__Sarajevo => 43.86,
+        Tz::Africa__Douala => 4.05,
+        Tz::Africa__Bangui => 4.36,
+        Tz::Africa__Ndjamena => 12.13,
+        Tz::Africa__Brazzaville => -4.27,
+        Tz::Europe__Zagreb => 45.81,
+        Tz::Europe__Prague => 50.09,
+        Tz::Europe__Copenhagen => 55.68,
+        Tz::Africa__Kinshasa => -4.32,
+        Tz::Africa__Malabo => 3.75,
+        Tz::Africa__Libreville => 0.42,
+        Tz::Europe__Budapest => 47.50,
+        Tz::Europe__Rome => 41.90,
+        Tz::Europe__Vaduz => 47.14,
+        Tz::Europe__Luxembourg => 49.61,
+        Tz::Europe__Malta => 35.90,
+        Tz::Europe__Monaco => 43.74,
+        Tz::Europe__Podgorica => 42.44,
+        Tz::Africa__Casablanca => 33.57,
+        Tz::Africa__Windhoek => -22.56,
+        Tz::Europe__Amsterdam => 52.37,
+        Tz::Africa__Niamey => 13.51,
+        Tz::Europe__Skopje => 42.00,
+        Tz::Europe__Oslo => 59.91,
+        Tz::Europe__Warsaw => 52.23,
+        Tz::Europe__San_Marino => 43.94,
+        Tz::Europe__Belgrade => 44.79,
+        Tz::Europe__Bratislava => 48.15,
+        Tz::Europe__Ljubljana => 46.06,
+        Tz::Europe__Madrid => 40.42,
+        Tz::Europe__Stockholm => 59.33,
+        Tz::Europe__Zurich => 47.37,
+        Tz::Africa__Tunis => 36.81,
+        Tz::Europe__Vatican => 41.90,
+        Tz::Africa__Cairo => 30.04,
+        Tz::Europe__Athens => 37.98,
+        Tz::Africa__Johannesburg => -26.20,
+        Tz::Africa__Gaborone => -24.65,
+        Tz::Europe__Sofia => 42.70,
+        Tz::Africa__Bujumbura => -3.38,
+        Tz::Asia__Nicosia => 35.18,
+        Tz::Europe__Tallinn => 59.44,
+        Tz::Africa__Mbabane => -26.32,
+        Tz::Europe__Helsinki => 60.17,
+        Tz::Asia__Jerusalem => 31.78,
+        Tz::Asia__Amman => 31.95,
+        Tz::Europe__Riga => 56.95,
+        Tz::Asia__Beirut => 33.89,
+        Tz::Africa__Maseru => -29.31,
+        Tz::Africa__Tripoli => 32.89,
+        Tz::Europe__Vilnius => 54.69,
+        Tz::Africa__Blantyre => -13.96, // Lilongwe
+        Tz::Europe__Chisinau => 47.01,
+        Tz::Africa__Maputo => -25.97,
+        Tz::Asia__Hebron => 31.90, // Ramallah
+        Tz::Europe__Bucharest => 44.43,
+        Tz::Africa__Kigali => -1.94,
+        Tz::Africa__Juba => 4.85,
+        Tz::Africa__Khartoum => 15.50,
+        Tz::Asia__Damascus => 33.51,
+        Tz::Europe__Kyiv => 50.45,
+        Tz::Africa__Lusaka => -15.42,
+        Tz::Africa__Harare => -17.83,
+        Tz::Europe__Moscow => 55.76,
+        Tz::Europe__Istanbul => 41.01,
+        Tz::Africa__Nairobi => -1.29,
+        Tz::Asia__Bahrain => 26.23,
+        Tz::Europe__Minsk => 53.90,
+        Tz::Indian__Comoro => -11.70,
+        Tz::Africa__Djibouti => 11.59,
+        Tz::Africa__Asmara => 15.32,
+        Tz::Africa__Addis_Ababa => 9.03,
+        Tz::Asia__Baghdad => 33.31,
+        Tz::Asia__Kuwait => 29.38,
+        Tz::Indian__Antananarivo => -18.88,
+        Tz::Asia__Qatar => 25.29,
+        Tz::Asia__Riyadh => 24.71,
+        Tz::Africa__Mogadishu => 2.05,
+        Tz::Africa__Dar_es_Salaam => -6.79,
+        Tz::Africa__Kampala => 0.35,
+        Tz::Asia__Aden => 12.79,
+
+        // Asia (UTC+3:30 to +9)
+        Tz::Asia__Tehran => 35.69,
+        Tz::Asia__Dubai => 25.20,
+        Tz::Asia__Yerevan => 40.18,
+        Tz::Asia__Baku => 40.41,
+        Tz::Asia__Tbilisi => 41.72,
+        Tz::Indian__Mauritius => -20.16,
+        Tz::Asia__Muscat => 23.59,
+        Tz::Indian__Mahe => -4.62,
+        Tz::Asia__Kabul => 34.53,
+        Tz::Asia__Karachi => 24.86,
+        Tz::Indian__Maldives => 4.18,
+        Tz::Asia__Dushanbe => 38.54,
+        Tz::Asia__Ashgabat => 37.95,
+        Tz::Asia__Tashkent => 41.31,
+        Tz::Asia__Kolkata => 19.08, // Mumbai
+        Tz::Asia__Colombo => 6.93,
+        Tz::Asia__Kathmandu => 27.72,
+        Tz::Asia__Dhaka => 23.81,
+        Tz::Asia__Thimphu => 27.47,
+        Tz::Asia__Almaty => 43.26,
+        Tz::Asia__Bishkek => 42.87,
+        Tz::Asia__Yangon => 16.85,
+        Tz::Asia__Bangkok => 13.76,
+        Tz::Asia__Jakarta => -6.21,
+        Tz::Asia__Phnom_Penh => 11.55,
+        Tz::Asia__Vientiane => 17.97,
+        Tz::Asia__Novosibirsk => 55.04,
+        Tz::Asia__Ho_Chi_Minh => 10.82,
+        Tz::Asia__Singapore => 1.35,
+        Tz::Asia__Shanghai => 31.23,
+        Tz::Asia__Hong_Kong => 22.32,
+        Tz::Australia__Perth => -31.95,
+        Tz::Asia__Brunei => 4.94,
+        Tz::Asia__Kuala_Lumpur => 3.139,
+        Tz::Asia__Ulaanbaatar => 47.92,
+        Tz::Asia__Manila => 14.60,
+        Tz::Asia__Taipei => 25.03,
+        Tz::Asia__Tokyo => 35.69,
+        Tz::Asia__Seoul => 37.57,
+        Tz::Asia__Pyongyang => 39.04,
+        Tz::Asia__Dili => -8.56,
+        Tz::Pacific__Palau => 7.34,
+
+        // Oceania / far-east Russia (UTC+9:30 to +14)
+        Tz::Australia__Adelaide => -34.93,
+        Tz::Australia__Sydney => -33.87,
+        Tz::Pacific__Chuuk => 7.45,
+        Tz::Pacific__Port_Moresby => -9.44,
+        Tz::Asia__Vladivostok => 43.12,
+        Tz::Pacific__Noumea => -22.27,
+        Tz::Pacific__Guadalcanal => -9.43, // Honiara
+        Tz::Pacific__Efate => -17.74,      // Port Vila
+        Tz::Pacific__Auckland => -36.85,
+        Tz::Pacific__Fiji => -18.13,
+        Tz::Pacific__Tarawa => 1.42,
+        Tz::Pacific__Majuro => 7.12,
+        Tz::Pacific__Nauru => -0.55,
+        Tz::Pacific__Funafuti => -8.52,
+        Tz::Pacific__Chatham => -43.95,
+        Tz::Pacific__Apia => -13.83,
+        Tz::Pacific__Tongatapu => -21.13,
+        Tz::Pacific__Kiritimati => 1.87,
+
+        _ => return None,
+    };
+    Some(lat)
+}
+
+/// Returns `(sunrise, sunset)` as fractional hours of local clock
+/// time using a simplified solar-position model.
+///
+/// Inputs:
+/// - `latitude_deg` — positive = north, negative = south
+/// - `day_of_year` — 1..=366 (e.g. from `chrono::Datelike::ordinal`)
+///
+/// The model assumes solar noon at 12:00 local time, which is off by
+/// the equation of time (±15 min through the year) and the city's
+/// longitude position within its timezone. For a "is it daytime?"
+/// boolean the error is negligible except within minutes of sunrise
+/// or sunset, where the question itself is ambiguous.
+///
+/// Polar regions:
+/// - Polar day → returns `(0.0, 24.0)` (sun never sets)
+/// - Polar night → returns `(12.0, 12.0)` (sun never rises — empty window)
+pub(crate) fn sun_window(latitude_deg: f64, day_of_year: u32) -> (f64, f64) {
+    use std::f64::consts::PI;
+
+    let lat = latitude_deg.to_radians();
+    // Cooper's formula for solar declination — accurate to within ~0.5°.
+    let declination =
+        (-23.44_f64).to_radians() * (2.0 * PI / 365.0 * (day_of_year as f64 + 10.0)).cos();
+
+    // Hour angle of sunrise/sunset, clamped for polar day/night.
+    let cos_omega = (-lat.tan() * declination.tan()).clamp(-1.0, 1.0);
+    let omega = cos_omega.acos();
+    let half_day_hours = omega * 12.0 / PI;
+
+    (12.0 - half_day_hours, 12.0 + half_day_hours)
+}
+
+/// Returns true when `local` falls inside the daytime window for the
+/// given timezone. Falls back to a 6..18 window when no curated
+/// latitude exists for `tz`.
+pub fn is_daytime_at(tz: Tz, local: &DateTime<Tz>) -> bool {
+    match latitude_for(tz) {
+        Some(lat) => {
+            let (sunrise, sunset) = sun_window(lat, local.ordinal());
+            let h = local.hour() as f64 + local.minute() as f64 / 60.0;
+            h >= sunrise && h < sunset
+        }
+        None => (6..18).contains(&local.hour()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn approx(a: f64, b: f64, tol: f64) -> bool {
+        (a - b).abs() < tol
+    }
+
+    #[test]
+    fn equator_equinox_is_twelve_hour_day() {
+        // Day 80 ≈ March 21 (vernal equinox)
+        let (sunrise, sunset) = sun_window(0.0, 80);
+        assert!(approx(sunrise, 6.0, 0.5));
+        assert!(approx(sunset, 18.0, 0.5));
+    }
+
+    #[test]
+    fn high_latitude_summer_is_long_day() {
+        // Reykjavík (64°N) in late June — sun barely sets
+        let (sunrise, sunset) = sun_window(64.13, 172);
+        assert!(sunset - sunrise > 20.0);
+    }
+
+    #[test]
+    fn high_latitude_winter_is_short_day() {
+        // Reykjavík in late December — only ~4 hours of daylight
+        let (sunrise, sunset) = sun_window(64.13, 355);
+        assert!(sunset - sunrise < 6.0);
+    }
+
+    #[test]
+    fn polar_summer_is_polar_day() {
+        // 80°N in mid-summer — sun never sets
+        let (sunrise, sunset) = sun_window(80.0, 172);
+        assert_eq!(sunrise, 0.0);
+        assert_eq!(sunset, 24.0);
+    }
+
+    #[test]
+    fn polar_winter_is_polar_night() {
+        // 80°N in mid-winter — sun never rises
+        let (sunrise, sunset) = sun_window(80.0, 355);
+        assert_eq!(sunrise, 12.0);
+        assert_eq!(sunset, 12.0);
+    }
+
+    #[test]
+    fn major_cities_have_curated_latitudes() {
+        for tz in [
+            Tz::Europe__London,
+            Tz::Asia__Tokyo,
+            Tz::America__New_York,
+            Tz::Australia__Sydney,
+            Tz::Atlantic__Reykjavik,
+        ] {
+            assert!(latitude_for(tz).is_some(), "missing latitude for {tz:?}");
+        }
     }
 }

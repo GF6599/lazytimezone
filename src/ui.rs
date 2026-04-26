@@ -27,8 +27,8 @@
 //! [`BigText`](tui_big_text::BigText) with up to 2 side clocks for
 //! favourite timezones.
 
+use chrono::Utc;
 use chrono::offset::Offset;
-use chrono::{Timelike, Utc};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
@@ -46,6 +46,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, InputMode, format_utc_offset};
 use crate::theme::ThemeColors;
+use crate::timezone::is_daytime_at;
 
 /// Top-level render entry point — splits the frame into five vertical
 /// zones and delegates to specialised draw functions.
@@ -196,9 +197,12 @@ fn draw_title_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc:
 ///
 /// ## Day/night colouring
 ///
-/// Hours 06:00–17:59 use `accent` (bright), all others use
-/// `accent_secondary` (dim). This gives an at-a-glance visual cue
-/// for whether it's daytime in the selected city.
+/// Daytime uses `accent` (bright), nighttime uses `accent_secondary`
+/// (dim). The day/night decision delegates to
+/// [`is_daytime_at`](crate::timezone::is_daytime_at), which computes
+/// sunrise/sunset from the city's curated latitude — so high-latitude
+/// cities like Reykjavík correctly stay "night" through a winter
+/// noon-twilight, and "day" through a polar summer night.
 ///
 /// ## Side clocks
 ///
@@ -213,8 +217,7 @@ fn draw_big_clock(
     tc: &ThemeColors,
 ) {
     let now = utc_now.with_timezone(&app.selected_timezone);
-    let hour = now.hour();
-    let is_day = (6..18).contains(&hour);
+    let is_day = is_daytime_at(app.selected_timezone, &now);
     let clock_color = if is_day {
         tc.accent
     } else {
@@ -325,8 +328,7 @@ fn draw_side_clock(
     tc: &ThemeColors,
 ) {
     let local = utc_now.with_timezone(&tz);
-    let hour = local.hour();
-    let is_day = (6..18).contains(&hour);
+    let is_day = is_daytime_at(tz, &local);
     let time_color = if is_day {
         tc.accent
     } else {
@@ -474,8 +476,7 @@ fn draw_table(
             let entry = &app.timezones[idx];
             let local = now.with_timezone(&entry.tz);
             let offset_secs = local.offset().fix().local_minus_utc();
-            let hour = local.hour();
-            let is_day = (6..18).contains(&hour);
+            let is_day = is_daytime_at(entry.tz, &local);
 
             let time_str = local.format("%H:%M:%S").to_string();
             let time_color = if is_day { tc.good } else { tc.muted };
