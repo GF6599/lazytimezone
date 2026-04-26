@@ -55,6 +55,9 @@ pub struct App {
 
     /// Full, immutable timezone catalogue loaded once at startup.
     pub timezones: Vec<TimezoneEntry>,
+    /// Maps each catalogue `Tz` to its index in `timezones`. Built
+    /// once at startup; never mutated.
+    tz_to_index: HashMap<Tz, usize>,
     /// Pre-normalized search metadata for each timezone entry.
     search_index: Vec<TimezoneSearchData>,
     /// Indices into `timezones` after applying search + favorites filter.
@@ -172,9 +175,17 @@ impl SearchQuery {
 
 impl App {
     pub fn new() -> Self {
+        Self::with_config(config::load())
+    }
+
+    fn with_config(cfg: config::Config) -> Self {
         let timezones = all_timezones();
+        let tz_to_index = timezones
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.tz, i))
+            .collect();
         let search_index = timezones.iter().map(TimezoneSearchData::new).collect();
-        let cfg = config::load();
         let theme = Theme::from_label(&cfg.theme);
         let favorites = cfg.favorites;
         let favorites_order = Self::build_favorites_order(&favorites);
@@ -195,6 +206,7 @@ impl App {
             selected_timezone: chrono_tz::Tz::UTC,
             selected_city_name: "UTC".to_string(),
             timezones,
+            tz_to_index,
             search_index,
             theme,
             favorites,
@@ -419,10 +431,8 @@ impl App {
             .take(count)
             .filter_map(|name| {
                 let tz: Tz = name.parse().ok()?;
-                self.timezones
-                    .iter()
-                    .find(|e| e.tz == tz)
-                    .map(|e| (e.tz, e.city))
+                let idx = *self.tz_to_index.get(&tz)?;
+                Some((tz, self.timezones[idx].city))
             })
             .collect()
     }
@@ -817,34 +827,7 @@ mod tests {
     use super::*;
 
     fn test_app() -> App {
-        let timezones = all_timezones();
-        let search_index = timezones.iter().map(TimezoneSearchData::new).collect();
-        let favorites = Vec::new();
-        let favorites_order = App::build_favorites_order(&favorites);
-        let mut filtered_indices: Vec<usize> = (0..timezones.len()).collect();
-        App::sort_indices(&mut filtered_indices, &timezones, &favorites_order);
-        let filtered_display_names = filtered_indices
-            .iter()
-            .map(|&idx| timezones[idx].city)
-            .collect();
-        App {
-            should_quit: false,
-            input_mode: InputMode::Normal,
-            search_query: String::new(),
-            cursor_position: 0,
-            timezones,
-            search_index,
-            filtered_indices,
-            filtered_display_names,
-            selected_row: 0,
-            selected_timezone: chrono_tz::Tz::UTC,
-            selected_city_name: "UTC".to_string(),
-            theme: Theme::Default,
-            favorites,
-            favorites_order,
-            show_favorites_only: false,
-            copied_flash: None,
-        }
+        App::with_config(config::Config::default())
     }
 
     fn apply_query(app: &mut App, query: &str) {
