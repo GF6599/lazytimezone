@@ -71,27 +71,29 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 }
 
 fn draw_title_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc: &ThemeColors) {
-    let title = Span::styled(
+    // Two-cell horizontal split: left flexes, right is exactly the
+    // theme label plus a trailing space. ratatui handles truncation
+    // and padding — no manual width arithmetic required.
+    let theme_text = format!("{} ", app.theme.label());
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min(0),
+            Constraint::Length(theme_text.len() as u16),
+        ])
+        .split(area);
+
+    let title = Paragraph::new(Span::styled(
         " lazytimezone",
         Style::default().fg(tc.title).add_modifier(Modifier::BOLD),
-    );
-    let theme_label = Span::styled(
-        format!("{} ", app.theme.label()),
-        Style::default().fg(tc.muted),
-    );
-    let line = Line::from(vec![
-        title,
-        Span::raw(
-            " ".repeat(
-                area.width
-                    .saturating_sub(14 + app.theme.label().len() as u16 + 1)
-                    as usize,
-            ),
-        ),
-        theme_label,
-    ]);
-    let bar = Paragraph::new(line).style(Style::default().bg(tc.bg).fg(tc.fg));
-    frame.render_widget(bar, area);
+    ))
+    .style(Style::default().bg(tc.bg).fg(tc.fg));
+    frame.render_widget(title, chunks[0]);
+
+    let theme = Paragraph::new(Span::styled(theme_text, Style::default().fg(tc.muted)))
+        .alignment(ratatui::layout::Alignment::Right)
+        .style(Style::default().bg(tc.bg));
+    frame.render_widget(theme, chunks[1]);
 }
 
 /// Renders the large ASCII-art clock with optional side clocks.
