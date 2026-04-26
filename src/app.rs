@@ -527,7 +527,10 @@ impl App {
     /// - Linux: `wl-copy` (Wayland) with `xclip` fallback (X11)
     pub fn copy_time(&mut self) {
         let now = Utc::now().with_timezone(&self.selected_timezone);
-        let formatted = now.format("%Y%m%dT%H%M%Z").to_string();
+        // Use %z (numeric offset, e.g. +0900) rather than %Z
+        // (alphabetic abbreviation), since abbreviations like CST are
+        // ambiguous (Central US vs China Standard Time).
+        let formatted = now.format("%Y%m%dT%H%M%z").to_string();
         for (cmd, args) in clipboard_commands() {
             if pipe_to_command(cmd, args, &formatted) {
                 self.copied_flash = Some(Instant::now());
