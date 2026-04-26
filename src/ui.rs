@@ -44,7 +44,7 @@ use tui_big_text::{BigText, PixelSize};
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::app::{App, InputMode};
+use crate::app::{App, InputMode, format_utc_offset};
 use crate::theme::ThemeColors;
 
 /// Top-level render entry point — splits the frame into five vertical
@@ -489,21 +489,6 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc
 // ============================================================================
 // Formatting helpers
 // ============================================================================
-
-/// Formats a UTC offset in seconds to a human-readable string like
-/// `UTC+5` or `UTC+5:30`. Used in both the table column and the
-/// search scoring haystack.
-pub fn format_utc_offset(total_secs: i32) -> String {
-    let sign = if total_secs >= 0 { '+' } else { '-' };
-    let abs = total_secs.unsigned_abs();
-    let hours = abs / 3600;
-    let mins = (abs % 3600) / 60;
-    if mins == 0 {
-        format!("UTC{}{}", sign, hours)
-    } else {
-        format!("UTC{}{}:{:02}", sign, hours, mins)
-    }
-}
 
 /// Formats the hour difference between two UTC offsets.
 /// Returns `"---"` when both offsets are identical (same zone),

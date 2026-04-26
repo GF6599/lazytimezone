@@ -29,7 +29,6 @@ use crate::timezone::{
     SupplementalSearchTerm, TimezoneEntry, all_timezones, country_search_aliases,
     supplemental_search_terms,
 };
-use crate::ui::format_utc_offset;
 
 /// Whether the app is accepting navigation keys or search text input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -712,6 +711,21 @@ fn word_matches_term(word: &str, term: &str) -> bool {
     }
     let stripped = word.trim_start_matches(['+', '-']);
     stripped != word && (stripped == term || stripped.starts_with(term))
+}
+
+/// Formats a UTC offset in seconds to a human-readable string like
+/// `UTC+5` or `UTC+5:30`. Used in both the table column and the
+/// search scoring haystack.
+pub fn format_utc_offset(total_secs: i32) -> String {
+    let sign = if total_secs >= 0 { '+' } else { '-' };
+    let abs = total_secs.unsigned_abs();
+    let hours = abs / 3600;
+    let mins = (abs % 3600) / 60;
+    if mins == 0 {
+        format!("UTC{}{}", sign, hours)
+    } else {
+        format!("UTC{}{}:{:02}", sign, hours, mins)
+    }
 }
 
 fn offset_search_terms(total_secs: i32) -> Vec<String> {
