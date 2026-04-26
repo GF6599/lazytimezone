@@ -299,6 +299,17 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc
         .title(" Search ")
         .title_style(Style::default().fg(tc.title));
 
+    // Inner width is `area.width - 2` (one column for each border).
+    let inner_width = area.width.saturating_sub(2);
+
+    // Compute horizontal scroll so the cursor stays visible. The
+    // cursor column is the display width of the query slice up to
+    // `cursor_position`. If it exceeds inner_width, we scroll right
+    // by `cursor_col - inner_width + 1` so the cursor sits one column
+    // inside the right border.
+    let cursor_col = app.search_query[..app.cursor_position].width() as u16;
+    let scroll_x = cursor_col.saturating_sub(inner_width.saturating_sub(1));
+
     let display = if app.search_query.is_empty() && app.input_mode != InputMode::Search {
         Span::styled("type / to search...", Style::default().fg(tc.muted))
     } else {
@@ -307,12 +318,15 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: ratatui::layout::Rect, tc
 
     let p = Paragraph::new(Line::from(display))
         .block(block)
-        .style(Style::default().bg(tc.bg));
+        .style(Style::default().bg(tc.bg))
+        .scroll((0, scroll_x));
     frame.render_widget(p, area);
 
     if app.input_mode == InputMode::Search {
-        let display_width = app.search_query[..app.cursor_position].width() as u16;
-        let x = area.x.saturating_add(display_width).saturating_add(1);
+        let visible_col = cursor_col.saturating_sub(scroll_x);
+        // Clamp to inside the right border so we never render past it.
+        let max_x = area.x + area.width.saturating_sub(1);
+        let x = (area.x + 1 + visible_col).min(max_x);
         let y = area.y + 1;
         frame.set_cursor_position((x, y));
     }

@@ -65,7 +65,10 @@ lazytimezone
 | Key | Action |
 |---|---|
 | Type | Filter timezones |
-| `Backspace` | Delete character |
+| `←` / `→` | Move cursor |
+| `Home` / `End` | Jump to start / end (also `Ctrl-a` / `Ctrl-e`) |
+| `Backspace` | Delete previous character |
+| `Delete` | Delete character under cursor |
 | `Ctrl-u` | Clear search |
 | `Esc` / `Enter` | Exit search |
 

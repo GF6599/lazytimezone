@@ -305,6 +305,47 @@ impl App {
         self.select_first_result();
     }
 
+    /// Moves the search cursor one grapheme to the left (byte-aware).
+    pub fn search_cursor_left(&mut self) {
+        if self.cursor_position > 0 {
+            let prev = self.search_query[..self.cursor_position]
+                .chars()
+                .next_back()
+                .map(|c| c.len_utf8())
+                .unwrap_or(0);
+            self.cursor_position -= prev;
+        }
+    }
+
+    /// Moves the search cursor one grapheme to the right (byte-aware).
+    pub fn search_cursor_right(&mut self) {
+        if self.cursor_position < self.search_query.len() {
+            let next = self.search_query[self.cursor_position..]
+                .chars()
+                .next()
+                .map(|c| c.len_utf8())
+                .unwrap_or(0);
+            self.cursor_position += next;
+        }
+    }
+
+    pub fn search_cursor_home(&mut self) {
+        self.cursor_position = 0;
+    }
+
+    pub fn search_cursor_end(&mut self) {
+        self.cursor_position = self.search_query.len();
+    }
+
+    /// Deletes the character at the cursor (forward delete).
+    pub fn search_delete(&mut self) {
+        if self.cursor_position < self.search_query.len() {
+            self.search_query.remove(self.cursor_position);
+            self.apply_filter();
+            self.select_first_result();
+        }
+    }
+
     /// Rebuilds `filtered_indices` from the current search query and
     /// favorites filter.
     ///

@@ -66,14 +66,27 @@ fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
     }
 }
 
-/// Text-input bindings: printable chars append, Backspace deletes,
+/// Text-input bindings: printable chars insert at cursor, Backspace
+/// deletes the previous char, Delete removes the char under the
+/// cursor, Left/Right move the cursor, Home/End jump to ends,
 /// Ctrl-u clears, Esc/Enter exits back to normal mode.
 fn handle_search_mode(app: &mut App, key: crossterm::event::KeyEvent) {
     match key.code {
         KeyCode::Esc | KeyCode::Enter => app.exit_search(),
         KeyCode::Backspace => app.search_backspace(),
+        KeyCode::Delete => app.search_delete(),
+        KeyCode::Left => app.search_cursor_left(),
+        KeyCode::Right => app.search_cursor_right(),
+        KeyCode::Home => app.search_cursor_home(),
+        KeyCode::End => app.search_cursor_end(),
         KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.clear_search_input();
+        }
+        KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.search_cursor_home();
+        }
+        KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.search_cursor_end();
         }
         KeyCode::Char(c) => app.search_input(c),
         _ => {}
