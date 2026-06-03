@@ -8,7 +8,7 @@ name = "lazytimezone"
 path = "src/main.rs"
 
 [dependencies]
-ratatui = "0.30"
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 crossterm = "0.29"
 chrono = { version = "0.4", features = ["clock"] }
 chrono-tz = "0.10"
@@ -16,3 +16,34 @@ tui-big-text = "0.8"
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 unicode-width = "0.2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = "symbols"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+# Tight panic discipline in production paths. Tests opt out per-module
+# via `#![allow(clippy::expect_used, ...)]` at the top of their
+# `#[cfg(test)] mod tests` block — see e.g. src/app.rs.
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+unreachable = "warn"
+needless_collect = "warn"
+or_fun_call = "warn"
+redundant_clone = "warn"
+
+# Allowed project-wide: the canonical ratatui layout pattern is
+# `let chunks = Layout::default()...split(area); frame.render_widget(w, chunks[0]);`
+# where the index is statically known to match the `Constraint` array
+# length. `.get(N).unwrap()` is uglier without being safer, and
+# `chunks.first().unwrap()` doesn't generalise past index 0. The same
+# applies to parallel-array indexing in src/search.rs where `i`
+# originates from a `base_indices` slice the caller built from
+# `0..entries.len()`.
+indexing_slicing = "allow"
