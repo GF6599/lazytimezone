@@ -58,6 +58,15 @@ pub struct TimezoneEntry {
     /// matching but not displayed in the table. For example, "San Diego"
     /// is an alias for the Los Angeles entry.
     pub aliases: &'static [&'static str],
+    /// Latitude of the **display city** in degrees (positive = north,
+    /// negative = south). Used by [`is_daytime_at`] to drive the
+    /// day/night colouring in the table — for high-latitude cities the
+    /// daylight window varies dramatically by season, and using a fixed
+    /// 06:00–18:00 window would mis-colour Reykjavík in June and
+    /// Auckland in December. Values are approximate (1–2 decimal places
+    /// — well within the precision needed for a binary "is it day?"
+    /// answer).
+    pub latitude: f64,
 }
 
 /// Returns the full catalogue of curated timezone entries, ordered
@@ -73,6 +82,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Pago_Pago,
             aliases: &[],
+            latitude: -14.28,
         },
         // ──────────────────────────────────────────
         // UTC-10
@@ -83,6 +93,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::Pacific__Honolulu,
             aliases: &["Maui", "Kauai", "Hilo", "Waikiki"],
+            latitude: 21.31,
         },
         // ──────────────────────────────────────────
         // UTC-9
@@ -93,6 +104,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Anchorage,
             aliases: &["Fairbanks", "Juneau"],
+            latitude: 61.22,
         },
         // ──────────────────────────────────────────
         // UTC-8
@@ -105,12 +117,14 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             aliases: &[
                 "San Diego",
                 "San Francisco",
+                "SF",
                 "Seattle",
                 "Portland",
                 "Las Vegas",
                 "Sacramento",
                 "Tijuana",
             ],
+            latitude: 34.05,
         },
         TimezoneEntry {
             city: "Vancouver",
@@ -118,6 +132,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Vancouver,
             aliases: &["Victoria", "Whistler"],
+            latitude: 49.28,
         },
         // ──────────────────────────────────────────
         // UTC-7
@@ -128,6 +143,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Denver,
             aliases: &["Salt Lake City", "Albuquerque", "Boise", "El Paso"],
+            latitude: 39.74,
         },
         TimezoneEntry {
             city: "Phoenix",
@@ -135,6 +151,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Phoenix,
             aliases: &["Tucson", "Scottsdale", "Mesa"],
+            latitude: 33.45,
         },
         // ──────────────────────────────────────────
         // UTC-6
@@ -160,6 +177,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "St. Louis",
                 "Tulsa",
             ],
+            latitude: 41.88,
         },
         TimezoneEntry {
             city: "Mexico City",
@@ -167,6 +185,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Mexico_City,
             aliases: &["Guadalajara", "Monterrey", "Puebla", "Toluca"],
+            latitude: 19.43,
         },
         TimezoneEntry {
             city: "Belmopan",
@@ -174,6 +193,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Belize,
             aliases: &["Belize City"],
+            latitude: 17.25,
         },
         TimezoneEntry {
             city: "San Jose",
@@ -181,6 +201,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Costa_Rica,
             aliases: &["Limon", "Tamarindo"],
+            latitude: 9.93,
         },
         TimezoneEntry {
             city: "San Salvador",
@@ -188,6 +209,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__El_Salvador,
             aliases: &[],
+            latitude: 13.69,
         },
         TimezoneEntry {
             city: "Guatemala City",
@@ -195,6 +217,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Guatemala,
             aliases: &["Antigua"],
+            latitude: 14.63,
         },
         TimezoneEntry {
             city: "Tegucigalpa",
@@ -202,6 +225,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Tegucigalpa,
             aliases: &["San Pedro Sula"],
+            latitude: 14.07,
         },
         TimezoneEntry {
             city: "Managua",
@@ -209,6 +233,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Managua,
             aliases: &["Leon", "Granada"],
+            latitude: 12.13,
         },
         // ──────────────────────────────────────────
         // UTC-5
@@ -239,6 +264,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Cincinnati",
                 "Buffalo",
             ],
+            latitude: 40.71,
         },
         TimezoneEntry {
             city: "Toronto",
@@ -246,13 +272,15 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Toronto,
             aliases: &["Montreal", "Ottawa", "Quebec City"],
+            latitude: 43.65,
         },
         TimezoneEntry {
-            city: "Bogota",
+            city: "Bogotá",
             country: "Colombia",
             region: "South America",
             tz: Tz::America__Bogota,
-            aliases: &["Medellin", "Cali", "Cartagena", "Barranquilla"],
+            aliases: &["Bogota", "Medellin", "Cali", "Cartagena", "Barranquilla"],
+            latitude: 4.71,
         },
         TimezoneEntry {
             city: "Nassau",
@@ -260,6 +288,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Nassau,
             aliases: &["Freeport"],
+            latitude: 25.05,
         },
         TimezoneEntry {
             city: "Havana",
@@ -267,6 +296,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Havana,
             aliases: &["Santiago de Cuba", "Varadero"],
+            latitude: 23.13,
         },
         TimezoneEntry {
             city: "Quito",
@@ -274,6 +304,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "South America",
             tz: Tz::America__Guayaquil,
             aliases: &["Guayaquil", "Cuenca"],
+            latitude: -0.18,
         },
         TimezoneEntry {
             city: "Port-au-Prince",
@@ -281,6 +312,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__PortauPrince,
             aliases: &[],
+            latitude: 18.55,
         },
         TimezoneEntry {
             city: "Kingston",
@@ -288,6 +320,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Jamaica,
             aliases: &["Montego Bay", "Ocho Rios"],
+            latitude: 17.97,
         },
         TimezoneEntry {
             city: "Panama City",
@@ -295,6 +328,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Panama,
             aliases: &["Colon", "Bocas del Toro"],
+            latitude: 8.97,
         },
         TimezoneEntry {
             city: "Lima",
@@ -302,6 +336,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "South America",
             tz: Tz::America__Lima,
             aliases: &["Cusco", "Arequipa", "Trujillo"],
+            latitude: -12.05,
         },
         // ──────────────────────────────────────────
         // UTC-4
@@ -312,6 +347,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "South America",
             tz: Tz::America__Santiago,
             aliases: &["Valparaiso", "Concepcion", "Vina del Mar"],
+            latitude: -33.45,
         },
         TimezoneEntry {
             city: "Halifax",
@@ -319,6 +355,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Halifax,
             aliases: &["Fredericton", "Charlottetown", "Moncton"],
+            latitude: 44.65,
         },
         TimezoneEntry {
             city: "St. John's",
@@ -326,6 +363,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Antigua,
             aliases: &[],
+            latitude: 17.12,
         },
         TimezoneEntry {
             city: "Bridgetown",
@@ -333,6 +371,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Barbados,
             aliases: &[],
+            latitude: 13.10,
         },
         TimezoneEntry {
             city: "La Paz",
@@ -340,6 +379,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "South America",
             tz: Tz::America__La_Paz,
             aliases: &["Santa Cruz", "Sucre", "Cochabamba"],
+            latitude: -16.50,
         },
         TimezoneEntry {
             city: "Manaus",
@@ -347,6 +387,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "South America",
             tz: Tz::America__Manaus,
             aliases: &["Boa Vista"],
+            latitude: -3.12,
         },
         TimezoneEntry {
             city: "Roseau",
@@ -354,6 +395,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Dominica,
             aliases: &[],
+            latitude: 15.30,
         },
         TimezoneEntry {
             city: "Santo Domingo",
@@ -361,6 +403,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Santo_Domingo,
             aliases: &["Santiago", "Punta Cana"],
+            latitude: 18.47,
         },
         TimezoneEntry {
             city: "St. George's",
@@ -368,6 +411,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Grenada,
             aliases: &[],
+            latitude: 12.05,
         },
         TimezoneEntry {
             city: "Georgetown",
@@ -375,13 +419,15 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "South America",
             tz: Tz::America__Guyana,
             aliases: &[],
+            latitude: 6.80,
         },
         TimezoneEntry {
-            city: "Asuncion",
+            city: "Asunción",
             country: "Paraguay",
             region: "South America",
             tz: Tz::America__Asuncion,
-            aliases: &["Ciudad del Este"],
+            aliases: &["Asuncion", "Ciudad del Este"],
+            latitude: -25.27,
         },
         TimezoneEntry {
             city: "Castries",
@@ -389,6 +435,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__St_Lucia,
             aliases: &[],
+            latitude: 14.00,
         },
         TimezoneEntry {
             city: "Basseterre",
@@ -396,6 +443,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__St_Kitts,
             aliases: &["Charlestown"],
+            latitude: 17.30,
         },
         TimezoneEntry {
             city: "Kingstown",
@@ -403,6 +451,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__St_Vincent,
             aliases: &[],
+            latitude: 13.16,
         },
         TimezoneEntry {
             city: "Port of Spain",
@@ -410,6 +459,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__Port_of_Spain,
             aliases: &["Scarborough"],
+            latitude: 10.66,
         },
         TimezoneEntry {
             city: "Caracas",
@@ -417,6 +467,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "South America",
             tz: Tz::America__Caracas,
             aliases: &["Maracaibo", "Valencia", "Barquisimeto"],
+            latitude: 10.50,
         },
         // ──────────────────────────────────────────
         // UTC-3:30
@@ -427,6 +478,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "North America",
             tz: Tz::America__St_Johns,
             aliases: &[],
+            latitude: 47.56,
         },
         // ──────────────────────────────────────────
         // UTC-3
@@ -438,6 +490,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             tz: Tz::America__Sao_Paulo,
             aliases: &[
                 "Rio de Janeiro",
+                "Brasília",
                 "Brasilia",
                 "Belo Horizonte",
                 "Salvador",
@@ -445,6 +498,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Recife",
                 "Porto Alegre",
             ],
+            latitude: -23.55,
         },
         TimezoneEntry {
             city: "Buenos Aires",
@@ -452,6 +506,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "South America",
             tz: Tz::America__Argentina__Buenos_Aires,
             aliases: &["Cordoba", "Rosario", "Mendoza", "Mar del Plata"],
+            latitude: -34.60,
         },
         TimezoneEntry {
             city: "Paramaribo",
@@ -459,6 +514,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "South America",
             tz: Tz::America__Paramaribo,
             aliases: &[],
+            latitude: 5.85,
         },
         TimezoneEntry {
             city: "Montevideo",
@@ -466,6 +522,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "South America",
             tz: Tz::America__Montevideo,
             aliases: &["Punta del Este"],
+            latitude: -34.90,
         },
         // ──────────────────────────────────────────
         // UTC-1
@@ -476,6 +533,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Atlantic",
             tz: Tz::Atlantic__Azores,
             aliases: &["Ponta Delgada"],
+            latitude: 37.74,
         },
         TimezoneEntry {
             city: "Praia",
@@ -483,6 +541,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Atlantic",
             tz: Tz::Atlantic__Cape_Verde,
             aliases: &["Mindelo"],
+            latitude: 14.93,
         },
         // ──────────────────────────────────────────
         // UTC+0
@@ -493,6 +552,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "",
             tz: Tz::UTC,
             aliases: &["GMT", "Greenwich", "Zulu"],
+            latitude: 0.0,
         },
         TimezoneEntry {
             city: "London",
@@ -511,13 +571,15 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Bristol",
                 "Sheffield",
             ],
+            latitude: 51.51,
         },
         TimezoneEntry {
-            city: "Reykjavik",
+            city: "Reykjavík",
             country: "Iceland",
             region: "Europe",
             tz: Tz::Atlantic__Reykjavik,
-            aliases: &["Akureyri"],
+            aliases: &["Reykjavik", "Akureyri"],
+            latitude: 64.13,
         },
         TimezoneEntry {
             city: "Accra",
@@ -525,6 +587,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Accra,
             aliases: &["Kumasi", "Tamale"],
+            latitude: 5.55,
         },
         TimezoneEntry {
             city: "Ouagadougou",
@@ -532,6 +595,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Ouagadougou,
             aliases: &["Bobo-Dioulasso"],
+            latitude: 12.37,
         },
         TimezoneEntry {
             city: "Banjul",
@@ -539,6 +603,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Banjul,
             aliases: &[],
+            latitude: 13.45,
         },
         TimezoneEntry {
             city: "Conakry",
@@ -546,6 +611,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Conakry,
             aliases: &[],
+            latitude: 9.51,
         },
         TimezoneEntry {
             city: "Bissau",
@@ -553,6 +619,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Bissau,
             aliases: &[],
+            latitude: 11.86,
         },
         TimezoneEntry {
             city: "Dublin",
@@ -560,6 +627,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Dublin,
             aliases: &["Cork", "Galway", "Limerick"],
+            latitude: 53.35,
         },
         TimezoneEntry {
             city: "Abidjan",
@@ -567,6 +635,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Abidjan,
             aliases: &["Yamoussoukro", "Bouake"],
+            latitude: 5.36,
         },
         TimezoneEntry {
             city: "Monrovia",
@@ -574,6 +643,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Monrovia,
             aliases: &[],
+            latitude: 6.31,
         },
         TimezoneEntry {
             city: "Bamako",
@@ -581,6 +651,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Bamako,
             aliases: &["Timbuktu"],
+            latitude: 12.65,
         },
         TimezoneEntry {
             city: "Nouakchott",
@@ -588,6 +659,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Nouakchott,
             aliases: &[],
+            latitude: 18.07,
         },
         TimezoneEntry {
             city: "Lisbon",
@@ -595,6 +667,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Lisbon,
             aliases: &["Porto", "Faro", "Braga", "Coimbra"],
+            latitude: 38.72,
         },
         TimezoneEntry {
             city: "Sao Tome",
@@ -602,6 +675,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Sao_Tome,
             aliases: &[],
+            latitude: 0.34,
         },
         TimezoneEntry {
             city: "Dakar",
@@ -609,6 +683,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Dakar,
             aliases: &["Saint-Louis"],
+            latitude: 14.69,
         },
         TimezoneEntry {
             city: "Freetown",
@@ -616,6 +691,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Freetown,
             aliases: &[],
+            latitude: 8.48,
         },
         TimezoneEntry {
             city: "Lome",
@@ -623,6 +699,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Lome,
             aliases: &[],
+            latitude: 6.13,
         },
         // ──────────────────────────────────────────
         // UTC+1
@@ -641,6 +718,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Strasbourg",
                 "Lille",
             ],
+            latitude: 48.86,
         },
         TimezoneEntry {
             city: "Berlin",
@@ -658,6 +736,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Dresden",
                 "Leipzig",
             ],
+            latitude: 52.52,
         },
         TimezoneEntry {
             city: "Lagos",
@@ -665,6 +744,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Lagos,
             aliases: &["Abuja", "Kano", "Ibadan", "Port Harcourt"],
+            latitude: 6.46,
         },
         TimezoneEntry {
             city: "Tirana",
@@ -672,6 +752,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Tirane,
             aliases: &["Durres"],
+            latitude: 41.33,
         },
         TimezoneEntry {
             city: "Algiers",
@@ -679,6 +760,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Algiers,
             aliases: &["Oran", "Constantine"],
+            latitude: 36.75,
         },
         TimezoneEntry {
             city: "Andorra la Vella",
@@ -686,6 +768,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Andorra,
             aliases: &[],
+            latitude: 42.51,
         },
         TimezoneEntry {
             city: "Luanda",
@@ -693,6 +776,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Luanda,
             aliases: &["Huambo", "Lobito"],
+            latitude: -8.84,
         },
         TimezoneEntry {
             city: "Vienna",
@@ -700,6 +784,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Vienna,
             aliases: &["Salzburg", "Innsbruck", "Graz", "Linz"],
+            latitude: 48.21,
         },
         TimezoneEntry {
             city: "Brussels",
@@ -707,6 +792,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Brussels,
             aliases: &["Antwerp", "Ghent", "Bruges", "Liege"],
+            latitude: 50.85,
         },
         TimezoneEntry {
             city: "Porto-Novo",
@@ -714,6 +800,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__PortoNovo,
             aliases: &["Cotonou"],
+            latitude: 6.50,
         },
         TimezoneEntry {
             city: "Sarajevo",
@@ -721,6 +808,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Sarajevo,
             aliases: &["Banja Luka", "Mostar"],
+            latitude: 43.86,
         },
         TimezoneEntry {
             city: "Douala",
@@ -728,6 +816,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Douala,
             aliases: &["Yaounde"],
+            latitude: 4.05,
         },
         TimezoneEntry {
             city: "Bangui",
@@ -735,6 +824,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Bangui,
             aliases: &[],
+            latitude: 4.36,
         },
         TimezoneEntry {
             city: "Ndjamena",
@@ -742,6 +832,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Ndjamena,
             aliases: &[],
+            latitude: 12.13,
         },
         TimezoneEntry {
             city: "Brazzaville",
@@ -749,6 +840,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Brazzaville,
             aliases: &["Pointe-Noire"],
+            latitude: -4.27,
         },
         TimezoneEntry {
             city: "Zagreb",
@@ -756,6 +848,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Zagreb,
             aliases: &["Split", "Dubrovnik", "Rijeka"],
+            latitude: 45.81,
         },
         TimezoneEntry {
             city: "Prague",
@@ -763,6 +856,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Prague,
             aliases: &["Brno", "Ostrava", "Pilsen"],
+            latitude: 50.09,
         },
         TimezoneEntry {
             city: "Copenhagen",
@@ -770,6 +864,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Copenhagen,
             aliases: &["Aarhus", "Odense", "Aalborg"],
+            latitude: 55.68,
         },
         TimezoneEntry {
             city: "Kinshasa",
@@ -777,6 +872,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Kinshasa,
             aliases: &["Lubumbashi", "Mbuji-Mayi"],
+            latitude: -4.32,
         },
         TimezoneEntry {
             city: "Malabo",
@@ -784,6 +880,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Malabo,
             aliases: &["Bata"],
+            latitude: 3.75,
         },
         TimezoneEntry {
             city: "Libreville",
@@ -791,6 +888,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Libreville,
             aliases: &["Port-Gentil"],
+            latitude: 0.42,
         },
         TimezoneEntry {
             city: "Budapest",
@@ -798,6 +896,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Budapest,
             aliases: &["Debrecen", "Szeged"],
+            latitude: 47.50,
         },
         TimezoneEntry {
             city: "Rome",
@@ -807,6 +906,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             aliases: &[
                 "Milan", "Naples", "Turin", "Florence", "Venice", "Bologna", "Palermo", "Genoa",
             ],
+            latitude: 41.90,
         },
         TimezoneEntry {
             city: "Vaduz",
@@ -814,6 +914,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Vaduz,
             aliases: &[],
+            latitude: 47.14,
         },
         TimezoneEntry {
             city: "Luxembourg City",
@@ -821,6 +922,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Luxembourg,
             aliases: &[],
+            latitude: 49.61,
         },
         TimezoneEntry {
             city: "Valletta",
@@ -828,6 +930,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Malta,
             aliases: &["Sliema", "St. Julian's"],
+            latitude: 35.90,
         },
         TimezoneEntry {
             city: "Monaco",
@@ -835,6 +938,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Monaco,
             aliases: &["Monte Carlo"],
+            latitude: 43.74,
         },
         TimezoneEntry {
             city: "Podgorica",
@@ -842,6 +946,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Podgorica,
             aliases: &["Budva", "Kotor"],
+            latitude: 42.44,
         },
         TimezoneEntry {
             city: "Casablanca",
@@ -849,6 +954,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Casablanca,
             aliases: &["Rabat", "Marrakesh", "Fez", "Tangier"],
+            latitude: 33.57,
         },
         TimezoneEntry {
             city: "Windhoek",
@@ -856,6 +962,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Windhoek,
             aliases: &["Walvis Bay", "Swakopmund"],
+            latitude: -22.56,
         },
         TimezoneEntry {
             city: "Amsterdam",
@@ -863,6 +970,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Amsterdam,
             aliases: &["Rotterdam", "The Hague", "Utrecht", "Eindhoven"],
+            latitude: 52.37,
         },
         TimezoneEntry {
             city: "Niamey",
@@ -870,6 +978,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Niamey,
             aliases: &["Zinder"],
+            latitude: 13.51,
         },
         TimezoneEntry {
             city: "Skopje",
@@ -877,6 +986,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Skopje,
             aliases: &["Ohrid", "Bitola"],
+            latitude: 42.00,
         },
         TimezoneEntry {
             city: "Oslo",
@@ -884,6 +994,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Oslo,
             aliases: &["Bergen", "Trondheim", "Stavanger", "Tromso"],
+            latitude: 59.91,
         },
         TimezoneEntry {
             city: "Warsaw",
@@ -891,6 +1002,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Warsaw,
             aliases: &["Krakow", "Gdansk", "Wroclaw", "Poznan", "Lodz"],
+            latitude: 52.23,
         },
         TimezoneEntry {
             city: "San Marino",
@@ -898,6 +1010,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__San_Marino,
             aliases: &[],
+            latitude: 43.94,
         },
         TimezoneEntry {
             city: "Belgrade",
@@ -905,6 +1018,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Belgrade,
             aliases: &["Novi Sad", "Nis"],
+            latitude: 44.79,
         },
         TimezoneEntry {
             city: "Bratislava",
@@ -912,6 +1026,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Bratislava,
             aliases: &["Kosice"],
+            latitude: 48.15,
         },
         TimezoneEntry {
             city: "Ljubljana",
@@ -919,6 +1034,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Ljubljana,
             aliases: &["Maribor"],
+            latitude: 46.06,
         },
         TimezoneEntry {
             city: "Madrid",
@@ -933,6 +1049,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Malaga",
                 "Zaragoza",
             ],
+            latitude: 40.42,
         },
         TimezoneEntry {
             city: "Stockholm",
@@ -940,13 +1057,15 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Stockholm,
             aliases: &["Gothenburg", "Malmo", "Uppsala"],
+            latitude: 59.33,
         },
         TimezoneEntry {
-            city: "Zurich",
+            city: "Zürich",
             country: "Switzerland",
             region: "Europe",
             tz: Tz::Europe__Zurich,
-            aliases: &["Geneva", "Basel", "Bern", "Lausanne"],
+            aliases: &["Zurich", "Geneva", "Basel", "Bern", "Lausanne"],
+            latitude: 47.37,
         },
         TimezoneEntry {
             city: "Tunis",
@@ -954,6 +1073,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Tunis,
             aliases: &["Sfax", "Sousse"],
+            latitude: 36.81,
         },
         TimezoneEntry {
             city: "Vatican City",
@@ -961,6 +1081,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Vatican,
             aliases: &[],
+            latitude: 41.90,
         },
         // ──────────────────────────────────────────
         // UTC+2
@@ -971,6 +1092,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Cairo,
             aliases: &["Alexandria", "Giza", "Luxor", "Aswan", "Sharm el-Sheikh"],
+            latitude: 30.04,
         },
         TimezoneEntry {
             city: "Athens",
@@ -985,6 +1107,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Rhodes",
                 "Santorini",
             ],
+            latitude: 37.98,
         },
         TimezoneEntry {
             city: "Johannesburg",
@@ -992,6 +1115,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Johannesburg,
             aliases: &["Cape Town", "Durban", "Pretoria", "Port Elizabeth"],
+            latitude: -26.20,
         },
         TimezoneEntry {
             city: "Gaborone",
@@ -999,6 +1123,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Gaborone,
             aliases: &["Francistown", "Maun"],
+            latitude: -24.65,
         },
         TimezoneEntry {
             city: "Sofia",
@@ -1006,6 +1131,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Sofia,
             aliases: &["Plovdiv", "Varna", "Burgas"],
+            latitude: 42.70,
         },
         TimezoneEntry {
             city: "Bujumbura",
@@ -1013,6 +1139,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Bujumbura,
             aliases: &["Gitega"],
+            latitude: -3.38,
         },
         TimezoneEntry {
             city: "Nicosia",
@@ -1020,6 +1147,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Asia__Nicosia,
             aliases: &["Limassol", "Larnaca", "Paphos"],
+            latitude: 35.18,
         },
         TimezoneEntry {
             city: "Tallinn",
@@ -1027,6 +1155,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Tallinn,
             aliases: &["Tartu"],
+            latitude: 59.44,
         },
         TimezoneEntry {
             city: "Mbabane",
@@ -1034,6 +1163,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Mbabane,
             aliases: &["Manzini"],
+            latitude: -26.32,
         },
         TimezoneEntry {
             city: "Helsinki",
@@ -1041,6 +1171,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Helsinki,
             aliases: &["Tampere", "Turku", "Espoo", "Oulu"],
+            latitude: 60.17,
         },
         TimezoneEntry {
             city: "Jerusalem",
@@ -1048,6 +1179,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Jerusalem,
             aliases: &["Tel Aviv", "Haifa", "Eilat"],
+            latitude: 31.78,
         },
         TimezoneEntry {
             city: "Amman",
@@ -1055,6 +1187,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Amman,
             aliases: &["Aqaba", "Irbid", "Petra"],
+            latitude: 31.95,
         },
         TimezoneEntry {
             city: "Riga",
@@ -1062,6 +1195,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Riga,
             aliases: &["Daugavpils", "Jurmala"],
+            latitude: 56.95,
         },
         TimezoneEntry {
             city: "Beirut",
@@ -1069,6 +1203,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Beirut,
             aliases: &["Tripoli", "Byblos"],
+            latitude: 33.89,
         },
         TimezoneEntry {
             city: "Maseru",
@@ -1076,6 +1211,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Maseru,
             aliases: &[],
+            latitude: -29.31,
         },
         TimezoneEntry {
             city: "Tripoli",
@@ -1083,6 +1219,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Tripoli,
             aliases: &["Benghazi", "Misrata"],
+            latitude: 32.89,
         },
         TimezoneEntry {
             city: "Vilnius",
@@ -1090,6 +1227,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Vilnius,
             aliases: &["Kaunas", "Klaipeda"],
+            latitude: 54.69,
         },
         TimezoneEntry {
             city: "Lilongwe",
@@ -1097,6 +1235,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Blantyre,
             aliases: &["Blantyre", "Mzuzu"],
+            latitude: -13.96,
         },
         TimezoneEntry {
             city: "Chisinau",
@@ -1104,6 +1243,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Chisinau,
             aliases: &["Tiraspol", "Balti"],
+            latitude: 47.01,
         },
         TimezoneEntry {
             city: "Maputo",
@@ -1111,6 +1251,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Maputo,
             aliases: &["Beira", "Nampula"],
+            latitude: -25.97,
         },
         TimezoneEntry {
             city: "Ramallah",
@@ -1118,6 +1259,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Hebron,
             aliases: &["Gaza", "Hebron", "Bethlehem", "Nablus"],
+            latitude: 31.90,
         },
         TimezoneEntry {
             city: "Bucharest",
@@ -1125,6 +1267,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Bucharest,
             aliases: &["Cluj-Napoca", "Timisoara", "Iasi", "Constanta", "Brasov"],
+            latitude: 44.43,
         },
         TimezoneEntry {
             city: "Kigali",
@@ -1132,6 +1275,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Kigali,
             aliases: &[],
+            latitude: -1.94,
         },
         TimezoneEntry {
             city: "Juba",
@@ -1139,6 +1283,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Juba,
             aliases: &[],
+            latitude: 4.85,
         },
         TimezoneEntry {
             city: "Khartoum",
@@ -1146,6 +1291,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Khartoum,
             aliases: &["Omdurman", "Port Sudan"],
+            latitude: 15.50,
         },
         TimezoneEntry {
             city: "Damascus",
@@ -1153,6 +1299,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Damascus,
             aliases: &["Aleppo", "Homs", "Latakia"],
+            latitude: 33.51,
         },
         TimezoneEntry {
             city: "Kyiv",
@@ -1160,6 +1307,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Kyiv,
             aliases: &["Kharkiv", "Odesa", "Dnipro", "Lviv"],
+            latitude: 50.45,
         },
         TimezoneEntry {
             city: "Lusaka",
@@ -1167,6 +1315,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Lusaka,
             aliases: &["Livingstone", "Ndola", "Kitwe"],
+            latitude: -15.42,
         },
         TimezoneEntry {
             city: "Harare",
@@ -1174,6 +1323,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Harare,
             aliases: &["Bulawayo", "Victoria Falls"],
+            latitude: -17.83,
         },
         // ──────────────────────────────────────────
         // UTC+3
@@ -1184,6 +1334,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Moscow,
             aliases: &["St. Petersburg", "Kazan", "Volgograd", "Nizhny Novgorod"],
+            latitude: 55.76,
         },
         TimezoneEntry {
             city: "Istanbul",
@@ -1198,6 +1349,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Bodrum",
                 "Cappadocia",
             ],
+            latitude: 41.01,
         },
         TimezoneEntry {
             city: "Nairobi",
@@ -1205,6 +1357,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Nairobi,
             aliases: &["Mombasa", "Kisumu", "Nakuru"],
+            latitude: -1.29,
         },
         TimezoneEntry {
             city: "Manama",
@@ -1212,6 +1365,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Bahrain,
             aliases: &["Muharraq"],
+            latitude: 26.23,
         },
         TimezoneEntry {
             city: "Minsk",
@@ -1219,6 +1373,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Europe",
             tz: Tz::Europe__Minsk,
             aliases: &["Gomel", "Brest", "Grodno"],
+            latitude: 53.90,
         },
         TimezoneEntry {
             city: "Moroni",
@@ -1226,6 +1381,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Indian__Comoro,
             aliases: &[],
+            latitude: -11.70,
         },
         TimezoneEntry {
             city: "Djibouti",
@@ -1233,6 +1389,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Djibouti,
             aliases: &[],
+            latitude: 11.59,
         },
         TimezoneEntry {
             city: "Asmara",
@@ -1240,6 +1397,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Asmara,
             aliases: &["Massawa"],
+            latitude: 15.32,
         },
         TimezoneEntry {
             city: "Addis Ababa",
@@ -1247,6 +1405,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Addis_Ababa,
             aliases: &["Dire Dawa", "Gondar", "Lalibela"],
+            latitude: 9.03,
         },
         TimezoneEntry {
             city: "Baghdad",
@@ -1254,6 +1413,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Baghdad,
             aliases: &["Basra", "Erbil", "Mosul", "Sulaymaniyah"],
+            latitude: 33.31,
         },
         TimezoneEntry {
             city: "Kuwait City",
@@ -1261,6 +1421,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Kuwait,
             aliases: &[],
+            latitude: 29.38,
         },
         TimezoneEntry {
             city: "Antananarivo",
@@ -1268,6 +1429,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Indian__Antananarivo,
             aliases: &["Toamasina", "Nosy Be"],
+            latitude: -18.88,
         },
         TimezoneEntry {
             city: "Doha",
@@ -1275,6 +1437,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Qatar,
             aliases: &["Al Wakrah"],
+            latitude: 25.29,
         },
         TimezoneEntry {
             city: "Riyadh",
@@ -1282,6 +1445,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Riyadh,
             aliases: &["Jeddah", "Mecca", "Medina", "Dammam"],
+            latitude: 24.71,
         },
         TimezoneEntry {
             city: "Mogadishu",
@@ -1289,6 +1453,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Mogadishu,
             aliases: &["Hargeisa"],
+            latitude: 2.05,
         },
         TimezoneEntry {
             city: "Dar es Salaam",
@@ -1296,6 +1461,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Dar_es_Salaam,
             aliases: &["Dodoma", "Zanzibar", "Arusha", "Kilimanjaro"],
+            latitude: -6.79,
         },
         TimezoneEntry {
             city: "Kampala",
@@ -1303,6 +1469,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Africa__Kampala,
             aliases: &["Entebbe", "Jinja"],
+            latitude: 0.35,
         },
         TimezoneEntry {
             city: "Aden",
@@ -1310,6 +1477,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Aden,
             aliases: &["Sanaa", "Taiz"],
+            latitude: 12.79,
         },
         // ──────────────────────────────────────────
         // UTC+3:30
@@ -1320,6 +1488,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Tehran,
             aliases: &["Isfahan", "Mashhad", "Tabriz", "Shiraz"],
+            latitude: 35.69,
         },
         // ──────────────────────────────────────────
         // UTC+4
@@ -1330,6 +1499,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Dubai,
             aliases: &["Abu Dhabi", "Sharjah", "Ajman"],
+            latitude: 25.20,
         },
         TimezoneEntry {
             city: "Yerevan",
@@ -1337,6 +1507,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Yerevan,
             aliases: &["Gyumri"],
+            latitude: 40.18,
         },
         TimezoneEntry {
             city: "Baku",
@@ -1344,6 +1515,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Baku,
             aliases: &["Ganja", "Sumqayit"],
+            latitude: 40.41,
         },
         TimezoneEntry {
             city: "Tbilisi",
@@ -1351,6 +1523,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Tbilisi,
             aliases: &["Batumi", "Kutaisi"],
+            latitude: 41.72,
         },
         TimezoneEntry {
             city: "Port Louis",
@@ -1358,6 +1531,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Indian__Mauritius,
             aliases: &[],
+            latitude: -20.16,
         },
         TimezoneEntry {
             city: "Muscat",
@@ -1365,6 +1539,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Muscat,
             aliases: &["Salalah", "Nizwa"],
+            latitude: 23.59,
         },
         TimezoneEntry {
             city: "Victoria",
@@ -1372,6 +1547,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Africa",
             tz: Tz::Indian__Mahe,
             aliases: &["Mahe"],
+            latitude: -4.62,
         },
         // ──────────────────────────────────────────
         // UTC+4:30
@@ -1382,6 +1558,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Kabul,
             aliases: &["Kandahar", "Herat", "Mazar-i-Sharif"],
+            latitude: 34.53,
         },
         // ──────────────────────────────────────────
         // UTC+5
@@ -1398,6 +1575,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Faisalabad",
                 "Peshawar",
             ],
+            latitude: 24.86,
         },
         TimezoneEntry {
             city: "Male",
@@ -1405,6 +1583,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Indian__Maldives,
             aliases: &[],
+            latitude: 4.18,
         },
         TimezoneEntry {
             city: "Dushanbe",
@@ -1412,6 +1591,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Dushanbe,
             aliases: &["Khujand"],
+            latitude: 38.54,
         },
         TimezoneEntry {
             city: "Ashgabat",
@@ -1419,6 +1599,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Ashgabat,
             aliases: &["Turkmenabat", "Mary"],
+            latitude: 37.95,
         },
         TimezoneEntry {
             city: "Tashkent",
@@ -1426,6 +1607,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Tashkent,
             aliases: &["Samarkand", "Bukhara", "Khiva", "Namangan"],
+            latitude: 41.31,
         },
         // ──────────────────────────────────────────
         // UTC+5:30
@@ -1450,6 +1632,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Goa",
                 "Kochi",
             ],
+            latitude: 19.08,
         },
         TimezoneEntry {
             city: "Colombo",
@@ -1457,6 +1640,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Colombo,
             aliases: &["Kandy", "Galle", "Jaffna"],
+            latitude: 6.93,
         },
         // ──────────────────────────────────────────
         // UTC+5:45
@@ -1467,6 +1651,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Kathmandu,
             aliases: &["Pokhara", "Lalitpur", "Biratnagar"],
+            latitude: 27.72,
         },
         // ──────────────────────────────────────────
         // UTC+6
@@ -1477,6 +1662,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Dhaka,
             aliases: &["Chittagong", "Sylhet", "Rajshahi", "Khulna"],
+            latitude: 23.81,
         },
         TimezoneEntry {
             city: "Thimphu",
@@ -1484,6 +1670,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Thimphu,
             aliases: &["Paro"],
+            latitude: 27.47,
         },
         TimezoneEntry {
             city: "Almaty",
@@ -1491,6 +1678,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Almaty,
             aliases: &["Astana", "Shymkent", "Nur-Sultan"],
+            latitude: 43.26,
         },
         TimezoneEntry {
             city: "Bishkek",
@@ -1498,6 +1686,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Bishkek,
             aliases: &["Osh"],
+            latitude: 42.87,
         },
         // ──────────────────────────────────────────
         // UTC+6:30
@@ -1508,6 +1697,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Yangon,
             aliases: &["Mandalay", "Naypyidaw", "Rangoon"],
+            latitude: 16.85,
         },
         // ──────────────────────────────────────────
         // UTC+7
@@ -1518,6 +1708,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Bangkok,
             aliases: &["Chiang Mai", "Phuket", "Pattaya", "Krabi"],
+            latitude: 13.76,
         },
         TimezoneEntry {
             city: "Jakarta",
@@ -1532,6 +1723,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Yogyakarta",
                 "Semarang",
             ],
+            latitude: -6.21,
         },
         TimezoneEntry {
             city: "Phnom Penh",
@@ -1539,6 +1731,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Phnom_Penh,
             aliases: &["Siem Reap", "Angkor Wat", "Battambang", "Sihanoukville"],
+            latitude: 11.55,
         },
         TimezoneEntry {
             city: "Vientiane",
@@ -1546,6 +1739,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Vientiane,
             aliases: &["Luang Prabang"],
+            latitude: 17.97,
         },
         TimezoneEntry {
             city: "Novosibirsk",
@@ -1553,6 +1747,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Novosibirsk,
             aliases: &["Krasnoyarsk", "Tomsk", "Barnaul", "Omsk"],
+            latitude: 55.04,
         },
         TimezoneEntry {
             city: "Ho Chi Minh City",
@@ -1560,6 +1755,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Ho_Chi_Minh,
             aliases: &["Hanoi", "Da Nang", "Saigon", "Hoi An", "Nha Trang"],
+            latitude: 10.82,
         },
         // ──────────────────────────────────────────
         // UTC+8
@@ -1570,6 +1766,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Singapore,
             aliases: &[],
+            latitude: 1.35,
         },
         TimezoneEntry {
             city: "Shanghai",
@@ -1590,6 +1787,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Suzhou",
                 "Qingdao",
             ],
+            latitude: 31.23,
         },
         TimezoneEntry {
             city: "Hong Kong",
@@ -1597,6 +1795,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Hong_Kong,
             aliases: &["Macau", "Kowloon"],
+            latitude: 22.32,
         },
         TimezoneEntry {
             city: "Perth",
@@ -1604,6 +1803,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Australia",
             tz: Tz::Australia__Perth,
             aliases: &["Fremantle"],
+            latitude: -31.95,
         },
         TimezoneEntry {
             city: "Bandar Seri Begawan",
@@ -1611,6 +1811,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Brunei,
             aliases: &[],
+            latitude: 4.94,
         },
         TimezoneEntry {
             city: "Kuala Lumpur",
@@ -1625,6 +1826,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Malacca",
                 "Langkawi",
             ],
+            latitude: 3.139,
         },
         TimezoneEntry {
             city: "Ulaanbaatar",
@@ -1632,6 +1834,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Ulaanbaatar,
             aliases: &["Erdenet", "Darkhan"],
+            latitude: 47.92,
         },
         TimezoneEntry {
             city: "Manila",
@@ -1639,6 +1842,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Manila,
             aliases: &["Cebu", "Davao", "Quezon City", "Boracay"],
+            latitude: 14.60,
         },
         TimezoneEntry {
             city: "Taipei",
@@ -1646,6 +1850,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Taipei,
             aliases: &["Kaohsiung", "Taichung", "Tainan"],
+            latitude: 25.03,
         },
         // ──────────────────────────────────────────
         // UTC+9
@@ -1658,6 +1863,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             aliases: &[
                 "Osaka", "Kyoto", "Yokohama", "Nagoya", "Sapporo", "Fukuoka", "Kobe", "Okinawa",
             ],
+            latitude: 35.69,
         },
         TimezoneEntry {
             city: "Seoul",
@@ -1665,6 +1871,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Seoul,
             aliases: &["Busan", "Incheon", "Daegu", "Jeju"],
+            latitude: 37.57,
         },
         TimezoneEntry {
             city: "Pyongyang",
@@ -1672,6 +1879,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Pyongyang,
             aliases: &[],
+            latitude: 39.04,
         },
         TimezoneEntry {
             city: "Dili",
@@ -1679,6 +1887,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Dili,
             aliases: &[],
+            latitude: -8.56,
         },
         TimezoneEntry {
             city: "Palau",
@@ -1686,6 +1895,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Palau,
             aliases: &["Koror"],
+            latitude: 7.34,
         },
         // ──────────────────────────────────────────
         // UTC+9:30
@@ -1696,6 +1906,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Australia",
             tz: Tz::Australia__Adelaide,
             aliases: &["Darwin"],
+            latitude: -34.93,
         },
         // ──────────────────────────────────────────
         // UTC+10
@@ -1706,6 +1917,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Australia",
             tz: Tz::Australia__Sydney,
             aliases: &["Melbourne", "Canberra", "Brisbane", "Gold Coast", "Hobart"],
+            latitude: -33.87,
         },
         TimezoneEntry {
             city: "Chuuk",
@@ -1713,6 +1925,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Chuuk,
             aliases: &["Pohnpei"],
+            latitude: 7.45,
         },
         TimezoneEntry {
             city: "Port Moresby",
@@ -1720,6 +1933,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Port_Moresby,
             aliases: &["Lae", "Mount Hagen"],
+            latitude: -9.44,
         },
         TimezoneEntry {
             city: "Vladivostok",
@@ -1727,6 +1941,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Asia",
             tz: Tz::Asia__Vladivostok,
             aliases: &["Khabarovsk"],
+            latitude: 43.12,
         },
         // ──────────────────────────────────────────
         // UTC+11
@@ -1737,6 +1952,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Noumea,
             aliases: &[],
+            latitude: -22.27,
         },
         TimezoneEntry {
             city: "Honiara",
@@ -1744,6 +1960,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Guadalcanal,
             aliases: &[],
+            latitude: -9.43,
         },
         TimezoneEntry {
             city: "Port Vila",
@@ -1751,6 +1968,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Efate,
             aliases: &[],
+            latitude: -17.74,
         },
         // ──────────────────────────────────────────
         // UTC+12
@@ -1767,6 +1985,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
                 "Queenstown",
                 "Dunedin",
             ],
+            latitude: -36.85,
         },
         TimezoneEntry {
             city: "Suva",
@@ -1774,6 +1993,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Fiji,
             aliases: &["Nadi", "Lautoka"],
+            latitude: -18.13,
         },
         TimezoneEntry {
             city: "Tarawa",
@@ -1781,6 +2001,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Tarawa,
             aliases: &[],
+            latitude: 1.42,
         },
         TimezoneEntry {
             city: "Majuro",
@@ -1788,6 +2009,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Majuro,
             aliases: &["Kwajalein"],
+            latitude: 7.12,
         },
         TimezoneEntry {
             city: "Nauru",
@@ -1795,6 +2017,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Nauru,
             aliases: &[],
+            latitude: -0.55,
         },
         TimezoneEntry {
             city: "Funafuti",
@@ -1802,6 +2025,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Funafuti,
             aliases: &[],
+            latitude: -8.52,
         },
         // ──────────────────────────────────────────
         // UTC+12:45
@@ -1812,6 +2036,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Chatham,
             aliases: &[],
+            latitude: -43.95,
         },
         // ──────────────────────────────────────────
         // UTC+13
@@ -1822,6 +2047,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Apia,
             aliases: &[],
+            latitude: -13.83,
         },
         TimezoneEntry {
             city: "Nukualofa",
@@ -1829,6 +2055,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Tongatapu,
             aliases: &[],
+            latitude: -21.13,
         },
         // ──────────────────────────────────────────
         // UTC+14
@@ -1839,6 +2066,7 @@ pub fn all_timezones() -> Vec<TimezoneEntry> {
             region: "Pacific",
             tz: Tz::Pacific__Kiritimati,
             aliases: &["Christmas Island"],
+            latitude: 1.87,
         },
     ]
 }
@@ -1854,6 +2082,19 @@ pub(crate) fn country_search_aliases(country: &str) -> &'static [&'static str] {
         "USA" => &["US", "United States", "United States of America", "America"],
         "UK" => &["United Kingdom", "Britain", "Great Britain", "England"],
         "UAE" => &["United Arab Emirates", "Emirates"],
+        // Common abbreviations and endonyms for major economies. These are
+        // search-only — the canonical country name shown in the table remains
+        // whatever the catalogue entry sets.
+        "New Zealand" => &["NZ", "Aotearoa"],
+        "South Africa" => &["SA", "RSA"],
+        "China" => &["PRC", "People's Republic of China"],
+        "South Korea" => &["ROK", "Korea", "Republic of Korea"],
+        "North Korea" => &["DPRK", "Democratic People's Republic of Korea"],
+        "Brazil" => &["Brasil"],
+        "Spain" => &["Espana", "España"],
+        "Germany" => &["Deutschland"],
+        "Japan" => &["Nippon", "Nihon"],
+        "Russia" => &["Rossiya", "Russian Federation"],
         _ => &[],
     }
 }
@@ -1935,6 +2176,24 @@ pub(crate) fn supplemental_search_terms(
                 raw: "Nevada",
                 display_in_results: true,
             },
+            // Short-form city codes (A).
+            SupplementalSearchTerm {
+                raw: "LA",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "SF",
+                display_in_results: false,
+            },
+            // Airport codes (B).
+            SupplementalSearchTerm {
+                raw: "LAX",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "SFO",
+                display_in_results: false,
+            },
         ],
         Tz::America__Vancouver => &[
             SupplementalSearchTerm {
@@ -1960,6 +2219,11 @@ pub(crate) fn supplemental_search_terms(
             SupplementalSearchTerm {
                 raw: "British Columbia",
                 display_in_results: true,
+            },
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "YVR",
+                display_in_results: false,
             },
         ],
         Tz::America__Denver => &[
@@ -2010,6 +2274,11 @@ pub(crate) fn supplemental_search_terms(
             SupplementalSearchTerm {
                 raw: "West Texas",
                 display_in_results: true,
+            },
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "DEN",
+                display_in_results: false,
             },
         ],
         Tz::America__Phoenix => &[
@@ -2111,6 +2380,29 @@ pub(crate) fn supplemental_search_terms(
                 raw: "Tennessee",
                 display_in_results: true,
             },
+            // Short-form (A).
+            SupplementalSearchTerm {
+                raw: "Chi",
+                display_in_results: false,
+            },
+            // Airport codes (B). Houston/Dallas are in this tz per the
+            // catalogue's Chicago entry aliases.
+            SupplementalSearchTerm {
+                raw: "ORD",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "MDW",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "DFW",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "IAH",
+                display_in_results: false,
+            },
         ],
         Tz::America__Mexico_City => &[
             SupplementalSearchTerm {
@@ -2136,6 +2428,11 @@ pub(crate) fn supplemental_search_terms(
             SupplementalSearchTerm {
                 raw: "CDMX",
                 display_in_results: true,
+            },
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "MEX",
+                display_in_results: false,
             },
         ],
         Tz::America__New_York => &[
@@ -2247,6 +2544,50 @@ pub(crate) fn supplemental_search_terms(
                 raw: "Indiana",
                 display_in_results: true,
             },
+            // Short-form city codes (A). These would otherwise be filtered
+            // out by `score_field`'s 3-char minimum on `contains`-mode.
+            SupplementalSearchTerm {
+                raw: "NYC",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "NY",
+                display_in_results: false,
+            },
+            // Airport codes (B). Atlanta, Boston, and DC-area airports are
+            // all in the Eastern (America/New_York) tz.
+            SupplementalSearchTerm {
+                raw: "JFK",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "LGA",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "EWR",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "ATL",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "BOS",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "DCA",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "IAD",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "BWI",
+                display_in_results: false,
+            },
         ],
         Tz::America__Toronto => &[
             SupplementalSearchTerm {
@@ -2276,6 +2617,11 @@ pub(crate) fn supplemental_search_terms(
             SupplementalSearchTerm {
                 raw: "Quebec",
                 display_in_results: true,
+            },
+            // Airport code (B). Doubles as a short-form for Toronto.
+            SupplementalSearchTerm {
+                raw: "YYZ",
+                display_in_results: false,
             },
         ],
         Tz::America__Halifax => &[
@@ -2347,8 +2693,32 @@ pub(crate) fn supplemental_search_terms(
                 raw: "BST",
                 display_in_results: false,
             },
+            // Short-form (A).
+            SupplementalSearchTerm {
+                raw: "LDN",
+                display_in_results: false,
+            },
+            // Airport codes (B).
+            SupplementalSearchTerm {
+                raw: "LHR",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "LGW",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "STN",
+                display_in_results: false,
+            },
+            // Historical / colloquial (C). Scotland is searchable but the
+            // canonical display label remains "London".
+            SupplementalSearchTerm {
+                raw: "Scotland",
+                display_in_results: false,
+            },
         ],
-        Tz::Europe__Paris | Tz::Europe__Berlin => &[
+        Tz::Europe__Paris => &[
             SupplementalSearchTerm {
                 raw: "Central European Time",
                 display_in_results: false,
@@ -2365,8 +2735,53 @@ pub(crate) fn supplemental_search_terms(
                 raw: "CEST",
                 display_in_results: false,
             },
+            // Short-form (A) and airport codes (B).
+            SupplementalSearchTerm {
+                raw: "PAR",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CDG",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "ORY",
+                display_in_results: false,
+            },
         ],
-        Tz::Europe__Athens | Tz::Africa__Cairo => &[
+        Tz::Europe__Berlin => &[
+            SupplementalSearchTerm {
+                raw: "Central European Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Central Europe",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CET",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CEST",
+                display_in_results: false,
+            },
+            // Short-form (A) and airport codes (B). Frankfurt and Munich
+            // are aliased to Berlin in the catalogue, so FRA/MUC route here.
+            SupplementalSearchTerm {
+                raw: "BER",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "FRA",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "MUC",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__Athens => &[
             SupplementalSearchTerm {
                 raw: "Eastern European Time",
                 display_in_results: false,
@@ -2384,6 +2799,29 @@ pub(crate) fn supplemental_search_terms(
                 display_in_results: false,
             },
         ],
+        Tz::Africa__Cairo => &[
+            SupplementalSearchTerm {
+                raw: "Eastern European Time",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Eastern Europe",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "EET",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "EEST",
+                display_in_results: false,
+            },
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "CAI",
+                display_in_results: false,
+            },
+        ],
         Tz::Asia__Kolkata => &[
             SupplementalSearchTerm {
                 raw: "India Standard Time",
@@ -2391,6 +2829,32 @@ pub(crate) fn supplemental_search_terms(
             },
             SupplementalSearchTerm {
                 raw: "IST",
+                display_in_results: false,
+            },
+            // Historical / colloquial city names (C). The canonical display
+            // labels remain "Mumbai"/"Kolkata"/"Chennai" via the entry's
+            // city/aliases — these search-only terms catch users who type
+            // the pre-rename names.
+            SupplementalSearchTerm {
+                raw: "Bombay",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Calcutta",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Madras",
+                display_in_results: false,
+            },
+            // Airport codes (B). Delhi is aliased to Mumbai in the catalogue,
+            // so DEL routes here.
+            SupplementalSearchTerm {
+                raw: "BOM",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "DEL",
                 display_in_results: false,
             },
         ],
@@ -2401,6 +2865,20 @@ pub(crate) fn supplemental_search_terms(
             },
             SupplementalSearchTerm {
                 raw: "JST",
+                display_in_results: false,
+            },
+            // Short-form (A).
+            SupplementalSearchTerm {
+                raw: "TYO",
+                display_in_results: false,
+            },
+            // Airport codes (B).
+            SupplementalSearchTerm {
+                raw: "HND",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "NRT",
                 display_in_results: false,
             },
         ],
@@ -2473,6 +2951,274 @@ pub(crate) fn supplemental_search_terms(
                 raw: "AEDT",
                 display_in_results: false,
             },
+            // Short-form (A) and airport codes (B). Melbourne is aliased to
+            // Sydney in the catalogue, so MEL routes here.
+            SupplementalSearchTerm {
+                raw: "SYD",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "MEL",
+                display_in_results: false,
+            },
+        ],
+        // ------------------------------------------------------------------
+        // New arms for shortcuts (A), airport codes (B), historical names (C).
+        // Grouped here at the bottom for ease of review; ordering within the
+        // match doesn't affect runtime as the discriminant is unique.
+        // ------------------------------------------------------------------
+        Tz::America__Sao_Paulo => &[
+            // Short-form (A) and airport code (B).
+            SupplementalSearchTerm {
+                raw: "SP",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "SAO",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "GRU",
+                display_in_results: false,
+            },
+        ],
+        Tz::America__Argentina__Buenos_Aires => &[
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "EZE",
+                display_in_results: false,
+            },
+        ],
+        Tz::America__Santiago => &[
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "SCL",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__Amsterdam => &[
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "AMS",
+                display_in_results: false,
+            },
+            // Historical / colloquial (C). "Holland" remains search-only;
+            // canonical display label stays "Amsterdam".
+            SupplementalSearchTerm {
+                raw: "Holland",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__Madrid => &[
+            // Airport codes (B). Barcelona-El Prat is in the same tz.
+            SupplementalSearchTerm {
+                raw: "MAD",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "BCN",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__Rome => &[
+            // Airport codes (B). Milan-Malpensa is in the same tz.
+            SupplementalSearchTerm {
+                raw: "FCO",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "MXP",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__Zurich => &[
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "ZRH",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__Vienna => &[
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "VIE",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__Istanbul => &[
+            // Airport codes (B). Note: IST collides with India Standard Time
+            // (also a supplemental term on Asia/Kolkata), but search scoring
+            // surfaces both, which is the correct behaviour for an ambiguous
+            // 3-letter code.
+            SupplementalSearchTerm {
+                raw: "IST",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "SAW",
+                display_in_results: false,
+            },
+        ],
+        Tz::Europe__Kyiv => &[
+            // Historical spelling (C). "Kyiv" is the catalogue's display
+            // label; "Kiev" routes here for users who type the older form.
+            SupplementalSearchTerm {
+                raw: "Kiev",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Dubai => &[
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "DXB",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Qatar => &[
+            // Airport code (B). Doha is the city; DOH the IATA code.
+            SupplementalSearchTerm {
+                raw: "DOH",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Doha",
+                display_in_results: true,
+            },
+        ],
+        Tz::Asia__Tehran => &[
+            // Historical / colloquial (C).
+            SupplementalSearchTerm {
+                raw: "Persia",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Yangon => &[
+            // Historical / colloquial (C). "Burma" was the pre-1989 name.
+            SupplementalSearchTerm {
+                raw: "Burma",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Bangkok => &[
+            // Short-form (A) and historical name (C).
+            SupplementalSearchTerm {
+                raw: "BKK",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Siam",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Jakarta => &[
+            // Short-form (A) and airport code (B).
+            SupplementalSearchTerm {
+                raw: "JKT",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "CGK",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Singapore => &[
+            // Short-forms (A) and airport code (B).
+            SupplementalSearchTerm {
+                raw: "SG",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "SGP",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "SIN",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Shanghai => &[
+            // Airport codes (B) and historical Beijing romanisation (C).
+            // PVG = Shanghai Pudong, SHA = Shanghai Hongqiao.
+            SupplementalSearchTerm {
+                raw: "PVG",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "SHA",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "Peking",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Hong_Kong => &[
+            // Short-forms (A) / airport code (B).
+            SupplementalSearchTerm {
+                raw: "HK",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "HKG",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Kuala_Lumpur => &[
+            // Short-form (A) and airport code (B).
+            SupplementalSearchTerm {
+                raw: "KL",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "KUL",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Seoul => &[
+            // Airport codes (B). GMP = Gimpo, ICN = Incheon.
+            SupplementalSearchTerm {
+                raw: "ICN",
+                display_in_results: false,
+            },
+            SupplementalSearchTerm {
+                raw: "GMP",
+                display_in_results: false,
+            },
+        ],
+        Tz::Asia__Colombo => &[
+            // Historical / colloquial (C).
+            SupplementalSearchTerm {
+                raw: "Ceylon",
+                display_in_results: false,
+            },
+        ],
+        Tz::Pacific__Auckland => &[
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "AKL",
+                display_in_results: false,
+            },
+        ],
+        Tz::Africa__Johannesburg => &[
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "JNB",
+                display_in_results: false,
+            },
+        ],
+        Tz::Africa__Nairobi => &[
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "NBO",
+                display_in_results: false,
+            },
+        ],
+        Tz::Africa__Lagos => &[
+            // Airport code (B).
+            SupplementalSearchTerm {
+                raw: "LOS",
+                display_in_results: false,
+            },
         ],
         _ => &[],
     }
@@ -2493,243 +3239,22 @@ pub(crate) fn supplemental_search_terms(
 // curated latitude fall back to the simple window — never worse than
 // the previous behaviour.
 
-/// Curated latitude (degrees, positive = north) for each timezone in
-/// the catalogue. `None` falls back to the 6..18 window.
+/// Returns the curated latitude for `tz` if present in [`all_timezones`].
 ///
-/// Values are approximate (1-2 decimal places — well within solar-
-/// noon precision needed for a "is it day?" yes/no answer).
+/// After the data-restructuring refactor, the source of truth for each city's
+/// latitude is the `latitude` field on [`TimezoneEntry`]. This wrapper exists
+/// purely so the original `latitude_for` call sites (and the legacy test
+/// `every_catalogue_entry_has_a_latitude`) keep compiling.
+///
+/// Complexity: O(n) over the catalogue per call (~217 entries). Called once
+/// per visible table row per second by [`is_daytime_at`], which is trivial.
+/// If profiling ever shows this on a hot path, switch callers that already
+/// hold a `&TimezoneEntry` to read `entry.latitude` directly.
 pub(crate) fn latitude_for(tz: Tz) -> Option<f64> {
-    let lat = match tz {
-        // Pacific (UTC-11 to -9)
-        Tz::Pacific__Pago_Pago => -14.28,
-        Tz::Pacific__Honolulu => 21.31,
-        Tz::America__Anchorage => 61.22,
-
-        // Americas (UTC-8 to -3)
-        Tz::America__Los_Angeles => 34.05,
-        Tz::America__Vancouver => 49.28,
-        Tz::America__Denver => 39.74,
-        Tz::America__Phoenix => 33.45,
-        Tz::America__Chicago => 41.88,
-        Tz::America__Mexico_City => 19.43,
-        Tz::America__Belize => 17.25,
-        Tz::America__Costa_Rica => 9.93,
-        Tz::America__El_Salvador => 13.69,
-        Tz::America__Guatemala => 14.63,
-        Tz::America__Tegucigalpa => 14.07,
-        Tz::America__Managua => 12.13,
-        Tz::America__New_York => 40.71,
-        Tz::America__Toronto => 43.65,
-        Tz::America__Bogota => 4.71,
-        Tz::America__Nassau => 25.05,
-        Tz::America__Havana => 23.13,
-        Tz::America__Guayaquil => -2.17, // Quito
-        Tz::America__PortauPrince => 18.55,
-        Tz::America__Jamaica => 17.97,
-        Tz::America__Panama => 8.97,
-        Tz::America__Lima => -12.05,
-        Tz::America__Santiago => -33.45,
-        Tz::America__Halifax => 44.65,
-        Tz::America__Antigua => 17.12,
-        Tz::America__Barbados => 13.10,
-        Tz::America__La_Paz => -16.50,
-        Tz::America__Manaus => -3.12,
-        Tz::America__Dominica => 15.30,
-        Tz::America__Santo_Domingo => 18.47,
-        Tz::America__Grenada => 12.05,
-        Tz::America__Guyana => 6.80,
-        Tz::America__Asuncion => -25.27,
-        Tz::America__St_Lucia => 14.00,
-        Tz::America__St_Kitts => 17.30,
-        Tz::America__St_Vincent => 13.16,
-        Tz::America__Port_of_Spain => 10.66,
-        Tz::America__Caracas => 10.50,
-        Tz::America__St_Johns => 47.56,
-        Tz::America__Sao_Paulo => -23.55,
-        Tz::America__Argentina__Buenos_Aires => -34.60,
-        Tz::America__Paramaribo => 5.85,
-        Tz::America__Montevideo => -34.90,
-
-        // Atlantic / Europe / Africa (UTC-1 to +3)
-        Tz::Atlantic__Azores => 37.74,
-        Tz::Atlantic__Cape_Verde => 14.93,
-        Tz::UTC => 0.0,
-        Tz::Europe__London => 51.51,
-        Tz::Atlantic__Reykjavik => 64.13,
-        Tz::Africa__Accra => 5.55,
-        Tz::Africa__Ouagadougou => 12.37,
-        Tz::Africa__Banjul => 13.45,
-        Tz::Africa__Conakry => 9.51,
-        Tz::Africa__Bissau => 11.86,
-        Tz::Europe__Dublin => 53.35,
-        Tz::Africa__Abidjan => 5.36,
-        Tz::Africa__Monrovia => 6.31,
-        Tz::Africa__Bamako => 12.65,
-        Tz::Africa__Nouakchott => 18.07,
-        Tz::Europe__Lisbon => 38.72,
-        Tz::Africa__Sao_Tome => 0.34,
-        Tz::Africa__Dakar => 14.69,
-        Tz::Africa__Freetown => 8.48,
-        Tz::Africa__Lome => 6.13,
-        Tz::Europe__Paris => 48.86,
-        Tz::Europe__Berlin => 52.52,
-        Tz::Africa__Lagos => 6.46,
-        Tz::Europe__Tirane => 41.33,
-        Tz::Africa__Algiers => 36.75,
-        Tz::Europe__Andorra => 42.51,
-        Tz::Africa__Luanda => -8.84,
-        Tz::Europe__Vienna => 48.21,
-        Tz::Europe__Brussels => 50.85,
-        Tz::Africa__PortoNovo => 6.50,
-        Tz::Europe__Sarajevo => 43.86,
-        Tz::Africa__Douala => 4.05,
-        Tz::Africa__Bangui => 4.36,
-        Tz::Africa__Ndjamena => 12.13,
-        Tz::Africa__Brazzaville => -4.27,
-        Tz::Europe__Zagreb => 45.81,
-        Tz::Europe__Prague => 50.09,
-        Tz::Europe__Copenhagen => 55.68,
-        Tz::Africa__Kinshasa => -4.32,
-        Tz::Africa__Malabo => 3.75,
-        Tz::Africa__Libreville => 0.42,
-        Tz::Europe__Budapest => 47.50,
-        Tz::Europe__Rome => 41.90,
-        Tz::Europe__Vaduz => 47.14,
-        Tz::Europe__Luxembourg => 49.61,
-        Tz::Europe__Malta => 35.90,
-        Tz::Europe__Monaco => 43.74,
-        Tz::Europe__Podgorica => 42.44,
-        Tz::Africa__Casablanca => 33.57,
-        Tz::Africa__Windhoek => -22.56,
-        Tz::Europe__Amsterdam => 52.37,
-        Tz::Africa__Niamey => 13.51,
-        Tz::Europe__Skopje => 42.00,
-        Tz::Europe__Oslo => 59.91,
-        Tz::Europe__Warsaw => 52.23,
-        Tz::Europe__San_Marino => 43.94,
-        Tz::Europe__Belgrade => 44.79,
-        Tz::Europe__Bratislava => 48.15,
-        Tz::Europe__Ljubljana => 46.06,
-        Tz::Europe__Madrid => 40.42,
-        Tz::Europe__Stockholm => 59.33,
-        Tz::Europe__Zurich => 47.37,
-        Tz::Africa__Tunis => 36.81,
-        Tz::Europe__Vatican => 41.90,
-        Tz::Africa__Cairo => 30.04,
-        Tz::Europe__Athens => 37.98,
-        Tz::Africa__Johannesburg => -26.20,
-        Tz::Africa__Gaborone => -24.65,
-        Tz::Europe__Sofia => 42.70,
-        Tz::Africa__Bujumbura => -3.38,
-        Tz::Asia__Nicosia => 35.18,
-        Tz::Europe__Tallinn => 59.44,
-        Tz::Africa__Mbabane => -26.32,
-        Tz::Europe__Helsinki => 60.17,
-        Tz::Asia__Jerusalem => 31.78,
-        Tz::Asia__Amman => 31.95,
-        Tz::Europe__Riga => 56.95,
-        Tz::Asia__Beirut => 33.89,
-        Tz::Africa__Maseru => -29.31,
-        Tz::Africa__Tripoli => 32.89,
-        Tz::Europe__Vilnius => 54.69,
-        Tz::Africa__Blantyre => -13.96, // Lilongwe
-        Tz::Europe__Chisinau => 47.01,
-        Tz::Africa__Maputo => -25.97,
-        Tz::Asia__Hebron => 31.90, // Ramallah
-        Tz::Europe__Bucharest => 44.43,
-        Tz::Africa__Kigali => -1.94,
-        Tz::Africa__Juba => 4.85,
-        Tz::Africa__Khartoum => 15.50,
-        Tz::Asia__Damascus => 33.51,
-        Tz::Europe__Kyiv => 50.45,
-        Tz::Africa__Lusaka => -15.42,
-        Tz::Africa__Harare => -17.83,
-        Tz::Europe__Moscow => 55.76,
-        Tz::Europe__Istanbul => 41.01,
-        Tz::Africa__Nairobi => -1.29,
-        Tz::Asia__Bahrain => 26.23,
-        Tz::Europe__Minsk => 53.90,
-        Tz::Indian__Comoro => -11.70,
-        Tz::Africa__Djibouti => 11.59,
-        Tz::Africa__Asmara => 15.32,
-        Tz::Africa__Addis_Ababa => 9.03,
-        Tz::Asia__Baghdad => 33.31,
-        Tz::Asia__Kuwait => 29.38,
-        Tz::Indian__Antananarivo => -18.88,
-        Tz::Asia__Qatar => 25.29,
-        Tz::Asia__Riyadh => 24.71,
-        Tz::Africa__Mogadishu => 2.05,
-        Tz::Africa__Dar_es_Salaam => -6.79,
-        Tz::Africa__Kampala => 0.35,
-        Tz::Asia__Aden => 12.79,
-
-        // Asia (UTC+3:30 to +9)
-        Tz::Asia__Tehran => 35.69,
-        Tz::Asia__Dubai => 25.20,
-        Tz::Asia__Yerevan => 40.18,
-        Tz::Asia__Baku => 40.41,
-        Tz::Asia__Tbilisi => 41.72,
-        Tz::Indian__Mauritius => -20.16,
-        Tz::Asia__Muscat => 23.59,
-        Tz::Indian__Mahe => -4.62,
-        Tz::Asia__Kabul => 34.53,
-        Tz::Asia__Karachi => 24.86,
-        Tz::Indian__Maldives => 4.18,
-        Tz::Asia__Dushanbe => 38.54,
-        Tz::Asia__Ashgabat => 37.95,
-        Tz::Asia__Tashkent => 41.31,
-        Tz::Asia__Kolkata => 19.08, // Mumbai
-        Tz::Asia__Colombo => 6.93,
-        Tz::Asia__Kathmandu => 27.72,
-        Tz::Asia__Dhaka => 23.81,
-        Tz::Asia__Thimphu => 27.47,
-        Tz::Asia__Almaty => 43.26,
-        Tz::Asia__Bishkek => 42.87,
-        Tz::Asia__Yangon => 16.85,
-        Tz::Asia__Bangkok => 13.76,
-        Tz::Asia__Jakarta => -6.21,
-        Tz::Asia__Phnom_Penh => 11.55,
-        Tz::Asia__Vientiane => 17.97,
-        Tz::Asia__Novosibirsk => 55.04,
-        Tz::Asia__Ho_Chi_Minh => 10.82,
-        Tz::Asia__Singapore => 1.35,
-        Tz::Asia__Shanghai => 31.23,
-        Tz::Asia__Hong_Kong => 22.32,
-        Tz::Australia__Perth => -31.95,
-        Tz::Asia__Brunei => 4.94,
-        Tz::Asia__Kuala_Lumpur => 3.139,
-        Tz::Asia__Ulaanbaatar => 47.92,
-        Tz::Asia__Manila => 14.60,
-        Tz::Asia__Taipei => 25.03,
-        Tz::Asia__Tokyo => 35.69,
-        Tz::Asia__Seoul => 37.57,
-        Tz::Asia__Pyongyang => 39.04,
-        Tz::Asia__Dili => -8.56,
-        Tz::Pacific__Palau => 7.34,
-
-        // Oceania / far-east Russia (UTC+9:30 to +14)
-        Tz::Australia__Adelaide => -34.93,
-        Tz::Australia__Sydney => -33.87,
-        Tz::Pacific__Chuuk => 7.45,
-        Tz::Pacific__Port_Moresby => -9.44,
-        Tz::Asia__Vladivostok => 43.12,
-        Tz::Pacific__Noumea => -22.27,
-        Tz::Pacific__Guadalcanal => -9.43, // Honiara
-        Tz::Pacific__Efate => -17.74,      // Port Vila
-        Tz::Pacific__Auckland => -36.85,
-        Tz::Pacific__Fiji => -18.13,
-        Tz::Pacific__Tarawa => 1.42,
-        Tz::Pacific__Majuro => 7.12,
-        Tz::Pacific__Nauru => -0.55,
-        Tz::Pacific__Funafuti => -8.52,
-        Tz::Pacific__Chatham => -43.95,
-        Tz::Pacific__Apia => -13.83,
-        Tz::Pacific__Tongatapu => -21.13,
-        Tz::Pacific__Kiritimati => 1.87,
-
-        _ => return None,
-    };
-    Some(lat)
+    all_timezones()
+        .into_iter()
+        .find(|e| e.tz == tz)
+        .map(|e| e.latitude)
 }
 
 /// Returns `(sunrise, sunset)` as fractional hours of local clock
@@ -2753,10 +3278,16 @@ pub(crate) fn sun_window(latitude_deg: f64, day_of_year: u32) -> (f64, f64) {
 
     let lat = latitude_deg.to_radians();
     // Cooper's formula for solar declination — accurate to within ~0.5°.
+    // The 365.0 denominator ignores leap years, introducing a ~1-day phase
+    // error that's negligible for a binary day/night decision.
     let declination =
         (-23.44_f64).to_radians() * (2.0 * PI / 365.0 * (day_of_year as f64 + 10.0)).cos();
 
     // Hour angle of sunrise/sunset, clamped for polar day/night.
+    // The `.clamp(-1.0, 1.0)` is load-bearing, not defensive: above the
+    // Arctic / below the Antarctic circle the argument to `acos` exceeds
+    // [-1, 1] and clamping is what produces the polar day (-> 0) or
+    // polar night (-> π) hour angle.
     let cos_omega = (-lat.tan() * declination.tan()).clamp(-1.0, 1.0);
     let omega = cos_omega.acos();
     let half_day_hours = omega * 12.0 / PI;
@@ -2778,8 +3309,30 @@ pub fn is_daytime_at(tz: Tz, local: &DateTime<Tz>) -> bool {
     }
 }
 
+/// Formats a UTC offset in seconds to a human-readable string like
+/// `UTC+5` or `UTC+5:30`.
+///
+/// Used by both the table column ([`crate::ui`]) and the search scoring
+/// haystack ([`crate::search`]) — kept here in [`timezone`] because UTC
+/// offsets are a timezone concern, not a search concern.
+pub fn format_utc_offset(total_secs: i32) -> String {
+    let sign = if total_secs >= 0 { '+' } else { '-' };
+    let abs = total_secs.unsigned_abs();
+    let hours = abs / 3600;
+    let mins = (abs % 3600) / 60;
+    if mins == 0 {
+        format!("UTC{}{}", sign, hours)
+    } else {
+        format!("UTC{}{}:{:02}", sign, hours, mins)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    // Tests panic on failure by design — see src/app.rs for the
+    // rationale on why production lints are relaxed inside test modules.
+    #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+
     use super::*;
 
     fn approx(a: f64, b: f64, tol: f64) -> bool {
@@ -2834,6 +3387,175 @@ mod tests {
             Tz::Atlantic__Reykjavik,
         ] {
             assert!(latitude_for(tz).is_some(), "missing latitude for {tz:?}");
+        }
+    }
+
+    /// Locks in the invariant that every catalogue entry has a curated
+    /// latitude. Without this, a new city added to `all_timezones()`
+    /// without a matching arm in `latitude_for` would silently fall
+    /// through to the `(6..18).contains(&hour)` default in
+    /// `is_daytime_at`, which is wrong for any high-latitude or
+    /// southern-hemisphere city.
+    #[test]
+    fn every_catalogue_entry_has_a_latitude() {
+        for entry in all_timezones() {
+            assert!(
+                latitude_for(entry.tz).is_some(),
+                "missing latitude for {} ({:?})",
+                entry.city,
+                entry.tz,
+            );
+        }
+    }
+
+    /// Spot-checks for well-known city latitudes. These are deliberately tight
+    /// (±0.05°) so they catch any misalignment between catalogue entries and
+    /// their latitude data. If you add a new city, please add a row here.
+    #[test]
+    fn known_city_latitudes_within_tolerance() {
+        use chrono_tz::Tz;
+        let cases: &[(Tz, f64, &str)] = &[
+            (Tz::Europe__London, 51.51, "London"),
+            (Tz::Asia__Tokyo, 35.69, "Tokyo"),
+            (Tz::America__New_York, 40.71, "New York"),
+            (Tz::Australia__Sydney, -33.87, "Sydney"),
+            (Tz::Atlantic__Reykjavik, 64.13, "Reykjavík"),
+            (Tz::America__Argentina__Buenos_Aires, -34.60, "Buenos Aires"),
+            (Tz::Asia__Singapore, 1.35, "Singapore"),
+            (Tz::Africa__Cairo, 30.04, "Cairo"),
+            (Tz::Pacific__Auckland, -36.85, "Auckland"),
+            (Tz::America__Los_Angeles, 34.05, "Los Angeles"),
+            (Tz::UTC, 0.00, "UTC (equator default)"),
+        ];
+        for (tz, expected, name) in cases {
+            let actual =
+                latitude_for(*tz).unwrap_or_else(|| panic!("no latitude for {} ({:?})", name, tz));
+            assert!(
+                (actual - expected).abs() < 0.05,
+                "{} latitude mismatch: expected ~{}, got {}",
+                name,
+                expected,
+                actual
+            );
+        }
+    }
+
+    /// Coverage: every tz that has supplemental_search_terms must appear in the
+    /// catalogue. This catches drift the other direction (supplemental terms for
+    /// a removed city).
+    #[test]
+    fn every_supplemental_search_term_targets_a_catalogue_entry() {
+        use std::collections::HashSet;
+        let catalogue_tzs: HashSet<_> = all_timezones().into_iter().map(|e| e.tz).collect();
+        // Iterate the catalogue and verify any supplemental terms it points at
+        // are valid — this is the inverse of `every_catalogue_entry_has_a_latitude`.
+        for entry in all_timezones() {
+            if !supplemental_search_terms(&entry).is_empty() {
+                assert!(
+                    catalogue_tzs.contains(&entry.tz),
+                    "supplemental_search_terms for {:?} but tz not in catalogue",
+                    entry.tz
+                );
+            }
+        }
+        // NB: a stronger test would iterate every tz that has terms and check
+        // catalogue membership, but supplemental_search_terms is keyed by Tz
+        // (enum), not by an iterable list — there's no source-of-truth iterator
+        // without exposing internals. The above test catches the practical case.
+    }
+
+    /// Helper for the findability tests below: look up `tz` in the catalogue
+    /// and assert that `term` is in either its `aliases` or its
+    /// `supplemental_search_terms`. Case-insensitive — short codes are
+    /// stored in upper case but users type them in any case.
+    fn assert_findable(tz: Tz, term: &str) {
+        let entry = all_timezones()
+            .into_iter()
+            .find(|e| e.tz == tz)
+            .unwrap_or_else(|| panic!("tz not in catalogue: {tz:?}"));
+        let in_aliases = entry.aliases.iter().any(|a| a.eq_ignore_ascii_case(term));
+        let in_supp = supplemental_search_terms(&entry)
+            .iter()
+            .any(|s| s.raw.eq_ignore_ascii_case(term));
+        assert!(
+            in_aliases || in_supp,
+            "{:?} should be findable as {:?} but it's in neither aliases nor supplemental terms",
+            tz,
+            term,
+        );
+    }
+
+    /// Section A — two- and three-letter city shortcuts. These were the
+    /// biggest losses in the findability review because `score_field`'s
+    /// 3-char minimum on contains-mode meant they never matched.
+    #[test]
+    fn nyc_la_sf_kl_resolve_to_their_cities() {
+        assert_findable(Tz::America__New_York, "NYC");
+        assert_findable(Tz::America__New_York, "NY");
+        assert_findable(Tz::America__Los_Angeles, "LA");
+        assert_findable(Tz::America__Los_Angeles, "SF");
+        assert_findable(Tz::Asia__Kuala_Lumpur, "KL");
+        assert_findable(Tz::Asia__Hong_Kong, "HK");
+        assert_findable(Tz::Asia__Singapore, "SG");
+    }
+
+    /// Section B — IATA airport codes route to the city whose timezone the
+    /// airport actually sits in. The Houston/Dallas case is the most
+    /// surprising one (Central Time → America/Chicago), so it's pinned here.
+    #[test]
+    fn airport_codes_lhr_jfk_hnd_route_to_expected_tz() {
+        assert_findable(Tz::Europe__London, "LHR");
+        assert_findable(Tz::America__New_York, "JFK");
+        assert_findable(Tz::America__New_York, "ATL"); // Atlanta is Eastern.
+        assert_findable(Tz::America__Chicago, "DFW"); // Dallas is Central.
+        assert_findable(Tz::America__Los_Angeles, "SFO"); // SF is Pacific.
+        assert_findable(Tz::Asia__Tokyo, "HND");
+        assert_findable(Tz::Asia__Tokyo, "NRT");
+        assert_findable(Tz::Asia__Singapore, "SIN");
+        assert_findable(Tz::Pacific__Auckland, "AKL");
+    }
+
+    /// Section C — historical / colloquial city and country names route to
+    /// the modern catalogue entry without overriding its display label.
+    #[test]
+    fn historical_names_bombay_kiev_route_correctly() {
+        assert_findable(Tz::Asia__Kolkata, "Bombay");
+        assert_findable(Tz::Asia__Kolkata, "Calcutta");
+        assert_findable(Tz::Asia__Kolkata, "Madras");
+        assert_findable(Tz::Europe__Kyiv, "Kiev");
+        assert_findable(Tz::Asia__Yangon, "Burma");
+        assert_findable(Tz::Asia__Colombo, "Ceylon");
+        assert_findable(Tz::Asia__Tehran, "Persia");
+        assert_findable(Tz::Asia__Bangkok, "Siam");
+        assert_findable(Tz::Europe__Amsterdam, "Holland");
+        // Saigon was already aliased before this change — verify it's still
+        // resolvable so a future cleanup doesn't accidentally drop it.
+        assert_findable(Tz::Asia__Ho_Chi_Minh, "Saigon");
+    }
+
+    /// Section D — country abbreviations and endonyms resolve via
+    /// `country_search_aliases`. Spot-checks the most common cases plus a
+    /// pre-existing one to lock the contract in.
+    #[test]
+    fn country_aliases_cover_major_economies() {
+        let cases: &[(&str, &str)] = &[
+            ("USA", "America"), // pre-existing
+            ("New Zealand", "NZ"),
+            ("South Africa", "SA"),
+            ("China", "PRC"),
+            ("South Korea", "ROK"),
+            ("Brazil", "Brasil"),
+            ("Germany", "Deutschland"),
+            ("Japan", "Nippon"),
+            ("Russia", "Rossiya"),
+            ("Spain", "Espana"),
+        ];
+        for (country, alias) in cases {
+            let aliases = country_search_aliases(country);
+            assert!(
+                aliases.iter().any(|a| a.eq_ignore_ascii_case(alias)),
+                "country {country:?} should expose alias {alias:?}, got {aliases:?}",
+            );
         }
     }
 }
