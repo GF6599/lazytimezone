@@ -58,13 +58,29 @@ impl Theme {
     }
 
     pub fn from_label(s: &str) -> Self {
-        match s {
-            "Dracula" => Theme::Dracula,
-            "Solarized" => Theme::Solarized,
-            "Nord" => Theme::Nord,
-            "Monokai" => Theme::Monokai,
-            "Gruvbox" => Theme::Gruvbox,
-            _ => Theme::Default,
+        Self::try_from_label(s).unwrap_or(Theme::Default)
+    }
+
+    /// Strict, case-insensitive label lookup.
+    ///
+    /// Returns `None` for unknown labels so callers (e.g. the config-load
+    /// path) can surface a warning instead of silently downgrading to
+    /// [`Theme::Default`].
+    pub fn try_from_label(label: &str) -> Option<Theme> {
+        if label.eq_ignore_ascii_case("Default") {
+            Some(Theme::Default)
+        } else if label.eq_ignore_ascii_case("Dracula") {
+            Some(Theme::Dracula)
+        } else if label.eq_ignore_ascii_case("Solarized") {
+            Some(Theme::Solarized)
+        } else if label.eq_ignore_ascii_case("Nord") {
+            Some(Theme::Nord)
+        } else if label.eq_ignore_ascii_case("Monokai") {
+            Some(Theme::Monokai)
+        } else if label.eq_ignore_ascii_case("Gruvbox") {
+            Some(Theme::Gruvbox)
+        } else {
+            None
         }
     }
 }
