@@ -23,28 +23,71 @@ use crate::app::{App, InputMode};
 /// Only `KeyEventKind::Press` is handled — release and repeat events
 /// are ignored to prevent duplicate actions on platforms that emit them.
 pub fn handle_events(app: &mut App, timeout: Duration) -> std::io::Result<()> {
-    if event::poll(timeout)?
-        && let Event::Key(key) = event::read()?
-    {
-        if key.kind != KeyEventKind::Press {
-            return Ok(());
+    if !event::poll(timeout)? {
+        return Ok(());
+    }
+    match event::read()? {
+        Event::Key(key) => {
+            dispatch_key(app, key);
+            // Coalesce auto-repeat bursts: when the user holds j/k, crossterm
+            // queues a key event per repeat. Drain any already-ready key events
+            // here so the main loop redraws once per burst, not once per key.
+            while event::poll(Duration::ZERO)? {
+                match event::read()? {
+                    Event::Key(next) => dispatch_key(app, next),
+                    // Non-Key events during a burst: stop draining so the main
+                    // loop can react (e.g. a Resize) on its next iteration.
+                    _ => break,
+                }
+            }
         }
-        if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
-            app.should_quit = true;
-            return Ok(());
-        }
-        // Help is modal: any key dismisses it before reaching the
-        // mode-specific handlers below.
-        if app.show_help {
-            app.close_help();
-            return Ok(());
-        }
-        match app.input_mode {
-            InputMode::Normal => handle_normal_mode(app, key),
-            InputMode::Search => handle_search_mode(app, key),
+        // Resize is handled implicitly by the main loop's unconditional
+        // redraw; the explicit arm documents that we consume it on purpose.
+        Event::Resize(_, _) => {}
+        // Mouse / focus events are not bound to any action yet. Match
+        // them explicitly so future additions are an obvious diff
+        // rather than a silently-dropped event.
+        Event::Mouse(_) | Event::FocusGained | Event::FocusLost => {}
+        // Bracketed paste: in Search mode, splat the entire payload
+        // into the query in one shot (avoiding the per-char filter
+        // recompute). Outside search there's no text field to paste
+        // into, so the event is dropped — same as the prior behaviour.
+        Event::Paste(text) => {
+            if app.input_mode == InputMode::Search {
+                app.search_paste(&text);
+            }
         }
     }
     Ok(())
+}
+
+/// Routes a single key event through the Ctrl-C, help-modal, and
+/// mode-specific handlers. Extracted so `handle_events` can also call it
+/// when draining a coalesced key-repeat burst.
+fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
+    if key.kind != KeyEventKind::Press {
+        return;
+    }
+    if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        app.should_quit = true;
+        return;
+    }
+    // Any keypress dismisses the startup-message banner so it never
+    // lingers past the user's first interaction. Done up here (not
+    // inside the per-mode handlers) so EVERY key flushes the banner —
+    // including ones that would otherwise be no-ops. The keypress is
+    // still allowed to flow through to its normal handler below.
+    app.dismiss_startup_messages();
+    // Help is modal: any key dismisses it before reaching the
+    // mode-specific handlers below.
+    if app.show_help {
+        app.close_help();
+        return;
+    }
+    match app.input_mode {
+        InputMode::Normal => handle_normal_mode(app, key),
+        InputMode::Search => handle_search_mode(app, key),
+    }
 }
 
 /// Vim-style bindings: `j/k` navigate, `/` searches, `f` toggles
@@ -78,10 +121,18 @@ fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
 /// Text-input bindings: printable chars insert at cursor, Backspace
 /// deletes the previous char, Delete removes the char under the
 /// cursor, Left/Right move the cursor, Home/End jump to ends,
-/// Ctrl-u clears, Esc/Enter exits back to normal mode.
+/// Ctrl-u clears, Ctrl-w deletes the previous word, Ctrl-k deletes to
+/// end of line, Ctrl-f toggles favourite on the highlighted row, Esc
+/// exits without committing, Enter commits the highlighted row and
+/// exits.
+///
+/// Ctrl ordering matters: the Ctrl-modified arms must come before the
+/// catch-all `KeyCode::Char(c)` insert, since a bare `f`/`w`/`k`/`u`
+/// keystroke should still type a literal character into the query.
 fn handle_search_mode(app: &mut App, key: crossterm::event::KeyEvent) {
     match key.code {
-        KeyCode::Esc | KeyCode::Enter => app.exit_search(),
+        KeyCode::Esc => app.exit_search(),
+        KeyCode::Enter => app.commit_search_result_and_exit(),
         KeyCode::Backspace => app.search_backspace(),
         KeyCode::Delete => app.search_delete(),
         KeyCode::Left => app.search_cursor_left(),
@@ -96,6 +147,18 @@ fn handle_search_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         }
         KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.search_cursor_end();
+        }
+        KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.delete_word_before_cursor();
+        }
+        KeyCode::Char('k') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.delete_to_end_of_line();
+        }
+        // Ctrl-f toggles favourite on the highlighted row without
+        // leaving search mode. Bare `f` keeps inserting the literal
+        // character, so multi-word queries like `fiji` still work.
+        KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.toggle_favorite();
         }
         KeyCode::Char(c) => app.search_input(c),
         _ => {}
