@@ -56,6 +56,7 @@ lazytimezone
 | `J` | Move favorite down in order |
 | `K` | Move favorite up in order |
 | `/` | Enter search mode |
+| `Ctrl-l` | Clear active search filter |
 | `t` | Cycle theme |
 | `c` | Copy time to clipboard |
 | `?` | Toggle help overlay |

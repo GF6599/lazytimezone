@@ -102,6 +102,7 @@ fn draw_help_popup(frame: &mut Frame, area: Rect, tc: &ThemeColors) {
         help_row("Ctrl-d / Ctrl-u", "Page down / up", tc),
         help_row("Enter", "Select timezone (set as main clock)", tc),
         help_row("/", "Enter search mode", tc),
+        help_row("Ctrl-l", "Clear active search filter", tc),
         help_row("f", "Toggle favorite on selected row", tc),
         help_row("F", "Toggle favorites-only filter", tc),
         help_row("J / K", "Move favorite down / up in order", tc),

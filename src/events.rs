@@ -91,7 +91,9 @@ fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
 }
 
 /// Vim-style bindings: `j/k` navigate, `/` searches, `f` toggles
-/// favorites, `J/K` reorder favorites, `t` cycles themes, `c` copies.
+/// favorites, `J/K` reorder favorites, `t` cycles themes, `c` copies,
+/// `Ctrl-l` clears any active search filter without entering search
+/// mode (shell-readline convention).
 fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
     match key.code {
         KeyCode::Char('q') => {
@@ -103,6 +105,13 @@ fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Char('G') | KeyCode::End => app.end(),
         KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => app.page_down(),
         KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => app.page_up(),
+        // Ctrl-l: clear any active filter while staying in Normal mode.
+        // Esc only exits search mode without wiping the query, so without
+        // this binding the only way to reset a stale filter is `/` (which
+        // also re-enters search mode).
+        KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.clear_search_input();
+        }
         KeyCode::PageDown => app.page_down(),
         KeyCode::PageUp => app.page_up(),
         KeyCode::Char('/') => app.enter_search(),
