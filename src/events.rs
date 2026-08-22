@@ -198,3 +198,109 @@ fn handle_search_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    // Tests panic on failure by design — see src/app.rs for the rationale
+    // on why the production panic lints are relaxed inside test modules.
+    #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+
+    use std::collections::VecDeque;
+
+    use crossterm::event::{KeyEvent, KeyEventState};
+
+    use super::*;
+    use crate::config;
+
+    /// `poll` reports readiness without blocking, which is what a burst
+    /// of already-buffered terminal input looks like.
+    struct QueuedEvents {
+        queued: VecDeque<Event>,
+    }
+
+    impl QueuedEvents {
+        fn new(events: Vec<Event>) -> Self {
+            Self {
+                queued: events.into(),
+            }
+        }
+
+        fn remaining(&self) -> usize {
+            self.queued.len()
+        }
+    }
+
+    impl EventSource for QueuedEvents {
+        fn poll(&mut self, _timeout: Duration) -> std::io::Result<bool> {
+            Ok(!self.queued.is_empty())
+        }
+
+        fn read(&mut self) -> std::io::Result<Event> {
+            self.queued
+                .pop_front()
+                .ok_or_else(|| std::io::Error::other("polled ready with an empty queue"))
+        }
+    }
+
+    fn key(c: char) -> Event {
+        Event::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        })
+    }
+
+    fn searching_app() -> App {
+        let mut app = App::with_config(config::Config::default());
+        app.enter_search();
+        app
+    }
+
+    #[test]
+    fn a_paste_arriving_behind_a_keystroke_is_not_discarded() {
+        let mut app = searching_app();
+        let mut source = QueuedEvents::new(vec![key('a'), Event::Paste("sia".to_string())]);
+
+        handle_events(&mut app, &mut source, Duration::ZERO).unwrap();
+
+        assert_eq!(app.search_query, "asia");
+    }
+
+    #[test]
+    fn a_resize_behind_a_keystroke_does_not_strand_the_rest_of_the_burst() {
+        let mut app = searching_app();
+        let mut source =
+            QueuedEvents::new(vec![key('a'), Event::Resize(80, 24), key('b'), key('c')]);
+
+        handle_events(&mut app, &mut source, Duration::ZERO).unwrap();
+
+        assert_eq!(app.search_query, "abc");
+    }
+
+    #[test]
+    fn the_drain_yields_before_an_unbounded_burst_starves_the_redraw() {
+        // Held `j` is the realistic burst: crossterm queues one event
+        // per auto-repeat, and navigation skips the filter recompute.
+        let mut app = App::with_config(config::Config::default());
+        let flood: Vec<Event> = (0..10_000).map(|_| key('j')).collect();
+        let mut source = QueuedEvents::new(flood);
+
+        handle_events(&mut app, &mut source, Duration::ZERO).unwrap();
+
+        assert!(
+            source.remaining() > 0,
+            "the loop must hand control back so the frame can be redrawn"
+        );
+    }
+
+    #[test]
+    fn an_idle_poll_leaves_the_app_untouched() {
+        let mut app = searching_app();
+        let mut source = QueuedEvents::new(vec![]);
+
+        handle_events(&mut app, &mut source, Duration::ZERO).unwrap();
+
+        assert_eq!(app.search_query, "");
+    }
+}

@@ -390,7 +390,7 @@ impl App {
     }
 
     #[cfg(test)]
-    fn with_config(cfg: config::Config) -> Self {
+    pub(crate) fn with_config(cfg: config::Config) -> Self {
         Self::with_config_state(cfg, Vec::new(), false)
     }
 
