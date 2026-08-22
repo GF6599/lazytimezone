@@ -82,16 +82,17 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     draw_status_bar(frame, app, outer[4], &tc);
 
     if app.show_help {
-        draw_help_popup(frame, frame.area(), &tc);
+        draw_help_popup(frame, app, frame.area(), &tc);
     }
 }
 
 /// Renders a centered help popup listing every keybinding, grouped
-/// by mode. Dismissed by any keypress (handled in `events.rs`).
+/// by mode. Scrolled with the arrows, dismissed by any other keypress
+/// (handled in `events.rs`).
 ///
 /// Uses [`Clear`] to wipe the underlying cells before drawing, so
 /// the popup's transparent borders don't bleed background through.
-fn draw_help_popup(frame: &mut Frame, area: Rect, tc: &ThemeColors) {
+fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect, tc: &ThemeColors) {
     let lines: Vec<Line> = vec![
         Line::from(Span::styled(
             "Normal mode",
@@ -123,8 +124,12 @@ fn draw_help_popup(frame: &mut Frame, area: Rect, tc: &ThemeColors) {
             tc,
         ),
         help_row("Backspace / Delete", "Delete previous / next char", tc),
+        help_row("Ctrl-w", "Delete previous word", tc),
+        help_row("Ctrl-k", "Delete to end of line", tc),
         help_row("Ctrl-u", "Clear search", tc),
-        help_row("Esc / Enter", "Exit search", tc),
+        help_row("Ctrl-f", "Toggle favorite on highlighted row", tc),
+        help_row("Enter", "Pick highlighted row and exit", tc),
+        help_row("Esc", "Exit without picking", tc),
         Line::from(""),
         Line::from(Span::styled(
             "Search syntax",
@@ -140,27 +145,39 @@ fn draw_help_popup(frame: &mut Frame, area: Rect, tc: &ThemeColors) {
             "  Tip: offsets reflect each city's CURRENT local time (DST-adjusted).",
             Style::default().fg(tc.muted).add_modifier(Modifier::ITALIC),
         )),
-        Line::from(""),
-        Line::from(Span::styled(
-            "Press any key to dismiss",
-            Style::default().fg(tc.muted).add_modifier(Modifier::ITALIC),
-        )),
     ];
 
     let popup_height = (lines.len() as u16 + 2).min(area.height.saturating_sub(2));
-    let popup_width: u16 = 64;
+    // 76 fits the longest row ("Tip: offsets reflect...") without
+    // truncation; `centered_rect` clamps it on a narrower terminal.
+    let popup_width: u16 = 76;
     let popup = centered_rect(popup_width, popup_height, area);
+
+    // The overlay is taller than a short terminal, so the tail is only
+    // reachable by scrolling. Clamping lives here because this is the
+    // only place the popup's height is known.
+    let visible = popup.height.saturating_sub(2) as usize;
+    let max_scroll = (lines.len().saturating_sub(visible)) as u16;
+    app.clamp_help_scroll(max_scroll);
 
     frame.render_widget(Clear, popup);
 
+    let footer = if max_scroll > 0 {
+        " \u{2191}\u{2193} scroll \u{00b7} any other key to close "
+    } else {
+        " any key to close "
+    };
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(tc.accent))
         .title(" Help ")
+        .title_style(Style::default().fg(tc.title).add_modifier(Modifier::BOLD))
+        .title_bottom(Line::from(footer).centered())
         .title_style(Style::default().fg(tc.title).add_modifier(Modifier::BOLD));
 
     let paragraph = Paragraph::new(lines)
         .block(block)
+        .scroll((app.help_scroll, 0))
         .style(Style::default().fg(tc.fg).bg(tc.bg));
     frame.render_widget(paragraph, popup);
 }
@@ -180,7 +197,6 @@ fn help_row(key: &'static str, desc: &'static str, tc: &ThemeColors) -> Line<'st
 
 /// Two-column search-syntax row: query example on the left (fixed-width,
 /// accent-coloured to read as "code"), description on the right (muted).
-/// Sized to fit the 64-col help popup (~16 + 2 + 38 ~= 58 payload cols).
 fn syntax_row(example: &'static str, desc: &'static str, tc: &ThemeColors) -> Line<'static> {
     Line::from(vec![
         Span::raw("  "),
@@ -1057,6 +1073,74 @@ mod tests {
         app.page_up();
 
         assert_eq!(app.selected_row, 0);
+    }
+
+    fn render_help(app: &mut App, width: u16, height: u16) -> Vec<String> {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        let tc = app.theme.colors();
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                draw_help_popup(frame, app, area, &tc);
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer().clone();
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol().to_string())
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_help_overlay_says_how_to_dismiss_it_on_a_short_terminal() {
+        // 80x24 cannot show the whole overlay at once, so the way out
+        // must not be one of the lines that scrolls off.
+        let mut app = test_app();
+
+        let rendered = render_help(&mut app, 80, 24).join("\n");
+
+        assert!(rendered.contains("close"), "got:\n{rendered}");
+    }
+
+    #[test]
+    fn every_help_line_is_reachable_by_scrolling() {
+        let mut app = test_app();
+        let mut seen = String::new();
+
+        for _ in 0..60 {
+            seen.push_str(&render_help(&mut app, 80, 24).join("\n"));
+            app.scroll_help(1);
+        }
+
+        for expected in [
+            "Ctrl-w",
+            "Ctrl-k",
+            "Ctrl-f",
+            "eastern time",
+            // The full sentence, so a popup too narrow for it fails here
+            // rather than silently clipping the closing bracket.
+            "Jump to start / end (also Ctrl-a / Ctrl-e)",
+            "CURRENT local time (DST-adjusted).",
+        ] {
+            assert!(
+                seen.contains(expected),
+                "{expected} was never rendered in full"
+            );
+        }
+    }
+
+    #[test]
+    fn the_help_scroll_stops_at_the_last_line() {
+        let mut app = test_app();
+        for _ in 0..500 {
+            app.scroll_help(1);
+        }
+        let at_end = render_help(&mut app, 80, 24).join("\n");
+
+        assert!(at_end.contains("Tip:"), "got:\n{at_end}");
     }
 
     #[test]

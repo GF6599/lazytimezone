@@ -357,8 +357,14 @@ pub struct App {
     /// `App` allocation-free on the idle tick path.
     pub(crate) copy_flash: Option<CopyFlash>,
     /// When true, the UI renders a help popup over the main view.
-    /// Toggled by `?` and dismissed by any key while open.
+    /// Toggled by `?`, scrolled with the arrows, dismissed by any other key.
     pub(crate) show_help: bool,
+    /// First visible line of the help popup.
+    ///
+    /// The overlay carries more lines than an 80x24 terminal can show, so
+    /// without this the tail of it is unreachable. Clamped by the
+    /// renderer, which is the only place the popup's height is known.
+    pub(crate) help_scroll: u16,
     /// One-shot messages produced at startup (config-load warnings or
     /// the parse-error message) for the status bar to surface.
     pub(crate) startup_messages: Vec<String>,
@@ -435,6 +441,7 @@ impl App {
             show_favorites_only: false,
             copy_flash: None,
             show_help: false,
+            help_scroll: 0,
             startup_messages,
             config_load_failed,
             started_at: Instant::now(),
@@ -456,10 +463,23 @@ impl App {
 
     pub(crate) fn toggle_help(&mut self) {
         self.show_help = !self.show_help;
+        self.help_scroll = 0;
     }
 
     pub(crate) fn close_help(&mut self) {
         self.show_help = false;
+        self.help_scroll = 0;
+    }
+
+    pub(crate) fn scroll_help(&mut self, lines: i16) {
+        self.help_scroll = self.help_scroll.saturating_add_signed(lines);
+    }
+
+    /// Clamps the help scroll to the last line the popup can show.
+    ///
+    /// Called by the renderer because `App` cannot know the popup height.
+    pub(crate) fn clamp_help_scroll(&mut self, max: u16) {
+        self.help_scroll = self.help_scroll.min(max);
     }
 
     pub(crate) fn move_up(&mut self) {

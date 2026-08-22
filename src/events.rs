@@ -106,10 +106,16 @@ fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
     // including ones that would otherwise be no-ops. The keypress is
     // still allowed to flow through to its normal handler below.
     app.dismiss_startup_messages();
-    // Help is modal: any key dismisses it before reaching the
-    // mode-specific handlers below.
+    // Help is modal: the arrows scroll it, any other key dismisses it
+    // before reaching the mode-specific handlers below.
     if app.show_help {
-        app.close_help();
+        match key.code {
+            KeyCode::Up => app.scroll_help(-1),
+            KeyCode::Down => app.scroll_help(1),
+            KeyCode::PageUp => app.scroll_help(-10),
+            KeyCode::PageDown => app.scroll_help(10),
+            _ => app.close_help(),
+        }
         return;
     }
     match app.input_mode {
