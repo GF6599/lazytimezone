@@ -36,6 +36,8 @@
 //! editorially chosen (e.g. "Mumbai" over the IANA canonical
 //! "Kolkata").
 
+use std::sync::OnceLock;
+
 use chrono::{DateTime, Datelike, Timelike};
 use chrono_tz::Tz;
 
@@ -71,7 +73,15 @@ pub struct TimezoneEntry {
 
 /// Returns the full catalogue of curated timezone entries, ordered
 /// by UTC offset from −11 (Pago Pago) to +14 (Kiritimati).
-pub fn all_timezones() -> Vec<TimezoneEntry> {
+///
+/// The table is large enough that rebuilding it per call turns any
+/// incidental lookup into a per-frame allocation.
+pub fn all_timezones() -> &'static [TimezoneEntry] {
+    static CATALOGUE: OnceLock<Vec<TimezoneEntry>> = OnceLock::new();
+    CATALOGUE.get_or_init(build_catalogue)
+}
+
+fn build_catalogue() -> Vec<TimezoneEntry> {
     vec![
         // ──────────────────────────────────────────
         // UTC-11
@@ -3239,20 +3249,12 @@ pub(crate) fn supplemental_search_terms(
 // curated latitude fall back to the simple window — never worse than
 // the previous behaviour.
 
-/// Returns the curated latitude for `tz` if present in [`all_timezones`].
-///
-/// After the data-restructuring refactor, the source of truth for each city's
-/// latitude is the `latitude` field on [`TimezoneEntry`]. This wrapper exists
-/// purely so the original `latitude_for` call sites (and the legacy test
-/// `every_catalogue_entry_has_a_latitude`) keep compiling.
-///
-/// Complexity: O(n) over the catalogue per call (~217 entries). Called once
-/// per visible table row per second by [`is_daytime_at`], which is trivial.
-/// If profiling ever shows this on a hot path, switch callers that already
-/// hold a `&TimezoneEntry` to read `entry.latitude` directly.
+/// Linear over the catalogue. A caller that already holds the
+/// [`TimezoneEntry`] should read `entry.latitude` and call
+/// [`is_daytime_at_latitude`] instead of paying for the search.
 pub(crate) fn latitude_for(tz: Tz) -> Option<f64> {
     all_timezones()
-        .into_iter()
+        .iter()
         .find(|e| e.tz == tz)
         .map(|e| e.latitude)
 }
@@ -3300,13 +3302,15 @@ pub(crate) fn sun_window(latitude_deg: f64, day_of_year: u32) -> (f64, f64) {
 /// latitude exists for `tz`.
 pub fn is_daytime_at(tz: Tz, local: &DateTime<Tz>) -> bool {
     match latitude_for(tz) {
-        Some(lat) => {
-            let (sunrise, sunset) = sun_window(lat, local.ordinal());
-            let h = local.hour() as f64 + local.minute() as f64 / 60.0;
-            h >= sunrise && h < sunset
-        }
+        Some(lat) => is_daytime_at_latitude(lat, local),
         None => (6..18).contains(&local.hour()),
     }
+}
+
+pub fn is_daytime_at_latitude(latitude_deg: f64, local: &DateTime<Tz>) -> bool {
+    let (sunrise, sunset) = sun_window(latitude_deg, local.ordinal());
+    let hour = local.hour() as f64 + local.minute() as f64 / 60.0;
+    hour >= sunrise && hour < sunset
 }
 
 /// Formats a UTC offset in seconds to a human-readable string like
@@ -3334,6 +3338,7 @@ mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
     use super::*;
+    use chrono::TimeZone;
 
     fn approx(a: f64, b: f64, tol: f64) -> bool {
         (a - b).abs() < tol
@@ -3367,6 +3372,33 @@ mod tests {
         let (sunrise, sunset) = sun_window(80.0, 172);
         assert_eq!(sunrise, 0.0);
         assert_eq!(sunset, 24.0);
+    }
+
+    #[test]
+    fn both_daytime_entry_points_agree_across_the_catalogue_and_the_year() {
+        // The table renders via the latitude it already holds while the
+        // clocks go through the tz lookup. One drifting from the other
+        // would colour the same city two ways in one frame.
+        let midyear = chrono::Utc
+            .with_ymd_and_hms(2026, 6, 21, 12, 0, 0)
+            .single()
+            .expect("valid instant");
+        let midwinter = chrono::Utc
+            .with_ymd_and_hms(2026, 12, 21, 12, 0, 0)
+            .single()
+            .expect("valid instant");
+
+        for entry in all_timezones() {
+            for instant in [midyear, midwinter] {
+                let local = instant.with_timezone(&entry.tz);
+                assert_eq!(
+                    is_daytime_at(entry.tz, &local),
+                    is_daytime_at_latitude(entry.latitude, &local),
+                    "{} disagrees at {local}",
+                    entry.city
+                );
+            }
+        }
     }
 
     #[test]
@@ -3446,11 +3478,11 @@ mod tests {
     #[test]
     fn every_supplemental_search_term_targets_a_catalogue_entry() {
         use std::collections::HashSet;
-        let catalogue_tzs: HashSet<_> = all_timezones().into_iter().map(|e| e.tz).collect();
+        let catalogue_tzs: HashSet<_> = all_timezones().iter().map(|e| e.tz).collect();
         // Iterate the catalogue and verify any supplemental terms it points at
         // are valid — this is the inverse of `every_catalogue_entry_has_a_latitude`.
         for entry in all_timezones() {
-            if !supplemental_search_terms(&entry).is_empty() {
+            if !supplemental_search_terms(entry).is_empty() {
                 assert!(
                     catalogue_tzs.contains(&entry.tz),
                     "supplemental_search_terms for {:?} but tz not in catalogue",
@@ -3470,11 +3502,11 @@ mod tests {
     /// stored in upper case but users type them in any case.
     fn assert_findable(tz: Tz, term: &str) {
         let entry = all_timezones()
-            .into_iter()
+            .iter()
             .find(|e| e.tz == tz)
             .unwrap_or_else(|| panic!("tz not in catalogue: {tz:?}"));
         let in_aliases = entry.aliases.iter().any(|a| a.eq_ignore_ascii_case(term));
-        let in_supp = supplemental_search_terms(&entry)
+        let in_supp = supplemental_search_terms(entry)
             .iter()
             .any(|s| s.raw.eq_ignore_ascii_case(term));
         assert!(

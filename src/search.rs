@@ -909,9 +909,9 @@ mod tests {
     /// `&'static str` fields that the supplemental-search-term lookup
     /// hashes against — hand-rolling synthetic entries would
     /// short-circuit half the index.
-    fn fixture() -> (Vec<TimezoneEntry>, SearchIndex) {
+    fn fixture() -> (&'static [TimezoneEntry], SearchIndex) {
         let entries = crate::timezone::all_timezones();
-        let index = SearchIndex::build(&entries);
+        let index = SearchIndex::build(entries);
         (entries, index)
     }
 
@@ -934,7 +934,7 @@ mod tests {
         // has no "paris" and vice versa. AND logic across terms means
         // the result set must be empty.
         let results =
-            run_search(&index, &entries, "tokyo paris", &favorites).expect("non-empty query");
+            run_search(&index, entries, "tokyo paris", &favorites).expect("non-empty query");
         assert!(
             results.is_empty(),
             "expected no AND-matches for 'tokyo paris', got {} hits",
@@ -963,7 +963,7 @@ mod tests {
         // Query "new york" — Tokyo gets no match, New York gets a strong
         // exact-city match. Despite the favourite bonus, New York wins:
         // the bonus is a tiebreaker, not a rank override.
-        let results = run_search(&index, &entries, "new york", &favorites).expect("non-empty");
+        let results = run_search(&index, entries, "new york", &favorites).expect("non-empty");
         assert!(!results.is_empty(), "expected matches for 'new york'");
         assert_eq!(
             results[0].0, new_york_idx,
@@ -987,9 +987,9 @@ mod tests {
         let mut favs2 = HashMap::new();
         favs2.insert(Tz::Australia__Sydney, 0usize);
 
-        let with_bonus = run_search(&index, &entries, "australia", &favs2).expect("non-empty");
+        let with_bonus = run_search(&index, entries, "australia", &favs2).expect("non-empty");
         let without_bonus =
-            run_search(&index, &entries, "australia", &HashMap::new()).expect("non-empty");
+            run_search(&index, entries, "australia", &HashMap::new()).expect("non-empty");
 
         let sydney_with = with_bonus
             .iter()
@@ -1015,8 +1015,8 @@ mod tests {
         // Pure punctuation normalizes to an empty term list — the
         // public contract is to return None so the caller can fall
         // back to the unfiltered view.
-        assert!(run_search(&index, &entries, "...", &favorites).is_none());
-        assert!(run_search(&index, &entries, "!!!", &favorites).is_none());
-        assert!(run_search(&index, &entries, "   ", &favorites).is_none());
+        assert!(run_search(&index, entries, "...", &favorites).is_none());
+        assert!(run_search(&index, entries, "!!!", &favorites).is_none());
+        assert!(run_search(&index, entries, "   ", &favorites).is_none());
     }
 }

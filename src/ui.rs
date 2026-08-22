@@ -48,7 +48,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, CopyStatus, InputMode};
 use crate::theme::ThemeColors;
-use crate::timezone::{format_utc_offset, is_daytime_at};
+use crate::timezone::{format_utc_offset, is_daytime_at, is_daytime_at_latitude};
 
 /// Rows of the table area consumed by non-data chrome: top border,
 /// header row, bottom border. Used to size the viewport and decide
@@ -595,7 +595,7 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
                 .expect("filtered_view row references a valid catalogue index");
             let local = now.with_timezone(&entry.tz);
             let offset_secs = local.offset().fix().local_minus_utc();
-            let is_day = is_daytime_at(entry.tz, &local);
+            let is_day = is_daytime_at_latitude(entry.latitude, &local);
 
             let time_str = local.format("%H:%M:%S").to_string();
             let time_style = if is_day {

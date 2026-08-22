@@ -34,7 +34,7 @@ use crate::timezone::{self, TimezoneEntry};
 /// they can't drift out of sync. The struct exposes no mutators; the
 /// catalogue is constructed once at startup and read thereafter.
 pub(crate) struct Catalogue {
-    entries: Vec<TimezoneEntry>,
+    entries: &'static [TimezoneEntry],
     by_tz: HashMap<Tz, usize>,
     search_index: SearchIndex,
 }
@@ -43,7 +43,7 @@ impl Catalogue {
     pub(crate) fn new() -> Self {
         let entries = timezone::all_timezones();
         let by_tz = entries.iter().enumerate().map(|(i, e)| (e.tz, i)).collect();
-        let search_index = SearchIndex::build(&entries);
+        let search_index = SearchIndex::build(entries);
         Self {
             entries,
             by_tz,
@@ -51,8 +51,8 @@ impl Catalogue {
         }
     }
 
-    pub(crate) fn entries(&self) -> &[TimezoneEntry] {
-        &self.entries
+    pub(crate) fn entries(&self) -> &'static [TimezoneEntry] {
+        self.entries
     }
 
     pub(crate) fn by_tz(&self, tz: Tz) -> Option<usize> {
