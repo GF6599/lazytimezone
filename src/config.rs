@@ -57,12 +57,22 @@ pub struct LoadWarning(pub String);
 /// Returns the base config directory, respecting `$XDG_CONFIG_HOME`
 /// with a fallback to `$HOME/.config`.
 fn config_dir() -> Option<PathBuf> {
-    std::env::var("XDG_CONFIG_HOME")
-        .ok()
+    config_dir_from(
+        std::env::var("XDG_CONFIG_HOME").ok(),
+        std::env::var("HOME").ok(),
+    )
+}
+
+/// `std::env::var` reports a set-but-empty variable as `Ok("")`, which
+/// would resolve to a relative `lazytimezone/config.toml` in whatever
+/// directory the app was launched from. Hence the emptiness filter.
+fn config_dir_from(xdg_config_home: Option<String>, home: Option<String>) -> Option<PathBuf> {
+    let non_empty = |value: String| (!value.is_empty()).then_some(value);
+    xdg_config_home
+        .and_then(non_empty)
         .map(PathBuf::from)
         .or_else(|| {
-            std::env::var("HOME")
-                .ok()
+            home.and_then(non_empty)
                 .map(|h| PathBuf::from(h).join(".config"))
         })
 }
@@ -340,6 +350,27 @@ mod tests {
             original,
             "a parse error must never rewrite the user's file"
         );
+    }
+
+    #[test]
+    fn an_empty_xdg_config_home_falls_back_to_home() {
+        let dir = config_dir_from(Some(String::new()), Some("/home/ada".to_string()));
+
+        assert_eq!(dir, Some(PathBuf::from("/home/ada/.config")));
+    }
+
+    #[test]
+    fn a_populated_xdg_config_home_wins_over_home() {
+        let dir = config_dir_from(Some("/xdg".to_string()), Some("/home/ada".to_string()));
+
+        assert_eq!(dir, Some(PathBuf::from("/xdg")));
+    }
+
+    #[test]
+    fn two_empty_environment_values_resolve_to_no_directory() {
+        let dir = config_dir_from(Some(String::new()), Some(String::new()));
+
+        assert_eq!(dir, None);
     }
 
     #[test]
