@@ -1388,4 +1388,38 @@ mod tests {
         assert_eq!(app.input_mode, InputMode::Normal);
         assert_eq!(app.filtered_view.len(), baseline_view_len);
     }
+
+    #[test]
+    fn re_entering_search_drops_the_previous_filter() {
+        // Esc leaves the filter in place, so `/` has to drop it: the
+        // search box the user is looking at is empty.
+        let mut app = test_app();
+        let baseline_view_len = app.filtered_view.len();
+
+        apply_query(&mut app, "tokyo");
+        assert!(app.filtered_view.len() < baseline_view_len);
+        app.exit_search();
+
+        app.enter_search();
+
+        assert_eq!(app.search_query, "");
+        assert_eq!(app.cursor_position, 0);
+        assert_eq!(app.input_mode, InputMode::Search);
+        assert_eq!(app.filtered_view.len(), baseline_view_len);
+    }
+
+    #[test]
+    fn re_entering_search_moves_the_selection_back_to_the_top() {
+        let mut app = test_app();
+
+        apply_query(&mut app, "asia");
+        app.move_down();
+        app.move_down();
+        assert_eq!(app.selected_row, 2);
+        app.exit_search();
+
+        app.enter_search();
+
+        assert_eq!(app.selected_row, 0);
+    }
 }
