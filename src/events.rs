@@ -6,7 +6,8 @@
 //!
 //! Key bindings are split by [`InputMode`]:
 //! - **Normal**: vim-style navigation, theme cycling, favorites, clipboard
-//! - **Search**: text input with backspace and clear (Ctrl-u)
+//! - **Search**: readline-style text entry, plus Ctrl-f to favourite the
+//!   highlighted row without leaving the query
 
 use std::time::Duration;
 

@@ -8,7 +8,7 @@
 //!
 //! | Group | Fields | Persisted? |
 //! |-------|--------|-----------|
-//! | Navigation | `selected_row`, `filtered_indices` | No |
+//! | Navigation | `selected_row`, `filtered_view` | No |
 //! | Selection | `selection` (`tz` + `city_name`) | No |
 //! | Search | `input_mode`, `search_query`, `cursor_position` | No |
 //! | Theme | `theme` | Yes (`~/.config/lazytimezone/config.toml`) |
@@ -200,8 +200,8 @@ pub(crate) struct FilteredRow {
 
 /// The current filtered view as a single owned vector of rows.
 ///
-/// Fuses the previously parallel `filtered_indices` / `filtered_display_names`
-/// vectors so an index can never be zipped against the wrong label.
+/// Each row carries its catalogue index and its label together, so the
+/// two cannot be zipped against each other in the wrong order.
 #[derive(Default, Debug)]
 pub(crate) struct FilteredView {
     rows: Vec<FilteredRow>,
@@ -318,8 +318,8 @@ pub(crate) struct CopyFlash {
 /// ## Pattern: Index-Based Filtering
 ///
 /// Rather than cloning or re-sorting the timezone list on every
-/// keystroke, `filtered_indices` holds indices into the immutable
-/// `timezones` vec. Searching and favouriting only rearrange these
+/// keystroke, `filtered_view` holds indices into the immutable
+/// catalogue. Searching and favouriting only rearrange these
 /// indices, keeping the underlying data allocation-free.
 pub struct App {
     pub(crate) should_quit: bool,
@@ -709,7 +709,7 @@ impl App {
         }
     }
 
-    /// Rebuilds `filtered_indices` from the current search query and
+    /// Rebuilds `filtered_view` from the current search query and
     /// favorites filter.
     ///
     /// Search is case-insensitive and punctuation-insensitive.
