@@ -201,3 +201,141 @@ fn migrate_legacy() -> Config {
 
     Config { theme, favorites }
 }
+
+#[cfg(test)]
+mod tests {
+    // Tests panic on failure by design — see src/app.rs for the rationale
+    // on why the production panic lints are relaxed inside test modules.
+    #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+
+    /// An isolated config tree under the OS temp directory, removed on drop.
+    ///
+    /// Every test gets its own so the suite stays order-independent under
+    /// the default multi-threaded runner.
+    struct TempConfig {
+        root: PathBuf,
+    }
+
+    impl TempConfig {
+        fn new() -> Self {
+            let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+            let root = std::env::temp_dir().join(format!(
+                "lazytimezone-test-{}-{}",
+                std::process::id(),
+                id
+            ));
+            let this = Self { root };
+            fs::create_dir_all(this.app_dir()).unwrap();
+            this
+        }
+
+        fn app_dir(&self) -> PathBuf {
+            self.root.join("lazytimezone")
+        }
+
+        fn config_path(&self) -> PathBuf {
+            self.app_dir().join("config.toml")
+        }
+
+        fn write_legacy(&self, theme: &str, favorites: &str) {
+            fs::write(self.app_dir().join("theme"), theme).unwrap();
+            fs::write(self.app_dir().join("favorites"), favorites).unwrap();
+        }
+
+        fn legacy_files_exist(&self) -> bool {
+            self.app_dir().join("theme").exists() || self.app_dir().join("favorites").exists()
+        }
+
+        /// Occupies the atomic-write temp path with a non-empty directory
+        /// so `try_save` cannot write it. Stands in for a read-only or
+        /// full config directory.
+        fn block_saving(&self) {
+            let blocker = self.app_dir().join("config.toml.tmp");
+            fs::create_dir_all(&blocker).unwrap();
+            fs::write(blocker.join("occupied"), b"x").unwrap();
+        }
+    }
+
+    impl Drop for TempConfig {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn migration_reads_legacy_files_from_the_directory_it_was_given() {
+        let tmp = TempConfig::new();
+        tmp.write_legacy("Nord\n", "Asia/Tokyo\nEurope/London\n");
+
+        let (cfg, _) = try_load(&tmp.config_path()).unwrap();
+
+        assert_eq!(cfg.theme, "Nord");
+        assert_eq!(cfg.favorites, vec!["Asia/Tokyo", "Europe/London"]);
+    }
+
+    #[test]
+    fn legacy_files_survive_a_failed_save() {
+        let tmp = TempConfig::new();
+        tmp.write_legacy("Nord\n", "Asia/Tokyo\n");
+        tmp.block_saving();
+
+        let (cfg, warnings) = try_load(&tmp.config_path()).unwrap();
+
+        assert_eq!(cfg.theme, "Nord", "the legacy theme should still be read");
+        assert!(!warnings.is_empty(), "the failed save should be reported");
+        assert!(
+            tmp.legacy_files_exist(),
+            "legacy files must not be deleted when the migrated config was never written"
+        );
+    }
+
+    #[test]
+    fn legacy_files_are_removed_once_the_save_succeeds() {
+        let tmp = TempConfig::new();
+        tmp.write_legacy("Gruvbox\n", "Asia/Tokyo\n");
+
+        let (_, warnings) = try_load(&tmp.config_path()).unwrap();
+
+        assert!(warnings.is_empty(), "the save was expected to succeed");
+        assert!(
+            tmp.config_path().exists(),
+            "the migrated config should exist"
+        );
+        assert!(
+            !tmp.legacy_files_exist(),
+            "legacy files should be cleaned up after a successful migration"
+        );
+    }
+
+    #[test]
+    fn a_malformed_file_is_reported_and_left_untouched() {
+        let tmp = TempConfig::new();
+        let original = "theme = \"Nord\"\nfavorites = [ oops";
+        fs::write(tmp.config_path(), original).unwrap();
+
+        let err = try_load(&tmp.config_path()).unwrap_err();
+
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            fs::read_to_string(tmp.config_path()).unwrap(),
+            original,
+            "a parse error must never rewrite the user's file"
+        );
+    }
+
+    #[test]
+    fn an_unknown_theme_loads_with_a_warning_rather_than_failing() {
+        let tmp = TempConfig::new();
+        fs::write(tmp.config_path(), "theme = \"Nonesuch\"\n").unwrap();
+
+        let (cfg, warnings) = try_load(&tmp.config_path()).unwrap();
+
+        assert_eq!(cfg.theme, "Nonesuch");
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].0.contains("Nonesuch"));
+    }
+}
