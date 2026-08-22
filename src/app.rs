@@ -493,6 +493,8 @@ impl App {
         self.input_mode = InputMode::Search;
         self.search_query.clear();
         self.cursor_position = 0;
+        self.apply_filter();
+        self.select_first_result();
     }
 
     pub(crate) fn exit_search(&mut self) {
