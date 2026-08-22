@@ -1,13 +1,13 @@
 # lazytimezone
 
-A terminal UI for browsing world clocks across 50+ timezones, built with Rust and [Ratatui](https://ratatui.rs).
+A terminal UI for browsing world clocks across 217 cities, built with Rust and [Ratatui](https://ratatui.rs).
 
 ![Rust](https://img.shields.io/badge/Rust-2024_edition-orange)
 
 ## Features
 
 - **Big clock display** with large ASCII-art time, city name, and date
-- **50 timezones** spanning Pacific, Americas, Europe, Africa, Asia, and Australia
+- **217 cities** spanning Pacific, Americas, Europe, Africa, Asia, and Australia
 - **Real-time search** by city, region, or UTC offset (e.g. `+5:30`, `UTC-8`, `asia +9`)
 - **6 built-in themes** — Default, Dracula, Solarized, Nord, Monokai, Gruvbox — persisted across sessions
 - **Time diff column** showing offset from your selected timezone
@@ -24,13 +24,17 @@ A terminal UI for browsing world clocks across 50+ timezones, built with Rust an
 cargo build --release
 
 # Or using just
-just install   # builds and copies binary to ~/
+just ship   # builds and copies the binary to ~/self-made-bin/
 ```
 
 ### Requirements
 
 - Rust 2024 edition (1.85+)
-- macOS (clipboard copy uses `pbcopy`)
+- Clipboard copy shells out to a platform tool, which must be on `PATH`:
+  `pbcopy` on macOS, `clip` on Windows, `wl-copy` or `xclip` on Linux.
+  Everything else works without them.
+- `just build` additionally needs [`cross`](https://github.com/cross-rs/cross)
+  for the Linux target and `codesign` for the macOS binary.
 
 ## Usage
 
@@ -59,7 +63,7 @@ lazytimezone
 | `Ctrl-l` | Clear active search filter |
 | `t` | Cycle theme |
 | `c` | Copy time to clipboard |
-| `?` | Toggle help overlay |
+| `?` | Toggle help overlay (`↑` / `↓` scroll it) |
 | `q` / `Ctrl-c` | Quit |
 
 #### Search mode
@@ -71,8 +75,12 @@ lazytimezone
 | `Home` / `End` | Jump to start / end (also `Ctrl-a` / `Ctrl-e`) |
 | `Backspace` | Delete previous character |
 | `Delete` | Delete character under cursor |
+| `Ctrl-w` | Delete previous word |
+| `Ctrl-k` | Delete to end of line |
 | `Ctrl-u` | Clear search |
-| `Esc` / `Enter` | Exit search |
+| `Ctrl-f` | Toggle favorite on the highlighted row |
+| `Enter` | Pick the highlighted row and exit search |
+| `Esc` | Exit search without picking |
 
 Search is case-insensitive with AND logic across whitespace-separated terms. It ignores punctuation, understands IANA timezone IDs, and also indexes common area keywords such as state names and timezone-family labels. Offset searches use each timezone's current UTC offset, so DST-aware cities move seasonally.
 
@@ -107,27 +115,20 @@ Cycle through themes with `t`. Theme and favorites are saved to `~/.config/lazyt
 
 ## Architecture
 
-```
-src/
-├── main.rs       Entry point and TUI event loop
-├── app.rs        Core state: selection, search, favorites, theme
-├── events.rs     Keyboard input → App mutations
-├── ui.rs         App state → ratatui Frame rendering
-├── config.rs     TOML persistence (~/.config/lazytimezone/config.toml)
-├── theme.rs      Colour palettes
-└── timezone.rs   Static catalogue of 50+ world cities
-```
-
 The application follows a single-owner state model: `App` holds all mutable state, the event loop calls `events::handle_events` to mutate it, then `ui::draw` reads it to render each frame. No shared or global state.
 
 ## Development
 
 ```sh
+just              # list every recipe
 just run          # run the app
-just fmt          # format + clippy
-just dist         # build release to dist/
-just install      # build + copy to ~/
+just check        # the full gate: clippy, tests, formatting
+just fmt          # format in place
+just build        # build release binaries into dist/
+just ship         # build, then copy to ~/self-made-bin/
 ```
+
+`just check` is what CI runs. Run it before pushing.
 
 ## License
 
