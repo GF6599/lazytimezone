@@ -499,9 +499,9 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
 /// ## Why manual viewport instead of ratatui's built-in scroll?
 ///
 /// We only build `Row` widgets for the visible slice of
-/// `filtered_indices`, keeping render cost O(visible) rather than
+/// `filtered_view`, keeping render cost O(visible) rather than
 /// O(total). The `TableState` selection index is then offset by
-/// `viewport_start` so the highlight tracks correctly.
+/// the viewport start so the highlight tracks correctly.
 fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect, tc: &ThemeColors) {
     // An empty body with no explanation reads as a broken app rather
     // than an active filter.

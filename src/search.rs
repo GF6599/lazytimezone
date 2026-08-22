@@ -17,8 +17,8 @@
 //! sharing that offset.
 //!
 //! Searches walk the cached index, score each candidate, and return the
-//! ranked `(index, display_name, score)` tuples; the caller does the
-//! split into `filtered_indices` / `filtered_display_names`.
+//! ranked `(index, display_name, score)` tuples; the caller turns them
+//! into the rows of its filtered view.
 //!
 //! ## Scoring model
 //!

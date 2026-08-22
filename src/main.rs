@@ -12,7 +12,7 @@
 //!              ├── ui        App state → ratatui Frame rendering
 //!              ├── config    TOML persistence (~/.config/lazytimezone/config.toml)
 //!              ├── theme     Color palettes
-//!              └── timezone  Static catalogue of 220+ world cities
+//!              └── timezone  Static catalogue of 217 world cities
 //! ```
 //!
 //! State flows unidirectionally: [`events`] mutates [`app::App`], then
