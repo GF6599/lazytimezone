@@ -172,8 +172,7 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect, tc: &ThemeColor
         .border_style(Style::default().fg(tc.accent))
         .title(" Help ")
         .title_style(Style::default().fg(tc.title).add_modifier(Modifier::BOLD))
-        .title_bottom(Line::from(footer).centered())
-        .title_style(Style::default().fg(tc.title).add_modifier(Modifier::BOLD));
+        .title_bottom(Line::from(Span::styled(footer, Style::default().fg(tc.muted))).centered());
 
     let paragraph = Paragraph::new(lines)
         .block(block)
