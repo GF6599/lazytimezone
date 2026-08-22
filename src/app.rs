@@ -184,6 +184,9 @@ impl Favorites {
     }
 }
 
+/// Page size used before the first frame has been drawn.
+const DEFAULT_PAGE_ROWS: usize = 10;
+
 /// A single visible row in the filtered timezone table.
 ///
 /// `display_name` may differ from the entry's canonical `city` when
@@ -368,6 +371,13 @@ pub struct App {
     /// Timestamp captured at construction time. Used by the UI to decide
     /// when to stop showing [`startup_messages`].
     pub(crate) started_at: Instant,
+    /// Rows the table had room for in the last rendered frame.
+    ///
+    /// Written by [`crate::ui::draw_table`] because the page size is a
+    /// property of the terminal, which `App` cannot see. The initial
+    /// value only applies to a page keypress that somehow arrives before
+    /// the first frame.
+    page_rows: usize,
 }
 
 impl App {
@@ -428,6 +438,7 @@ impl App {
             startup_messages,
             config_load_failed,
             started_at: Instant::now(),
+            page_rows: DEFAULT_PAGE_ROWS,
         }
     }
 
@@ -463,13 +474,20 @@ impl App {
         }
     }
 
+    /// Records how many rows the table can show, so a page matches what
+    /// the user is looking at.
+    pub(crate) fn set_page_rows(&mut self, rows: usize) {
+        self.page_rows = rows.max(1);
+    }
+
     pub(crate) fn page_up(&mut self) {
-        self.selected_row = self.selected_row.saturating_sub(10);
+        self.selected_row = self.selected_row.saturating_sub(self.page_rows);
     }
 
     pub(crate) fn page_down(&mut self) {
         if !self.filtered_view.is_empty() {
-            self.selected_row = (self.selected_row + 10).min(self.filtered_view.len() - 1);
+            self.selected_row =
+                (self.selected_row + self.page_rows).min(self.filtered_view.len() - 1);
         }
     }
 
