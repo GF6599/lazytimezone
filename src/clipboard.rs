@@ -102,3 +102,65 @@ fn clipboard_commands() -> &'static [(&'static str, &'static [&'static str])] {
 fn clipboard_commands() -> &'static [(&'static str, &'static [&'static str])] {
     &[]
 }
+
+#[cfg(test)]
+mod tests {
+    // Tests panic on failure by design — see src/app.rs for the rationale
+    // on why the production panic lints are relaxed inside test modules.
+    #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+
+    use super::*;
+
+    /// `std::process::Child` has no `Drop` impl, so a child that is
+    /// dropped without `wait` stays in the table until the parent exits.
+    fn unreaped_children() -> usize {
+        let output = std::process::Command::new("ps")
+            .args(["-ax", "-o", "stat=,ppid="])
+            .output()
+            .expect("ps is available");
+        let listing = String::from_utf8_lossy(&output.stdout);
+        // A silently empty listing would make every assertion below pass
+        // for the wrong reason.
+        assert!(
+            listing.lines().count() > 1,
+            "ps returned no process listing, so this test proves nothing"
+        );
+        let ours = std::process::id().to_string();
+        listing
+            .lines()
+            .filter(|line| line.trim_start().starts_with('Z'))
+            .filter(|line| line.split_whitespace().nth(1) == Some(ours.as_str()))
+            .count()
+    }
+
+    #[test]
+    fn a_command_that_never_reads_stdin_is_still_reaped() {
+        // `false` exits before consuming its input. A payload past the
+        // pipe buffer therefore fails the write rather than racing it.
+        let payload = "x".repeat(4 * 1024 * 1024);
+        let before = unreaped_children();
+
+        for _ in 0..10 {
+            let _ = pipe_to_command("false", &[], &payload);
+        }
+
+        assert_eq!(unreaped_children(), before);
+    }
+
+    #[test]
+    fn a_non_zero_exit_is_reported_with_the_program_name() {
+        let err = pipe_to_command("false", &[], "irrelevant").unwrap_err();
+
+        assert!(err.to_string().contains("false"), "got: {err}");
+    }
+
+    #[test]
+    fn a_missing_binary_is_reported_with_the_program_name() {
+        let err = pipe_to_command("lazytimezone-no-such-binary", &[], "x").unwrap_err();
+
+        assert!(
+            err.to_string().contains("lazytimezone-no-such-binary"),
+            "got: {err}"
+        );
+    }
+}
