@@ -536,6 +536,7 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
 
     let total_rows = app.filtered_view.len();
     let viewport = TableViewport::new(area.height, total_rows, app.selected_row);
+    app.set_page_rows(viewport.capacity);
 
     // Loop-invariant styles — `Style` is `Copy`, so hoisting avoids
     // rebuilding identical structs once per visible row per frame.
