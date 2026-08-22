@@ -61,6 +61,7 @@ fn run_tui() -> std::io::Result<()> {
     // `result` instead of skipping the restore() call below.
     let result = (|| -> std::io::Result<()> {
         let mut app = app::App::new();
+        let mut events = events::TerminalEvents;
 
         // Tick rate matches the clock's display granularity (1 s).
         // Idle iterations sleep until the next second boundary instead of
@@ -75,7 +76,7 @@ fn run_tui() -> std::io::Result<()> {
             })?;
 
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-            events::handle_events(&mut app, timeout)?;
+            events::handle_events(&mut app, &mut events, timeout)?;
 
             if last_tick.elapsed() >= tick_rate {
                 // Advance by exactly one tick_rate instead of snapping to

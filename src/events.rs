@@ -14,6 +14,27 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 
 use crate::app::{App, InputMode};
 
+/// The terminal is the only implementation that ships. The seam exists
+/// because the drain loop below is otherwise unreachable under test:
+/// `event::poll` needs a live terminal.
+pub trait EventSource {
+    fn poll(&mut self, timeout: Duration) -> std::io::Result<bool>;
+    fn read(&mut self) -> std::io::Result<Event>;
+}
+
+#[derive(Debug)]
+pub struct TerminalEvents;
+
+impl EventSource for TerminalEvents {
+    fn poll(&mut self, timeout: Duration) -> std::io::Result<bool> {
+        event::poll(timeout)
+    }
+
+    fn read(&mut self) -> std::io::Result<Event> {
+        event::read()
+    }
+}
+
 /// Polls for a key event for at most `timeout`.
 ///
 /// The caller (the event loop in `main`) computes `timeout` so the
@@ -22,18 +43,22 @@ use crate::app::{App, InputMode};
 ///
 /// Only `KeyEventKind::Press` is handled — release and repeat events
 /// are ignored to prevent duplicate actions on platforms that emit them.
-pub fn handle_events(app: &mut App, timeout: Duration) -> std::io::Result<()> {
-    if !event::poll(timeout)? {
+pub fn handle_events(
+    app: &mut App,
+    source: &mut impl EventSource,
+    timeout: Duration,
+) -> std::io::Result<()> {
+    if !source.poll(timeout)? {
         return Ok(());
     }
-    match event::read()? {
+    match source.read()? {
         Event::Key(key) => {
             dispatch_key(app, key);
             // Coalesce auto-repeat bursts: when the user holds j/k, crossterm
             // queues a key event per repeat. Drain any already-ready key events
             // here so the main loop redraws once per burst, not once per key.
-            while event::poll(Duration::ZERO)? {
-                match event::read()? {
+            while source.poll(Duration::ZERO)? {
+                match source.read()? {
                     Event::Key(next) => dispatch_key(app, next),
                     // Non-Key events during a burst: stop draining so the main
                     // loop can react (e.g. a Resize) on its next iteration.
