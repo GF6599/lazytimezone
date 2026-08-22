@@ -491,11 +491,7 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
     // than an active filter.
     // Title still reads "0/N timezones" so the count is unambiguous.
     if app.filtered_view.is_empty() {
-        let count_text = format!(
-            " {}/{} timezones ",
-            app.filtered_view.len(),
-            app.catalogue.len()
-        );
+        let count_text = table_title(app);
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(tc.border))
@@ -538,16 +534,8 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
     .map(|h| Cell::from(*h).style(Style::default().fg(tc.accent).add_modifier(Modifier::BOLD)));
     let header = Row::new(header_cells).height(1);
 
-    let visible_rows = (area.height as usize)
-        .saturating_sub(TABLE_CHROME_ROWS)
-        .max(1);
     let total_rows = app.filtered_view.len();
-    let viewport_start = if total_rows <= visible_rows || app.selected_row < visible_rows {
-        0
-    } else {
-        app.selected_row + 1 - visible_rows
-    };
-    let viewport_end = (viewport_start + visible_rows).min(total_rows);
+    let viewport = TableViewport::new(area.height, total_rows, app.selected_row);
 
     // Loop-invariant styles — `Style` is `Copy`, so hoisting avoids
     // rebuilding identical structs once per visible row per frame.
@@ -567,7 +555,7 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
     let needle_lc = app.search_query.trim().to_lowercase();
     let needle_lc: &str = needle_lc.as_str();
 
-    let rows: Vec<Row> = app.filtered_view.rows()[viewport_start..viewport_end]
+    let rows: Vec<Row> = app.filtered_view.rows()[viewport.start..viewport.end]
         .iter()
         .map(|row| {
             let idx = row.catalogue_idx;
@@ -632,19 +620,7 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
         })
         .collect();
 
-    let count_text = if app.show_favorites_only {
-        format!(
-            " {}/{} timezones \u{2605} ",
-            app.filtered_view.len(),
-            app.catalogue.len()
-        )
-    } else {
-        format!(
-            " {}/{} timezones ",
-            app.filtered_view.len(),
-            app.catalogue.len()
-        )
-    };
+    let count_text = table_title(app);
 
     let widths = [
         Constraint::Percentage(30), // city
@@ -674,12 +650,12 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
 
     let mut state = TableState::default();
     if !app.filtered_view.is_empty() {
-        state.select(Some(app.selected_row.saturating_sub(viewport_start)));
+        state.select(Some(app.selected_row.saturating_sub(viewport.start)));
     }
 
     frame.render_stateful_widget(table, area, &mut state);
 
-    if app.filtered_view.len() > (area.height as usize).saturating_sub(TABLE_CHROME_ROWS) {
+    if total_rows > viewport.capacity {
         let mut scrollbar_state =
             ScrollbarState::new(app.filtered_view.len()).position(app.selected_row);
         frame.render_stateful_widget(
@@ -772,6 +748,49 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
 // ============================================================================
 // Formatting helpers
 // ============================================================================
+
+/// The rows the table can show, and which slice of the list it shows.
+///
+/// One derivation feeds the row slice, the highlight offset and the
+/// scrollbar. Recomputing the capacity separately let the scrollbar
+/// disagree with the body about how many rows fit.
+#[derive(Debug, PartialEq, Eq)]
+struct TableViewport {
+    start: usize,
+    end: usize,
+    capacity: usize,
+}
+
+impl TableViewport {
+    fn new(area_height: u16, total_rows: usize, selected: usize) -> Self {
+        let capacity = (area_height as usize)
+            .saturating_sub(TABLE_CHROME_ROWS)
+            .max(1);
+        let start = if total_rows <= capacity || selected < capacity {
+            0
+        } else {
+            selected + 1 - capacity
+        };
+        Self {
+            start,
+            end: (start + capacity).min(total_rows),
+            capacity,
+        }
+    }
+}
+
+fn table_title(app: &App) -> String {
+    let star = if app.show_favorites_only {
+        "\u{2605} "
+    } else {
+        ""
+    };
+    format!(
+        " {}/{} timezones {star}",
+        app.filtered_view.len(),
+        app.catalogue.len()
+    )
+}
 
 /// The query is truncated to ~24 display columns so a long paste cannot
 /// push the advice off the end of the line.
@@ -967,6 +986,55 @@ mod tests {
         let rendered = render_table(&mut app, 80, 12).join("\n");
 
         assert!(rendered.contains("Press F"), "got:\n{rendered}");
+    }
+
+    #[test]
+    fn the_viewport_scrolls_only_far_enough_to_reveal_the_selection() {
+        let at_top = TableViewport::new(12, 217, 0);
+        assert_eq!((at_top.start, at_top.end, at_top.capacity), (0, 9, 9));
+
+        let at_bottom = TableViewport::new(12, 217, 216);
+        assert_eq!((at_bottom.start, at_bottom.end), (208, 217));
+
+        let last_fully_visible = TableViewport::new(12, 217, 8);
+        assert_eq!(last_fully_visible.start, 0);
+    }
+
+    #[test]
+    fn a_viewport_shorter_than_its_chrome_still_reports_one_row() {
+        // The layout keeps the table at 6 rows or more today, so this
+        // pins the floor rather than describing a reachable state.
+        for height in 0..=TABLE_CHROME_ROWS as u16 {
+            let viewport = TableViewport::new(height, 217, 0);
+            assert_eq!(viewport.capacity, 1, "height {height}");
+            assert_eq!(viewport.end - viewport.start, 1, "height {height}");
+        }
+    }
+
+    #[test]
+    fn a_list_shorter_than_the_viewport_is_shown_whole() {
+        let viewport = TableViewport::new(20, 3, 2);
+
+        assert_eq!((viewport.start, viewport.end), (0, 3));
+    }
+
+    #[test]
+    fn an_empty_list_yields_an_empty_slice() {
+        let viewport = TableViewport::new(20, 0, 0);
+
+        assert_eq!((viewport.start, viewport.end), (0, 0));
+    }
+
+    #[test]
+    fn the_favourites_filter_marks_the_title_in_both_empty_and_full_states() {
+        let mut app = test_app();
+        assert!(!table_title(&app).contains('\u{2605}'));
+
+        app.toggle_favorites_filter();
+
+        assert!(table_title(&app).contains('\u{2605}'));
+        let rendered = render_table(&mut app, 80, 12).join("\n");
+        assert!(rendered.contains('\u{2605}'), "got:\n{rendered}");
     }
 
     #[test]
