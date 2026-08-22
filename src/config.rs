@@ -8,7 +8,8 @@
 //! ```
 //!
 //! On first launch after the migration, legacy plain-text files (`theme`
-//! and `favorites`) are imported automatically and then deleted.
+//! and `favorites`) are imported automatically, and removed once the
+//! unified file is safely written.
 //!
 //! ## API shape
 //!
@@ -90,17 +91,28 @@ pub fn default_path() -> Option<PathBuf> {
 /// the user's broken file before they have a chance to fix it.
 ///
 /// When the path doesn't exist the legacy plain-text migration still
-/// runs so first-launch upgrades behave the same as before.
+/// runs so first-launch upgrades behave the same as before. `path` is
+/// the only place migration looks, including for the legacy files.
 pub fn try_load(path: &Path) -> io::Result<(Config, Vec<LoadWarning>)> {
     if !path.exists() {
-        let cfg = migrate_legacy();
+        let app_dir = path.parent().unwrap_or_else(|| Path::new("."));
+        let (cfg, legacy_files) = migrate_legacy(app_dir);
         // Migration is a one-shot upgrade — persist the result so legacy
         // files don't get re-read on the next launch. Errors here are
         // surfaced as a LoadWarning so the TUI status bar can display
         // them; stderr is invisible in alt-screen mode.
         let mut warnings = Vec::new();
-        if let Err(e) = try_save(path, &cfg) {
-            warnings.push(LoadWarning(format!("Failed to write migrated config: {e}")));
+        match try_save(path, &cfg) {
+            Ok(()) => {
+                for legacy in legacy_files {
+                    let _ = fs::remove_file(legacy);
+                }
+            }
+            // Until this write succeeds the legacy files are the user's
+            // only remaining copy of their settings.
+            Err(e) => {
+                warnings.push(LoadWarning(format!("Failed to write migrated config: {e}")));
+            }
         }
         return Ok((cfg, warnings));
     }
@@ -171,35 +183,38 @@ pub fn try_save(path: &Path, config: &Config) -> io::Result<()> {
     Ok(())
 }
 
-/// Imports legacy plain-text `theme` and `favorites` files, then removes them.
-fn migrate_legacy() -> Config {
-    let Some(dir) = config_dir() else {
-        return Config::default();
+/// Imports legacy plain-text `theme` and `favorites` files from `app_dir`.
+///
+/// The returned paths are the ones that existed and were read. Removing
+/// them belongs to the caller, once the migrated config is on disk.
+fn migrate_legacy(app_dir: &Path) -> (Config, Vec<PathBuf>) {
+    let theme_path = app_dir.join("theme");
+    let favorites_path = app_dir.join("favorites");
+    let mut read_files = Vec::new();
+
+    let theme = match fs::read_to_string(&theme_path) {
+        Ok(contents) => {
+            read_files.push(theme_path);
+            Some(contents.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(default_theme)
+        }
+        Err(_) => default_theme(),
     };
-    let app_dir = dir.join("lazytimezone");
 
-    let theme = fs::read_to_string(app_dir.join("theme"))
-        .ok()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(default_theme);
-
-    let favorites = fs::read_to_string(app_dir.join("favorites"))
-        .ok()
-        .map(|contents| {
+    let favorites = match fs::read_to_string(&favorites_path) {
+        Ok(contents) => {
+            read_files.push(favorites_path);
             contents
                 .lines()
                 .map(|l| l.trim().to_string())
                 .filter(|l| !l.is_empty())
                 .collect()
-        })
-        .unwrap_or_default();
+        }
+        Err(_) => Vec::new(),
+    };
 
-    // Clean up legacy files.
-    let _ = fs::remove_file(app_dir.join("theme"));
-    let _ = fs::remove_file(app_dir.join("favorites"));
-
-    Config { theme, favorites }
+    (Config { theme, favorites }, read_files)
 }
 
 #[cfg(test)]
