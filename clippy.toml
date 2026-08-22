@@ -1,6 +1,0 @@
-# Project-specific lint thresholds. Most lint config lives in
-# Cargo.toml [lints] for edition 2024 ergonomics; this file carries
-# the lints that need numeric thresholds or path-based config.
-
-cognitive-complexity-threshold = 25
-too-many-lines-threshold = 120
