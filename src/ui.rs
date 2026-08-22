@@ -487,11 +487,10 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
 /// O(total). The `TableState` selection index is then offset by
 /// `viewport_start` so the highlight tracks correctly.
 fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect, tc: &ThemeColors) {
-    // Empty-results guidance: when the user has typed a query that
-    // matches nothing, replace the empty table body with a centred
-    // hint pointing at the syntax they probably haven't discovered.
+    // An empty body with no explanation reads as a broken app rather
+    // than an active filter.
     // Title still reads "0/N timezones" so the count is unambiguous.
-    if app.filtered_view.is_empty() && !app.search_query.is_empty() {
+    if app.filtered_view.is_empty() {
         let count_text = format!(
             " {}/{} timezones ",
             app.filtered_view.len(),
@@ -505,9 +504,6 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        // Truncate the displayed query to ~24 display cols (unicode-width aware).
-        let truncated = truncate_display(&app.search_query, 24);
-
         // Vertically centre the hint inside the table body.
         let pad_top = inner.height.saturating_sub(1) / 2;
         let hint_area = Rect {
@@ -516,10 +512,7 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
             width: inner.width,
             height: 1.min(inner.height),
         };
-        let msg = format!(
-            "No matches for \"{}\". Try a city, country, or +5:30.",
-            truncated
-        );
+        let msg = empty_table_hint(&app.search_query, app.show_favorites_only);
         let p = Paragraph::new(Line::from(Span::styled(msg, Style::default().fg(tc.muted))))
             .alignment(ratatui::layout::Alignment::Center)
             .style(Style::default().bg(tc.bg));
@@ -780,6 +773,23 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
 // Formatting helpers
 // ============================================================================
 
+/// The query is truncated to ~24 display columns so a long paste cannot
+/// push the advice off the end of the line.
+fn empty_table_hint(query: &str, favorites_only: bool) -> String {
+    match (query.is_empty(), favorites_only) {
+        (true, true) => "No favourites yet. Press F to show everything, f to add one.".to_string(),
+        (false, true) => format!(
+            "No favourite matches \"{}\". Press F to search everything.",
+            truncate_display(query, 24)
+        ),
+        (false, false) => format!(
+            "No matches for \"{}\". Try a city, country, or +5:30.",
+            truncate_display(query, 24)
+        ),
+        (true, false) => "No timezones to show.".to_string(),
+    }
+}
+
 /// Formats the hour difference between two UTC offsets.
 ///
 /// Returns `"0h"` when offsets are identical but timezones differ
@@ -943,6 +953,20 @@ mod tests {
                 || rendered.to_lowercase().contains("favorite"),
             "got:\n{rendered}"
         );
+    }
+
+    #[test]
+    fn an_unmatched_query_inside_the_favourites_filter_names_the_way_out() {
+        let mut app = test_app();
+        app.toggle_favorites_filter();
+        app.enter_search();
+        for c in "tokyo".chars() {
+            app.search_input(c);
+        }
+
+        let rendered = render_table(&mut app, 80, 12).join("\n");
+
+        assert!(rendered.contains("Press F"), "got:\n{rendered}");
     }
 
     #[test]
