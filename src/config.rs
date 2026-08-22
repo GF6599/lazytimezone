@@ -23,6 +23,7 @@ use crate::theme::Theme;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -148,10 +149,13 @@ pub fn try_load(path: &Path) -> io::Result<(Config, Vec<LoadWarning>)> {
 
 /// Atomically persist `config` to `path`.
 ///
-/// Writes to a sibling `<name>.tmp` file then `fs::rename`s it into
-/// place. On POSIX `rename` is atomic; on Windows it's atomic for the
-/// same-volume case that applies here. A crash mid-write leaves the
-/// previous good file intact rather than a zero-byte stub.
+/// Writes to a sibling `<name>.tmp` file, flushes it, then `fs::rename`s
+/// it into place. On POSIX `rename` is atomic; on Windows it's atomic
+/// for the same-volume case that applies here. A crash mid-write leaves
+/// the previous good file intact rather than a zero-byte stub.
+///
+/// The flush is what makes that last sentence true: without it the
+/// rename can reach the disk ahead of the bytes it points at.
 ///
 /// If anything fails after the temp file is created, we try to remove
 /// it so successive runs don't accumulate stale `*.tmp` siblings.
@@ -180,7 +184,7 @@ pub fn try_save(path: &Path, config: &Config) -> io::Result<()> {
         }
     };
 
-    if let Err(e) = fs::write(&tmp, &contents) {
+    if let Err(e) = write_and_sync(&tmp, contents.as_bytes()) {
         let _ = fs::remove_file(&tmp);
         return Err(e);
     }
@@ -191,6 +195,12 @@ pub fn try_save(path: &Path, config: &Config) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+fn write_and_sync(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let mut file = fs::File::create(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()
 }
 
 /// Imports legacy plain-text `theme` and `favorites` files from `app_dir`.
