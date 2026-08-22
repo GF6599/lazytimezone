@@ -35,6 +35,10 @@ impl EventSource for TerminalEvents {
     }
 }
 
+/// Without a cap the drain below only exits when the producer runs out,
+/// so piped or held input stalls the redraw and the quit check.
+const MAX_DRAINED_EVENTS: usize = 256;
+
 /// Polls for a key event for at most `timeout`.
 ///
 /// The caller (the event loop in `main`) computes `timeout` so the
@@ -51,39 +55,38 @@ pub fn handle_events(
     if !source.poll(timeout)? {
         return Ok(());
     }
-    match source.read()? {
-        Event::Key(key) => {
-            dispatch_key(app, key);
-            // Coalesce auto-repeat bursts: when the user holds j/k, crossterm
-            // queues a key event per repeat. Drain any already-ready key events
-            // here so the main loop redraws once per burst, not once per key.
-            while source.poll(Duration::ZERO)? {
-                match source.read()? {
-                    Event::Key(next) => dispatch_key(app, next),
-                    // Non-Key events during a burst: stop draining so the main
-                    // loop can react (e.g. a Resize) on its next iteration.
-                    _ => break,
-                }
-            }
-        }
-        // Resize is handled implicitly by the main loop's unconditional
-        // redraw; the explicit arm documents that we consume it on purpose.
-        Event::Resize(_, _) => {}
-        // Mouse / focus events are not bound to any action yet. Match
-        // them explicitly so future additions are an obvious diff
-        // rather than a silently-dropped event.
-        Event::Mouse(_) | Event::FocusGained | Event::FocusLost => {}
+    dispatch_event(app, source.read()?);
+
+    // Coalesce auto-repeat bursts: when the user holds j/k, crossterm
+    // queues a key event per repeat. Draining the already-ready ones here
+    // means the main loop redraws once per burst, not once per key.
+    let mut drained = 0;
+    while drained < MAX_DRAINED_EVENTS && source.poll(Duration::ZERO)? {
+        dispatch_event(app, source.read()?);
+        drained += 1;
+    }
+    Ok(())
+}
+
+/// No arm may break out of the caller's drain. `source.read` has already
+/// dequeued the event, so leaving early drops it: harmless for a
+/// `Resize`, silent data loss for a `Paste`.
+fn dispatch_event(app: &mut App, event: Event) {
+    match event {
+        Event::Key(key) => dispatch_key(app, key),
         // Bracketed paste: in Search mode, splat the entire payload
         // into the query in one shot (avoiding the per-char filter
-        // recompute). Outside search there's no text field to paste
-        // into, so the event is dropped — same as the prior behaviour.
+        // recompute). Outside search there's no text field to paste into.
         Event::Paste(text) => {
             if app.input_mode == InputMode::Search {
                 app.search_paste(&text);
             }
         }
+        // Mouse / focus events are not bound to any action yet. Match
+        // them explicitly so future additions are an obvious diff
+        // rather than a silently-dropped event.
+        Event::Resize(_, _) | Event::Mouse(_) | Event::FocusGained | Event::FocusLost => {}
     }
-    Ok(())
 }
 
 /// Routes a single key event through the Ctrl-C, help-modal, and
