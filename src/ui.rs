@@ -1038,6 +1038,30 @@ mod tests {
     }
 
     #[test]
+    fn a_page_moves_by_the_number_of_rows_actually_on_screen() {
+        let mut app = test_app();
+        // A 12-row area leaves 9 rows for data after the chrome.
+        render_table(&mut app, 80, 12);
+
+        app.page_down();
+
+        assert_eq!(app.selected_row, 9);
+    }
+
+    #[test]
+    fn paging_back_returns_to_where_it_started() {
+        let mut app = test_app();
+        render_table(&mut app, 80, 20);
+
+        app.page_down();
+        app.page_down();
+        app.page_up();
+        app.page_up();
+
+        assert_eq!(app.selected_row, 0);
+    }
+
+    #[test]
     fn the_row_count_in_the_title_reflects_the_filter() {
         let mut app = test_app();
         app.enter_search();
