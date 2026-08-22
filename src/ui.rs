@@ -874,3 +874,87 @@ fn truncate_display(s: &str, max_cols: usize) -> Cow<'_, str> {
     }
     Cow::Owned(format!("{}\u{2026}", &s[..end]))
 }
+
+#[cfg(test)]
+mod tests {
+    // Tests panic on failure by design — see src/app.rs for the rationale
+    // on why the production panic lints are relaxed inside test modules.
+    #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    use super::*;
+    use crate::config;
+
+    /// Renders the table alone, not the surrounding frame, as one
+    /// string per buffer row.
+    fn render_table(app: &mut App, width: u16, height: u16) -> Vec<String> {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        let now = Utc::now();
+        let tc = app.theme.colors();
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                draw_table(frame, app, &now, area, &tc);
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer().clone();
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol().to_string())
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn test_app() -> App {
+        App::with_config(config::Config::default())
+    }
+
+    #[test]
+    fn a_query_that_matches_nothing_suggests_the_search_syntax() {
+        let mut app = test_app();
+        app.enter_search();
+        for c in "zzzznotacity".chars() {
+            app.search_input(c);
+        }
+
+        let rendered = render_table(&mut app, 80, 12).join("\n");
+
+        assert!(rendered.contains("No matches"), "got:\n{rendered}");
+    }
+
+    #[test]
+    fn an_empty_favourites_filter_says_how_to_add_one() {
+        let mut app = test_app();
+        app.toggle_favorites_filter();
+        assert!(app.filtered_view.is_empty());
+
+        let rendered = render_table(&mut app, 80, 12).join("\n");
+
+        assert!(
+            rendered.contains('f'),
+            "an empty favourites list must not render as a blank table:\n{rendered}"
+        );
+        assert!(
+            rendered.to_lowercase().contains("favourite")
+                || rendered.to_lowercase().contains("favorite"),
+            "got:\n{rendered}"
+        );
+    }
+
+    #[test]
+    fn the_row_count_in_the_title_reflects_the_filter() {
+        let mut app = test_app();
+        app.enter_search();
+        for c in "tokyo".chars() {
+            app.search_input(c);
+        }
+
+        let rendered = render_table(&mut app, 80, 12).join("\n");
+
+        assert!(rendered.contains("1/217"), "got:\n{rendered}");
+    }
+}
