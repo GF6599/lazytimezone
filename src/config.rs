@@ -84,11 +84,6 @@ fn config_path() -> Option<PathBuf> {
 
 /// Canonical on-disk config path, or `None` if neither `$XDG_CONFIG_HOME`
 /// nor `$HOME` is set.
-///
-/// Exposed so a future caller of [`try_load`] can format diagnostics
-/// against the same path the loader is reading from. Wired up by a
-/// later wave; the `allow(dead_code)` silences the interim warning.
-#[allow(dead_code)]
 pub fn default_path() -> Option<PathBuf> {
     config_path()
 }

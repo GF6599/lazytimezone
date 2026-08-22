@@ -3245,9 +3245,8 @@ pub(crate) fn supplemental_search_terms(
 // the year at mid-latitudes).
 //
 // We compute sunrise/sunset from the city's latitude and the day of
-// year using a simplified solar-position model. Cities without a
-// curated latitude fall back to the simple window — never worse than
-// the previous behaviour.
+// year using a simplified solar-position model. A city with no curated
+// latitude falls back to the fixed window.
 
 /// Linear over the catalogue. A caller that already holds the
 /// [`TimezoneEntry`] should read `entry.latitude` and call

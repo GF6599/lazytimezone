@@ -594,12 +594,9 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
             };
 
             let is_fav = app.is_favorite(idx);
-            // City name spans: when search is active, dim the non-matching
-            // portion of the display name so the matched substring pops.
-            // Only the first occurrence of the WHOLE query string is
-            // highlighted — multi-term AND queries and per-term highlighting
-            // are intentionally out of scope (would require a helper in
-            // search.rs, which is out of bounds for this edit).
+            // Only the first occurrence of the whole query string is
+            // highlighted. Per-term highlighting for a multi-term AND
+            // query is deliberately not attempted.
             let name_spans = city_name_spans(display_name, needle_lc, tc, fg_style);
             let city_cell = if is_fav {
                 let mut spans = Vec::with_capacity(name_spans.len() + 1);

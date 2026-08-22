@@ -95,9 +95,9 @@ pub(crate) struct Favorites {
 }
 
 impl Favorites {
-    /// Builds favourites from on-disk string form. Unparseable entries
-    /// are skipped silently — matching the prior behaviour where invalid
-    /// IANA strings simply dropped out of the loaded list.
+    /// Builds favourites from on-disk string form. An entry that is not
+    /// a valid IANA identifier is dropped without comment, so a config
+    /// hand-edited to nonsense still loads.
     pub(crate) fn from_strings(items: impl IntoIterator<Item = String>) -> Self {
         let ordered: Vec<Tz> = items
             .into_iter()
@@ -1245,11 +1245,9 @@ mod tests {
     /// not rebuild the position lookup, so the next sort used stale
     /// positions and the visual reorder did not take effect.
     ///
-    /// After the cluster refactor this invariant is structural — the
-    /// position map lives inside [`Favorites`] and is rebuilt on every
-    /// mutator — but the behaviour assertion below still pins down the
-    /// public-visible sort order, so a regression in the new code path
-    /// would still trip the test.
+    /// [`Favorites`] now rebuilds its position map inside every mutator,
+    /// so the invariant is structural. The assertion below pins the
+    /// user-visible sort order rather than that mechanism.
     #[test]
     fn reorder_favorites_updates_sort_order_immediately() {
         let mut app = test_app();
