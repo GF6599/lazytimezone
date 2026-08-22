@@ -57,21 +57,18 @@ fn pipe_to_command(cmd: &str, args: &[&str], text: &str) -> io::Result<()> {
         .spawn()
         .map_err(|e| io::Error::new(e.kind(), format!("failed to spawn {cmd}: {e}")))?;
 
-    // Hold stdin in a block so it's dropped (closing the pipe) before
-    // we wait — otherwise pbcopy/xclip never see EOF and hang.
-    {
-        let stdin = child
-            .stdin
-            .as_mut()
-            .ok_or_else(|| io::Error::other(format!("failed to open stdin for {cmd}")))?;
-        stdin
-            .write_all(text.as_bytes())
-            .map_err(|e| io::Error::new(e.kind(), format!("failed to write to {cmd}: {e}")))?;
-    }
+    // `Child` has no `Drop`, so returning before `wait` leaves a zombie
+    // for the life of the process. A clipboard tool that exits without
+    // reading (wl-copy with no Wayland session) fails the write on every
+    // keypress, which is how that accumulates.
+    let written = write_to_stdin(&mut child, cmd, text);
 
+    // `wait` closes stdin itself, which is what lets the child see EOF.
     let status = child
         .wait()
         .map_err(|e| io::Error::new(e.kind(), format!("failed to wait on {cmd}: {e}")))?;
+
+    written?;
 
     if status.success() {
         Ok(())
@@ -80,6 +77,16 @@ fn pipe_to_command(cmd: &str, args: &[&str], text: &str) -> io::Result<()> {
             "{cmd} exited with status {status}"
         )))
     }
+}
+
+fn write_to_stdin(child: &mut std::process::Child, cmd: &str, text: &str) -> io::Result<()> {
+    let stdin = child
+        .stdin
+        .as_mut()
+        .ok_or_else(|| io::Error::other(format!("failed to open stdin for {cmd}")))?;
+    stdin
+        .write_all(text.as_bytes())
+        .map_err(|e| io::Error::new(e.kind(), format!("failed to write to {cmd}: {e}")))
 }
 
 /// Returns the platform-appropriate clipboard command(s) to try, in priority order.
