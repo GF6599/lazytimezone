@@ -1027,6 +1027,60 @@ mod tests {
     }
 
     #[test]
+    fn favoriting_a_city_does_not_favorite_its_zone_neighbours() {
+        let mut app = test_app();
+        apply_query(&mut app, "boston");
+        app.toggle_favorite();
+
+        app.toggle_favorites_filter();
+        apply_query(&mut app, "");
+
+        assert_eq!(app.filtered_view.len(), 1);
+        assert_eq!(first_city(&app), "Boston");
+    }
+
+    #[test]
+    fn the_unsearched_list_shows_one_major_city_per_zone() {
+        let mut app = test_app();
+
+        apply_query(&mut app, "");
+
+        let len = app.filtered_view.len();
+        assert!(len > 300 && len < 500, "got {len} rows");
+        assert_eq!(first_city(&app), "Shanghai");
+        let mut seen = std::collections::HashSet::new();
+        assert!((0..len).all(|n| seen.insert(nth_tz(&app, n))));
+    }
+
+    #[test]
+    fn a_favorited_small_city_appears_above_the_majors() {
+        let mut app = test_app();
+        apply_query(&mut app, "portland maine");
+        app.toggle_favorite();
+
+        apply_query(&mut app, "");
+
+        assert_eq!(first_city(&app), "Portland");
+        let majors: Vec<&str> = filtered_city_names(&app, app.filtered_view.len());
+        assert!(majors.contains(&"New York City"));
+    }
+
+    #[test]
+    fn a_legacy_zone_favorite_becomes_its_major_city() {
+        let cfg = config::Config {
+            favorites: vec!["Asia/Tokyo".to_string()],
+            ..config::Config::default()
+        };
+        let mut app = App::with_config(cfg);
+
+        app.toggle_favorites_filter();
+        apply_query(&mut app, "");
+
+        assert_eq!(app.filtered_view.len(), 1);
+        assert_eq!(first_city(&app), "Tokyo");
+    }
+
+    #[test]
     fn search_by_city_and_state_narrows_to_that_city() {
         let mut app = test_app();
 
