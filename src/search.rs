@@ -42,15 +42,13 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use chrono::DateTime;
-use chrono::Utc;
-use chrono::offset::Offset;
-use chrono_tz::Tz;
-
 use crate::timezone::{
     SupplementalSearchTerm, TimezoneEntry, city_search_aliases, country_search_aliases,
     format_utc_offset, region_of, zone_search_terms,
 };
+use chrono::DateTime;
+use chrono::Utc;
+use chrono::offset::Offset;
 
 /// Minimum query length required for a contains-style (substring) match.
 ///
@@ -104,7 +102,7 @@ impl SearchIndex {
     /// for the unfiltered catalogue, or just the favorites' indices when
     /// the favorites-only filter is active.
     ///
-    /// `favorite_positions` maps each favorite [`Tz`] to its
+    /// `favorite_positions` maps each favorite catalogue index to its
     /// user-ordered position; only `contains_key` is used here (the
     /// position itself drives the unfiltered sort, not the scored
     /// search).
@@ -114,7 +112,7 @@ impl SearchIndex {
         entries: &[TimezoneEntry],
         base_indices: &[usize],
         now: &DateTime<Utc>,
-        favorite_positions: &HashMap<Tz, usize>,
+        favorite_positions: &HashMap<usize, usize>,
     ) -> Option<Vec<(usize, &'static str, u32)>> {
         let query = SearchQuery::new(query_text);
         if query.terms.is_empty() {
@@ -153,7 +151,7 @@ impl SearchIndex {
                     score += term_score / 2;
                 }
                 score += self.entries[i].pop_score;
-                if favorite_positions.contains_key(&entry.tz) {
+                if favorite_positions.contains_key(&i) {
                     score += FAVORITE_TIEBREAKER_BONUS;
                 }
                 let display_name = best_display_name(entry, &self.entries[i], &query);
@@ -711,6 +709,8 @@ mod tests {
     // rationale on why production lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
+    use chrono_tz::Tz;
+
     use super::*;
 
     // ── normalize_search_text ──────────────────────────────────────
@@ -886,7 +886,7 @@ mod tests {
         index: &SearchIndex,
         entries: &[TimezoneEntry],
         query: &str,
-        favorites: &HashMap<Tz, usize>,
+        favorites: &HashMap<usize, usize>,
     ) -> Option<Vec<(usize, &'static str, u32)>> {
         let base: Vec<usize> = (0..entries.len()).collect();
         let now = Utc::now();
@@ -925,7 +925,7 @@ mod tests {
 
         // Favourite Tokyo only.
         let mut favorites = HashMap::new();
-        favorites.insert(Tz::Asia__Tokyo, 0usize);
+        favorites.insert(tokyo_idx, 0usize);
 
         // Query "new york" — Tokyo gets no match, New York gets a strong
         // exact-city match. Despite the favourite bonus, New York wins:
@@ -952,7 +952,7 @@ mod tests {
             .position(|e| e.tz == Tz::Australia__Sydney)
             .expect("Sydney in catalogue");
         let mut favs2 = HashMap::new();
-        favs2.insert(Tz::Australia__Sydney, 0usize);
+        favs2.insert(sydney_idx, 0usize);
 
         let with_bonus = run_search(&index, entries, "australia", &favs2).expect("non-empty");
         let without_bonus =

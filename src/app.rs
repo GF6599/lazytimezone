@@ -29,34 +29,27 @@ use crate::timezone::{self, TimezoneEntry};
 
 /// Immutable, derived-index-bearing timezone catalogue.
 ///
-/// Bundles the full [`TimezoneEntry`] list together with the two indexes
-/// derived from it — the `Tz`-to-position map and the search index — so
-/// they can't drift out of sync. The struct exposes no mutators; the
-/// catalogue is constructed once at startup and read thereafter.
+/// Bundles the full [`TimezoneEntry`] list together with the search
+/// index derived from it, so they can't drift out of sync. The struct
+/// exposes no mutators; the catalogue is constructed once at startup
+/// and read thereafter.
 pub(crate) struct Catalogue {
     entries: &'static [TimezoneEntry],
-    by_tz: HashMap<Tz, usize>,
     search_index: SearchIndex,
 }
 
 impl Catalogue {
     pub(crate) fn new() -> Self {
         let entries = timezone::all_timezones();
-        let by_tz = entries.iter().enumerate().map(|(i, e)| (e.tz, i)).collect();
         let search_index = SearchIndex::build(entries);
         Self {
             entries,
-            by_tz,
             search_index,
         }
     }
 
     pub(crate) fn entries(&self) -> &'static [TimezoneEntry] {
         self.entries
-    }
-
-    pub(crate) fn by_tz(&self, tz: Tz) -> Option<usize> {
-        self.by_tz.get(&tz).copied()
     }
 
     pub(crate) fn search_index(&self) -> &SearchIndex {
@@ -83,91 +76,122 @@ impl Default for Catalogue {
 /// Internally stores parsed [`Tz`] values (not strings) so search,
 /// sort, and rendering paths never re-parse on the hot path. Strings
 /// only appear at the on-disk boundary via
-/// [`Favorites::from_strings`] / [`Favorites::to_strings`].
+/// [`Favorites::from_config`] / [`Favorites::to_config`].
 ///
 /// The `position` map is always a correct projection of `ordered`:
 /// every mutator calls [`rebuild_positions`](Self::rebuild_positions)
 /// before returning, so external observers can never see a stale map.
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Favorites {
-    ordered: Vec<Tz>,
-    position: HashMap<Tz, usize>,
+    ordered: Vec<usize>,
+    position: HashMap<usize, usize>,
 }
 
 impl Favorites {
-    /// Builds favourites from on-disk string form. An entry that is not
-    /// a valid IANA identifier is dropped without comment, so a config
-    /// hand-edited to nonsense still loads.
-    pub(crate) fn from_strings(items: impl IntoIterator<Item = String>) -> Self {
-        let ordered: Vec<Tz> = items
-            .into_iter()
-            .filter_map(|s| s.parse::<Tz>().ok())
-            .collect();
-        let position = ordered.iter().enumerate().map(|(i, tz)| (*tz, i)).collect();
-        Self { ordered, position }
+    /// Resolves the config entries against the catalogue. A `City`
+    /// entry names one row, a legacy `Zone` entry resolves to the
+    /// zone's most populous city. The second return value lists the
+    /// entries that no longer match a catalogue row, so the caller
+    /// can say so instead of dropping them silently.
+    pub(crate) fn from_config(
+        items: &[config::FavoriteEntry],
+        entries: &[TimezoneEntry],
+    ) -> (Self, Vec<String>) {
+        let mut ordered = Vec::new();
+        let mut dropped = Vec::new();
+        for item in items {
+            let resolved = match item {
+                config::FavoriteEntry::City { city, admin1, cc } => entries
+                    .iter()
+                    .position(|e| e.city == city && e.admin1 == admin1 && e.cc == cc),
+                config::FavoriteEntry::Zone(zone) => zone
+                    .parse::<Tz>()
+                    .ok()
+                    .and_then(|tz| entries.iter().position(|e| e.tz == tz)),
+            };
+            match resolved {
+                Some(idx) if !ordered.contains(&idx) => ordered.push(idx),
+                Some(_) => {}
+                None => dropped.push(match item {
+                    config::FavoriteEntry::City { city, .. } => city.clone(),
+                    config::FavoriteEntry::Zone(zone) => zone.clone(),
+                }),
+            }
+        }
+        let position = ordered.iter().enumerate().map(|(i, &e)| (e, i)).collect();
+        (Self { ordered, position }, dropped)
     }
 
-    /// Serializes the ordered list back into IANA strings for persistence.
-    pub(crate) fn to_strings(&self) -> Vec<String> {
+    /// Serializes back to the on-disk `City` form.
+    pub(crate) fn to_config(&self, entries: &[TimezoneEntry]) -> Vec<config::FavoriteEntry> {
         self.ordered
             .iter()
-            .map(|tz| tz.name().to_string())
+            .filter_map(|&idx| entries.get(idx))
+            .map(|e| config::FavoriteEntry::City {
+                city: e.city.to_string(),
+                admin1: e.admin1.to_string(),
+                cc: e.cc.to_string(),
+            })
             .collect()
     }
 
-    pub(crate) fn contains(&self, tz: Tz) -> bool {
-        self.position.contains_key(&tz)
+    pub(crate) fn contains(&self, idx: usize) -> bool {
+        self.position.contains_key(&idx)
     }
 
-    pub(crate) fn position(&self, tz: Tz) -> Option<usize> {
-        self.position.get(&tz).copied()
+    pub(crate) fn position(&self, idx: usize) -> Option<usize> {
+        self.position.get(&idx).copied()
     }
 
     /// Returns the raw position map. Exposed so callers like the
-    /// [`SearchIndex::search`] hot path can pass `&HashMap<Tz, usize>`
+    /// [`SearchIndex::search`] hot path can pass `&HashMap<usize, usize>`
     /// without rebuilding it.
-    pub(crate) fn position_map(&self) -> &HashMap<Tz, usize> {
+    pub(crate) fn position_map(&self) -> &HashMap<usize, usize> {
         &self.position
     }
 
-    pub(crate) fn top(&self, n: usize) -> impl Iterator<Item = Tz> + '_ {
+    pub(crate) fn top(&self, n: usize) -> impl Iterator<Item = usize> + '_ {
         self.ordered.iter().take(n).copied()
     }
 
-    /// Toggles `tz` in the favourite list. Returns `true` when the
-    /// timezone was added, `false` when it was removed.
-    pub(crate) fn toggle(&mut self, tz: Tz) -> bool {
-        if let Some(&idx) = self.position.get(&tz) {
-            self.ordered.remove(idx);
+    pub(crate) fn indices(&self) -> impl Iterator<Item = usize> + '_ {
+        self.ordered.iter().copied()
+    }
+
+    /// Toggles `idx` in the favourite list. Returns `true` when the
+    /// row was added, `false` when it was removed.
+    pub(crate) fn toggle(&mut self, idx: usize) -> bool {
+        if let Some(&at) = self.position.get(&idx) {
+            self.ordered.remove(at);
             self.rebuild_positions();
             false
         } else {
-            self.ordered.push(tz);
-            self.position.insert(tz, self.ordered.len() - 1);
+            self.ordered.push(idx);
+            self.position.insert(idx, self.ordered.len() - 1);
             true
         }
     }
 
-    /// Swaps `tz` one slot earlier in the order. Returns `true` if a
-    /// move happened, `false` if `tz` was absent or already first.
-    pub(crate) fn move_up(&mut self, tz: Tz) -> bool {
-        if let Some(idx) = self.position(tz)
-            && idx > 0
+    /// Swaps `idx` one slot earlier in the order. Returns `true` if a
+    /// move happened, `false` if `idx` was absent or already first.
+    pub(crate) fn move_up(&mut self, idx: usize) -> bool {
+        if let Some(at) = self.position(idx)
+            && at > 0
         {
-            self.ordered.swap(idx - 1, idx);
+            self.ordered.swap(at - 1, at);
             self.rebuild_positions();
             return true;
         }
         false
     }
 
-    /// Swaps `tz` one slot later in the order. Returns `true` if a
-    /// move happened, `false` if `tz` was absent or already last.
-    pub(crate) fn move_down(&mut self, tz: Tz) -> bool {
-        if let Some(idx) = self.position(tz)
-            && idx + 1 < self.ordered.len()
+    /// Swaps `idx` one slot later in the order. Returns `true` if a
+    /// move happened, `false` if `idx` was absent or already last.
+    pub(crate) fn move_down(&mut self, idx: usize) -> bool {
+        if let Some(at) = self.position(idx)
+            && at + 1 < self.ordered.len()
         {
-            self.ordered.swap(idx, idx + 1);
+            self.ordered.swap(at, at + 1);
             self.rebuild_positions();
             return true;
         }
@@ -179,7 +203,7 @@ impl Favorites {
             .ordered
             .iter()
             .enumerate()
-            .map(|(i, tz)| (*tz, i))
+            .map(|(i, &idx)| (idx, i))
             .collect();
     }
 }
@@ -417,9 +441,15 @@ impl App {
     ) -> Self {
         let catalogue = Catalogue::new();
         let theme = Theme::from_label(&cfg.theme);
-        let favorites = Favorites::from_strings(cfg.favorites);
+        let (favorites, dropped) = Favorites::from_config(&cfg.favorites, catalogue.entries());
+        let mut startup_messages = startup_messages;
+        for name in dropped {
+            startup_messages.push(format!(
+                "Dropped favorite {name}: not in the city catalogue"
+            ));
+        }
 
-        let mut indices: Vec<usize> = (0..catalogue.len()).collect();
+        let mut indices = Self::browse_indices_for(&favorites);
         Self::sort_indices(&mut indices, catalogue.entries(), favorites.position_map());
         let mut filtered_view = FilteredView::default();
         filtered_view.set_from_indices(indices, &catalogue);
@@ -724,7 +754,12 @@ impl App {
         let base_indices = self.base_indices();
 
         if self.search_query.is_empty() {
-            self.set_sorted_results(base_indices);
+            if self.show_favorites_only {
+                self.set_sorted_results(base_indices);
+            } else {
+                let browse = self.browse_indices();
+                self.set_sorted_results(browse);
+            }
         } else {
             let now = Utc::now();
             match self.catalogue.search_index().search(
@@ -759,11 +794,8 @@ impl App {
     }
 
     pub(crate) fn toggle_favorite(&mut self) {
-        if let Some((idx, _)) = self.current_result()
-            && let Some(entry) = self.catalogue.get(idx)
-        {
-            let tz = entry.tz;
-            self.favorites.toggle(tz);
+        if let Some((idx, _)) = self.current_result() {
+            self.favorites.toggle(idx);
             self.save_config();
             self.apply_filter();
         }
@@ -771,8 +803,7 @@ impl App {
 
     pub(crate) fn move_favorite_up(&mut self) {
         if let Some((idx, _)) = self.current_result()
-            && let Some(entry) = self.catalogue.get(idx)
-            && self.favorites.move_up(entry.tz)
+            && self.favorites.move_up(idx)
         {
             self.save_config();
             self.apply_filter();
@@ -782,8 +813,7 @@ impl App {
 
     pub(crate) fn move_favorite_down(&mut self) {
         if let Some((idx, _)) = self.current_result()
-            && let Some(entry) = self.catalogue.get(idx)
-            && self.favorites.move_down(entry.tz)
+            && self.favorites.move_down(idx)
         {
             self.save_config();
             self.apply_filter();
@@ -796,17 +826,15 @@ impl App {
     pub(crate) fn top_favorite_timezones(&self, count: usize) -> Vec<(chrono_tz::Tz, &str)> {
         self.favorites
             .top(count)
-            .filter_map(|tz| {
-                let idx = self.catalogue.by_tz(tz)?;
-                Some((tz, self.catalogue.get(idx)?.city))
+            .filter_map(|idx| {
+                let entry = self.catalogue.get(idx)?;
+                Some((entry.tz, entry.city))
             })
             .collect()
     }
 
     pub(crate) fn is_favorite(&self, tz_index: usize) -> bool {
-        self.catalogue
-            .get(tz_index)
-            .is_some_and(|entry| self.favorites.contains(entry.tz))
+        self.favorites.contains(tz_index)
     }
 
     fn current_result(&self) -> Option<(usize, &'static str)> {
@@ -815,14 +843,33 @@ impl App {
     }
 
     fn base_indices(&self) -> Vec<usize> {
-        let entries = self.catalogue.entries();
         if self.show_favorites_only {
-            (0..entries.len())
-                .filter(|&i| self.favorites.contains(entries[i].tz))
-                .collect()
+            self.favorites.indices().collect()
         } else {
-            (0..entries.len()).collect()
+            (0..self.catalogue.len()).collect()
         }
+    }
+
+    /// The unsearched list: favorites in the user's order, then the
+    /// most populous city of every other zone. Searching still covers
+    /// the whole catalogue, this only shapes browsing.
+    fn browse_indices_for(favorites: &Favorites) -> Vec<usize> {
+        let mut indices: Vec<usize> = favorites.indices().collect();
+        // A favorited major city must not appear twice, but a favorite
+        // does not hide the rest of its zone: Portland, Maine on the
+        // list must not remove New York City from it.
+        let favorite_set: std::collections::HashSet<usize> = indices.iter().copied().collect();
+        indices.extend(
+            crate::timezone::zone_representatives()
+                .iter()
+                .copied()
+                .filter(|i| !favorite_set.contains(i)),
+        );
+        indices
+    }
+
+    fn browse_indices(&self) -> Vec<usize> {
+        Self::browse_indices_for(&self.favorites)
     }
 
     fn set_sorted_results(&mut self, mut indices: Vec<usize>) {
@@ -851,12 +898,12 @@ impl App {
     /// followed by non-favourites in catalogue (population) order.
     fn sort_indices(
         indices: &mut [usize],
-        timezones: &[TimezoneEntry],
-        favorites_order: &HashMap<Tz, usize>,
+        _timezones: &[TimezoneEntry],
+        favorites_order: &HashMap<usize, usize>,
     ) {
         indices.sort_by(|&a, &b| {
-            let a_pos = favorites_order.get(&timezones[a].tz);
-            let b_pos = favorites_order.get(&timezones[b].tz);
+            let a_pos = favorites_order.get(&a);
+            let b_pos = favorites_order.get(&b);
             match (a_pos, b_pos) {
                 (Some(ai), Some(bi)) => ai.cmp(bi),
                 (Some(_), None) => std::cmp::Ordering::Less,
@@ -881,7 +928,7 @@ impl App {
         };
         let cfg = config::Config {
             theme: self.theme.label().to_string(),
-            favorites: self.favorites.to_strings(),
+            favorites: self.favorites.to_config(self.catalogue.entries()),
         };
         // Route through `try_save` (not `save`) so we can surface the
         // failure to the user. The original `config::save` eprintln!s on
@@ -1068,7 +1115,7 @@ mod tests {
     #[test]
     fn a_legacy_zone_favorite_becomes_its_major_city() {
         let cfg = config::Config {
-            favorites: vec!["Asia/Tokyo".to_string()],
+            favorites: vec![config::FavoriteEntry::Zone("Asia/Tokyo".to_string())],
             ..config::Config::default()
         };
         let mut app = App::with_config(cfg);
@@ -1228,17 +1275,16 @@ mod tests {
     fn toggle_favorite_adds_and_removes() {
         let mut app = test_app();
         app.selected_row = 0;
-        app.select_timezone();
-        let tz = app.selection.tz;
+        let idx = app.filtered_view.get(0).unwrap().catalogue_idx;
 
-        assert!(!app.favorites.contains(tz));
+        assert!(!app.favorites.contains(idx));
         app.toggle_favorite();
-        assert!(app.favorites.contains(tz));
-        assert!(app.favorites.position(tz).is_some());
+        assert!(app.favorites.contains(idx));
+        assert!(app.favorites.position(idx).is_some());
 
         app.toggle_favorite();
-        assert!(!app.favorites.contains(tz));
-        assert!(app.favorites.position(tz).is_none());
+        assert!(!app.favorites.contains(idx));
+        assert!(app.favorites.position(idx).is_none());
     }
 
     #[test]
@@ -1388,8 +1434,6 @@ mod tests {
 
         assert_eq!(first_tz(&app), favs[1].1);
         assert!(first_index_of(&app, favs[0].1) < first_index_of(&app, favs[2].1));
-        assert_eq!(app.favorites.position(favs[0].1), Some(1));
-        assert_eq!(app.favorites.position(favs[1].1), Some(0));
 
         app.selected_row = first_index_of(&app, favs[2].1);
         app.move_favorite_up();
@@ -1510,7 +1554,7 @@ mod tests {
         let baseline_view_len = app.filtered_view.len();
 
         apply_query(&mut app, "tokyo");
-        assert!(app.filtered_view.len() < baseline_view_len);
+        assert_ne!(app.filtered_view.len(), baseline_view_len);
         app.input_mode = InputMode::Normal;
 
         app.clear_search_input();
@@ -1529,7 +1573,7 @@ mod tests {
         let baseline_view_len = app.filtered_view.len();
 
         apply_query(&mut app, "tokyo");
-        assert!(app.filtered_view.len() < baseline_view_len);
+        assert_ne!(app.filtered_view.len(), baseline_view_len);
         app.exit_search();
 
         app.enter_search();

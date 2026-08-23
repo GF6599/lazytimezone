@@ -168,6 +168,21 @@ pub(crate) fn country_search_aliases(country: &str) -> &'static [&'static str] {
     }
 }
 
+/// Catalogue index of the most populous city of each zone, in
+/// catalogue (population) order. This is the unsearched browse list.
+pub fn zone_representatives() -> &'static [usize] {
+    static REPS: OnceLock<Vec<usize>> = OnceLock::new();
+    REPS.get_or_init(|| {
+        let mut seen = std::collections::HashSet::new();
+        all_timezones()
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| seen.insert(e.tz))
+            .map(|(i, _)| i)
+            .collect()
+    })
+}
+
 /// Continent-level region derived from the IANA identifier, e.g.
 /// "America" for `America/New_York`. Search-only.
 pub(crate) fn region_of(tz: Tz) -> &'static str {
