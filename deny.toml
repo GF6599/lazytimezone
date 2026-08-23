@@ -48,7 +48,10 @@ exceptions = []
 # `darling`. Re-tighten to "deny" the moment that lands.
 multiple-versions = "warn"
 wildcards = "allow"
-highlight = "all-dependencies"
+# cargo-deny accepts "simplest-path", "lowest-version" or "all". An
+# unrecognised value fails config deserialization, which aborts every
+# check in this file rather than just this one.
+highlight = "all"
 deny = []
 skip = []
 skip-tree = []
