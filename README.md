@@ -123,4 +123,4 @@ just check    # the quality gate: clippy, then the tests, then a format check
 
 ## License
 
-MIT.
+MIT. The city catalogue in `data/cities.tsv` derives from [GeoNames](https://www.geonames.org/), licensed CC BY 4.0.
