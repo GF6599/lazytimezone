@@ -70,7 +70,7 @@ Press `?` in the app for the same key list, plus the search syntax.
 
 | Key | Action |
 |---|---|
-| Type | Filter the cities |
+| `Type` | Filter the cities |
 | `Left` / `Right` | Move the cursor |
 | `Home` / `End` | Jump to the start or the end, also `Ctrl-a` / `Ctrl-e` |
 | `Backspace` | Delete the previous character |

@@ -96,7 +96,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 /// app yet. Both lists are hand-written, so
 /// `every_help_binding_appears_in_the_readme` holds them together.
 const NORMAL_MODE_HELP: &[(&str, &str)] = &[
-    ("j / k / ↑ ↓", "Move up / down"),
+    ("j / k / Up / Down", "Move up / down"),
     ("g / G", "Jump to top / bottom"),
     ("Ctrl-d / Ctrl-u", "Page down / up"),
     ("Enter", "Select timezone (set as main clock)"),
@@ -113,7 +113,7 @@ const NORMAL_MODE_HELP: &[(&str, &str)] = &[
 
 const SEARCH_MODE_HELP: &[(&str, &str)] = &[
     ("Type", "Filter timezones (AND across terms)"),
-    ("← / →", "Move cursor"),
+    ("Left / Right", "Move cursor"),
     ("Home / End", "Jump to start / end (also Ctrl-a / Ctrl-e)"),
     ("Backspace / Delete", "Delete previous / next char"),
     ("Ctrl-w", "Delete previous word"),
