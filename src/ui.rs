@@ -92,49 +92,63 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 ///
 /// Uses [`Clear`] to wipe the underlying cells before drawing, so
 /// the popup's transparent borders don't bleed background through.
+/// The README lists the same bindings for a reader who has not built the
+/// app yet. Both lists are hand-written, so
+/// `every_help_binding_appears_in_the_readme` holds them together.
+const NORMAL_MODE_HELP: &[(&str, &str)] = &[
+    ("j / k / ↑ ↓", "Move up / down"),
+    ("g / G", "Jump to top / bottom"),
+    ("Ctrl-d / Ctrl-u", "Page down / up"),
+    ("Enter", "Select timezone (set as main clock)"),
+    ("/", "Enter search mode"),
+    ("Ctrl-l", "Clear active search filter"),
+    ("f", "Toggle favorite on selected row"),
+    ("F", "Toggle favorites-only filter"),
+    ("J / K", "Move favorite down / up in order"),
+    ("t", "Cycle theme"),
+    ("c", "Copy selected time to clipboard"),
+    ("?", "Toggle this help"),
+    ("q / Ctrl-c", "Quit"),
+];
+
+const SEARCH_MODE_HELP: &[(&str, &str)] = &[
+    ("Type", "Filter timezones (AND across terms)"),
+    ("← / →", "Move cursor"),
+    ("Home / End", "Jump to start / end (also Ctrl-a / Ctrl-e)"),
+    ("Backspace / Delete", "Delete previous / next char"),
+    ("Ctrl-w", "Delete previous word"),
+    ("Ctrl-k", "Delete to end of line"),
+    ("Ctrl-u", "Clear search"),
+    ("Ctrl-f", "Toggle favorite on highlighted row"),
+    ("Enter", "Pick highlighted row and exit"),
+    ("Esc", "Exit without picking"),
+];
+
+/// Bold accent heading that opens each of the overlay's three sections.
+fn section_header(title: &'static str, tc: &ThemeColors) -> Line<'static> {
+    Line::from(Span::styled(
+        title,
+        Style::default().fg(tc.accent).add_modifier(Modifier::BOLD),
+    ))
+}
+
 fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect, tc: &ThemeColors) {
-    let lines: Vec<Line> = vec![
-        Line::from(Span::styled(
-            "Normal mode",
-            Style::default().fg(tc.accent).add_modifier(Modifier::BOLD),
-        )),
-        help_row("j / k / ↑ ↓", "Move up / down", tc),
-        help_row("g / G", "Jump to top / bottom", tc),
-        help_row("Ctrl-d / Ctrl-u", "Page down / up", tc),
-        help_row("Enter", "Select timezone (set as main clock)", tc),
-        help_row("/", "Enter search mode", tc),
-        help_row("Ctrl-l", "Clear active search filter", tc),
-        help_row("f", "Toggle favorite on selected row", tc),
-        help_row("F", "Toggle favorites-only filter", tc),
-        help_row("J / K", "Move favorite down / up in order", tc),
-        help_row("t", "Cycle theme", tc),
-        help_row("c", "Copy selected time to clipboard", tc),
-        help_row("?", "Toggle this help", tc),
-        help_row("q / Ctrl-c", "Quit", tc),
-        Line::from(""),
-        Line::from(Span::styled(
-            "Search mode",
-            Style::default().fg(tc.accent).add_modifier(Modifier::BOLD),
-        )),
-        help_row("Type", "Filter timezones (AND across terms)", tc),
-        help_row("← / →", "Move cursor", tc),
-        help_row(
-            "Home / End",
-            "Jump to start / end (also Ctrl-a / Ctrl-e)",
-            tc,
-        ),
-        help_row("Backspace / Delete", "Delete previous / next char", tc),
-        help_row("Ctrl-w", "Delete previous word", tc),
-        help_row("Ctrl-k", "Delete to end of line", tc),
-        help_row("Ctrl-u", "Clear search", tc),
-        help_row("Ctrl-f", "Toggle favorite on highlighted row", tc),
-        help_row("Enter", "Pick highlighted row and exit", tc),
-        help_row("Esc", "Exit without picking", tc),
-        Line::from(""),
-        Line::from(Span::styled(
-            "Search syntax",
-            Style::default().fg(tc.accent).add_modifier(Modifier::BOLD),
-        )),
+    let mut lines: Vec<Line> = vec![section_header("Normal mode", tc)];
+    lines.extend(
+        NORMAL_MODE_HELP
+            .iter()
+            .map(|&(key, desc)| help_row(key, desc, tc)),
+    );
+    lines.push(Line::from(""));
+    lines.push(section_header("Search mode", tc));
+    lines.extend(
+        SEARCH_MODE_HELP
+            .iter()
+            .map(|&(key, desc)| help_row(key, desc, tc)),
+    );
+    lines.push(Line::from(""));
+    lines.push(section_header("Search syntax", tc));
+    lines.extend([
         syntax_row("tokyo", "city or alias", tc),
         syntax_row("+5:30, UTC-8", "offset (today's local time)", tc),
         syntax_row("asia, europe", "region", tc),
@@ -145,7 +159,7 @@ fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect, tc: &ThemeColor
             "  Tip: offsets reflect each city's CURRENT local time (DST-adjusted).",
             Style::default().fg(tc.muted).add_modifier(Modifier::ITALIC),
         )),
-    ];
+    ]);
 
     let popup_height = (lines.len() as u16 + 2).min(area.height.saturating_sub(2));
     // 76 fits the longest row ("Tip: offsets reflect...") without
