@@ -1168,4 +1168,32 @@ mod tests {
 
         assert!(rendered.contains("1/217"), "got:\n{rendered}");
     }
+
+    /// A binding can reach the overlay and never reach the README, which
+    /// is what happened to Ctrl-w, Ctrl-k and Ctrl-f. The README wraps
+    /// every key in backticks, so the check can be exact.
+    #[test]
+    fn every_help_binding_appears_in_the_readme() {
+        let readme = include_str!("../README.md");
+        let mut missing = Vec::new();
+
+        for &(keys, desc) in NORMAL_MODE_HELP.iter().chain(SEARCH_MODE_HELP) {
+            let named = keys.split(" / ").flat_map(str::split_whitespace);
+            // Ctrl-a and Ctrl-e are named in a description, not a key column.
+            let in_prose = desc
+                .split(|c: char| !c.is_ascii_alphanumeric() && c != '-')
+                .filter(|token| token.starts_with("Ctrl-"));
+
+            for token in named.chain(in_prose) {
+                if !readme.contains(&format!("`{token}`")) {
+                    missing.push(token);
+                }
+            }
+        }
+
+        assert!(
+            missing.is_empty(),
+            "the overlay names these keys, the README does not: {missing:?}"
+        );
+    }
 }
