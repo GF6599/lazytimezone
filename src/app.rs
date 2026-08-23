@@ -1027,6 +1027,29 @@ mod tests {
     }
 
     #[test]
+    fn search_by_city_and_state_narrows_to_that_city() {
+        let mut app = test_app();
+
+        apply_query(&mut app, "portland maine");
+
+        assert_eq!(first_city(&app), "Portland");
+        let row = app.filtered_view.get(0).unwrap();
+        let entry = app.catalogue.get(row.catalogue_idx).unwrap();
+        assert_eq!(entry.admin1, "Maine");
+    }
+
+    #[test]
+    fn search_folds_diacritics_in_both_directions() {
+        let mut app = test_app();
+
+        apply_query(&mut app, "zurich");
+        assert_eq!(first_city(&app), "Z\u{fc}rich");
+
+        apply_query(&mut app, "z\u{fc}rich");
+        assert_eq!(first_city(&app), "Z\u{fc}rich");
+    }
+
+    #[test]
     fn search_finds_a_city_that_shares_its_zone_with_a_bigger_one() {
         let mut app = test_app();
 
