@@ -7,7 +7,7 @@ A terminal world clock browser. Search by city, region, country, or UTC offset, 
 ## Features
 
 - **Large clock.** The time, the city, and the date, in block digits.
-- **217 cities.** The Pacific, the Americas, Europe, Africa, Asia, and Australia.
+- **34,000 cities.** Every GeoNames place above 15,000 people, with its state and country.
 - **Search.** By city, region, country, or UTC offset, for example `+5:30`, `UTC-8`, `asia +9`.
 - **6 themes.** The app saves your choice.
 - **Time difference column.** The offset from the city you select.

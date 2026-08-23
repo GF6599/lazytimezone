@@ -60,8 +60,7 @@ fn parse_admin1(text: &str) -> HashMap<String, String> {
             let mut cols = line.split('\t');
             let key = cols.next()?;
             let name = cols.next()?;
-            (!key.is_empty() && !name.is_empty())
-                .then(|| (key.to_string(), name.to_string()))
+            (!key.is_empty() && !name.is_empty()).then(|| (key.to_string(), name.to_string()))
         })
         .collect()
 }
@@ -292,8 +291,7 @@ mod tests {
 
         let tsv = render_tsv(&rows);
 
-        let (headers, data): (Vec<&str>, Vec<&str>) =
-            tsv.lines().partition(|l| l.starts_with('#'));
+        let (headers, data): (Vec<&str>, Vec<&str>) = tsv.lines().partition(|l| l.starts_with('#'));
         assert_eq!(data.len(), 1);
         assert!(headers.iter().any(|h| h.contains("CC BY 4.0")));
         assert_eq!(

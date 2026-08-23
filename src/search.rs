@@ -51,8 +51,8 @@ use chrono::offset::Offset;
 use chrono_tz::Tz;
 
 use crate::timezone::{
-    SupplementalSearchTerm, TimezoneEntry, country_search_aliases, format_utc_offset,
-    supplemental_search_terms,
+    SupplementalSearchTerm, TimezoneEntry, city_search_aliases, country_search_aliases,
+    format_utc_offset, region_of, zone_search_terms,
 };
 
 /// Minimum query length required for a contains-style (substring) match.
@@ -160,7 +160,11 @@ impl SearchIndex {
             .collect();
 
         scored.sort_by(|a, b| {
+            // Population separates the hundreds of rows a zone-wide
+            // phrase like "eastern time" matches equally: the big
+            // cities are what such a query means.
             b.2.cmp(&a.2)
+                .then_with(|| entries[b.0].population.cmp(&entries[a.0].population))
                 .then_with(|| a.1.cmp(b.1))
                 .then_with(|| entries[a.0].city.cmp(entries[b.0].city))
         });
@@ -219,12 +223,20 @@ impl TimezoneSearchData {
         Self {
             city: SearchText::new(entry.city),
             country: normalize_search_text(entry.country),
-            region: normalize_search_text(entry.region),
+            region: normalize_search_text(region_of(entry.tz)),
             timezone_words: normalize_search_text(&entry.tz.to_string()),
-            aliases: entry
-                .aliases
-                .iter()
-                .map(|alias| SearchText::new(alias))
+            // Per-city aliases: the ASCII transliteration plus the
+            // curated nicknames, exonyms, and landmarks. Other cities
+            // in the zone are catalogue rows now, not aliases.
+            aliases: (!entry.ascii.is_empty())
+                .then(|| SearchText::new(entry.ascii))
+                .into_iter()
+                .chain(
+                    city_search_aliases(entry.city, entry.cc)
+                        .iter()
+                        .copied()
+                        .map(SearchText::new),
+                )
                 .filter(|alias| !alias.normalized.is_empty())
                 .collect(),
             country_aliases: country_search_aliases(entry.country)
@@ -232,7 +244,7 @@ impl TimezoneSearchData {
                 .map(|alias| normalize_search_text(alias))
                 .filter(|alias| !alias.is_empty())
                 .collect(),
-            keywords: supplemental_search_terms(entry)
+            keywords: zone_search_terms(entry.tz)
                 .iter()
                 .copied()
                 .map(SearchKeyword::new)

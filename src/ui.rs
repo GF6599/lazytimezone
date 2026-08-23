@@ -16,7 +16,7 @@
 //! │ Search bar (3 rows, bordered)                │
 //! ├──────────────────────────────────────────────┤
 //! │ Timezone table (fills remaining space)       │
-//! │  City │ Country │ Region │ Time │ UTC │ Diff │
+//! │  City │ Country │ State │ Time │ UTC │ Diff │
 //! ├──────────────────────────────────────────────┤
 //! │ Status bar (1 row)                           │
 //! └──────────────────────────────────────────────┘
@@ -554,7 +554,7 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
     let header_cells = [
         "City",
         "Country",
-        "Region",
+        "State",
         "Local Time",
         "UTC Offset",
         "Diff",
@@ -639,7 +639,7 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
             Row::new(vec![
                 city_cell,
                 Cell::from(entry.country).style(muted_style),
-                Cell::from(entry.region).style(muted_style),
+                Cell::from(entry.admin1).style(muted_style),
                 Cell::from(time_str).style(time_style),
                 Cell::from(utc_offset).style(muted_style),
                 Cell::from(diff).style(info_style),
@@ -652,7 +652,7 @@ fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect,
     let widths = [
         Constraint::Percentage(30), // city
         Constraint::Ratio(1, 7),    // country
-        Constraint::Ratio(1, 7),    // region
+        Constraint::Ratio(1, 7),    // state
         Constraint::Ratio(1, 7),    // local time
         Constraint::Ratio(1, 7),    // utc offset
         Constraint::Ratio(1, 7),    // diff
@@ -1166,7 +1166,13 @@ mod tests {
 
         let rendered = render_table(&mut app, 80, 12).join("\n");
 
-        assert!(rendered.contains("1/217"), "got:\n{rendered}");
+        let filtered = app.filtered_view.len();
+        let total = crate::timezone::all_timezones().len();
+        assert!(filtered < total, "the query must actually filter");
+        assert!(
+            rendered.contains(&format!("{filtered}/{total}")),
+            "got:\n{rendered}"
+        );
     }
 
     /// A binding can reach the overlay and never reach the README, which

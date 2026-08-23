@@ -848,7 +848,7 @@ impl App {
     }
 
     /// Sorts indices so favourites appear first (in user-defined order),
-    /// followed by non-favourites sorted alphabetically by city name.
+    /// followed by non-favourites in catalogue (population) order.
     fn sort_indices(
         indices: &mut [usize],
         timezones: &[TimezoneEntry],
@@ -861,7 +861,9 @@ impl App {
                 (Some(ai), Some(bi)) => ai.cmp(bi),
                 (Some(_), None) => std::cmp::Ordering::Less,
                 (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => timezones[a].city.cmp(timezones[b].city),
+                // Catalogue order is population order, so the
+                // unsearched list leads with the major cities.
+                (None, None) => a.cmp(&b),
             }
         });
     }
@@ -995,7 +997,7 @@ mod tests {
 
         apply_query(&mut app, "america/new_york");
 
-        assert_eq!(first_city(&app), "New York");
+        assert_eq!(first_city(&app), "New York City");
     }
 
     #[test]
@@ -1004,7 +1006,7 @@ mod tests {
 
         apply_query(&mut app, "united states");
         let us_matches = filtered_city_names(&app, 12);
-        assert!(us_matches.contains(&"New York"));
+        assert!(us_matches.contains(&"New York City"));
 
         apply_query(&mut app, "st johns");
         let st_johns_matches = filtered_city_names(&app, 6);
@@ -1015,29 +1017,34 @@ mod tests {
     fn search_supports_state_and_timezone_family_terms() {
         let mut app = test_app();
 
+        // Every Texan city carries its state, so the biggest one wins.
         apply_query(&mut app, "texas");
-        assert_eq!(first_city(&app), "Chicago");
-        assert_eq!(filtered_display_names(&app, 1), vec!["Texas"]);
-
-        app.select_timezone();
-        assert_eq!(app.selection.city_name, "Texas");
+        assert_eq!(first_city(&app), "Houston");
 
         apply_query(&mut app, "eastern time");
-        assert_eq!(first_city(&app), "New York");
-        assert_eq!(filtered_display_names(&app, 1), vec!["New York"]);
+        assert_eq!(first_city(&app), "New York City");
+        assert_eq!(filtered_display_names(&app, 1), vec!["New York City"]);
+    }
+
+    #[test]
+    fn search_finds_a_city_that_shares_its_zone_with_a_bigger_one() {
+        let mut app = test_app();
+
+        apply_query(&mut app, "boston");
+
+        assert_eq!(first_city(&app), "Boston");
+        app.select_timezone();
+        assert_eq!(app.selection.city_name, "Boston");
     }
 
     #[test]
     fn search_displays_the_matching_alias_city() {
         let mut app = test_app();
 
-        apply_query(&mut app, "boston");
+        apply_query(&mut app, "saigon");
 
-        assert_eq!(first_city(&app), "New York");
-        assert_eq!(filtered_display_names(&app, 1), vec!["Boston"]);
-
-        app.select_timezone();
-        assert_eq!(app.selection.city_name, "Boston");
+        assert_eq!(first_city(&app), "Ho Chi Minh City");
+        assert_eq!(filtered_display_names(&app, 1), vec!["Saigon"]);
     }
 
     #[test]
@@ -1049,9 +1056,10 @@ mod tests {
         assert!(pacific_matches.contains(&"Honolulu"));
 
         apply_query(&mut app, "+0530");
-        let offset_matches = filtered_city_names(&app, 6);
-        assert!(offset_matches.contains(&"Mumbai"));
-        assert!(offset_matches.contains(&"Colombo"));
+        assert!(filtered_city_names(&app, 6).contains(&"Mumbai"));
+        // Colombo matches too, below the more populous Indian cities.
+        let everything = filtered_city_names(&app, app.filtered_view.len());
+        assert!(everything.contains(&"Colombo"));
     }
 
     #[test]
@@ -1167,9 +1175,13 @@ mod tests {
         app.toggle_favorite();
         assert_eq!(app.filtered_view.len(), total);
 
-        // Toggle favorites-only mode
+        // Toggle favorites-only mode. Favorites are zone-keyed, so
+        // the filter keeps every city of the favorited zone.
         app.toggle_favorites_filter();
-        assert_eq!(app.filtered_view.len(), 1);
+        let fav_tz = app.selection.tz;
+        assert!(!app.filtered_view.is_empty());
+        assert!(app.filtered_view.len() < total);
+        assert!((0..app.filtered_view.len()).all(|n| nth_tz(&app, n) == fav_tz));
 
         // Toggle back
         app.toggle_favorites_filter();
@@ -1282,26 +1294,31 @@ mod tests {
             app.toggle_favorite();
         }
 
+        // A zone-keyed favorite pulls up every city of its zone, so
+        // the order shows as zone blocks: compare first occurrences.
+        let first_index_of = |app: &App, tz: chrono_tz::Tz| {
+            (0..app.filtered_view.len())
+                .find(|&n| nth_tz(app, n) == tz)
+                .unwrap_or_else(|| panic!("{tz:?} not in the view"))
+        };
+
         apply_query(&mut app, "");
         assert_eq!(first_tz(&app), favs[0].1);
-        assert_eq!(nth_tz(&app, 1), favs[1].1);
-        assert_eq!(nth_tz(&app, 2), favs[2].1);
+        assert!(first_index_of(&app, favs[1].1) < first_index_of(&app, favs[2].1));
 
         app.selected_row = 0;
         app.move_favorite_down();
 
         assert_eq!(first_tz(&app), favs[1].1);
-        assert_eq!(nth_tz(&app, 1), favs[0].1);
-        assert_eq!(nth_tz(&app, 2), favs[2].1);
+        assert!(first_index_of(&app, favs[0].1) < first_index_of(&app, favs[2].1));
         assert_eq!(app.favorites.position(favs[0].1), Some(1));
         assert_eq!(app.favorites.position(favs[1].1), Some(0));
 
-        app.selected_row = 2;
+        app.selected_row = first_index_of(&app, favs[2].1);
         app.move_favorite_up();
 
         assert_eq!(first_tz(&app), favs[1].1);
-        assert_eq!(nth_tz(&app, 1), favs[2].1);
-        assert_eq!(nth_tz(&app, 2), favs[0].1);
+        assert!(first_index_of(&app, favs[2].1) < first_index_of(&app, favs[0].1));
     }
 
     // ── Search editing (paste, commit, word-delete, kill-line) ──────
