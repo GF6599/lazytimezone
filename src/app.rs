@@ -1074,6 +1074,26 @@ mod tests {
     }
 
     #[test]
+    fn picking_a_city_in_the_picker_favorites_it_and_sets_the_hero() {
+        let mut app = test_app();
+        app.enter_search();
+        for c in "boston".chars() {
+            app.search_input(c);
+        }
+
+        app.commit_search_result_and_exit();
+
+        assert_eq!(app.selection.city_name, "Boston");
+        let boston = app
+            .catalogue
+            .entries()
+            .iter()
+            .position(|e| e.city == "Boston" && e.cc == "US")
+            .unwrap();
+        assert!(app.favorites.contains(boston));
+    }
+
+    #[test]
     fn favoriting_a_city_does_not_favorite_its_zone_neighbours() {
         let mut app = test_app();
         apply_query(&mut app, "boston");
