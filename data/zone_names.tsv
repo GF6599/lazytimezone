@@ -1,0 +1,240 @@
+# Curated zone search phrases (names, abbreviations, and areas).
+# tz	term	display
+Pacific/Honolulu	Hawaii	1
+Pacific/Honolulu	Hawaii Time	0
+Pacific/Honolulu	Hawaii-Aleutian Time	0
+Pacific/Honolulu	HST	0
+America/Anchorage	Alaska	1
+America/Anchorage	Alaska Time	0
+America/Anchorage	AKST	0
+America/Anchorage	AKDT	0
+America/Los_Angeles	Pacific Time	0
+America/Los_Angeles	Pacific	0
+America/Los_Angeles	PT	0
+America/Los_Angeles	PST	0
+America/Los_Angeles	PDT	0
+America/Los_Angeles	California	1
+America/Los_Angeles	Oregon	1
+America/Los_Angeles	Washington State	1
+America/Los_Angeles	Nevada	1
+America/Los_Angeles	LA	0
+America/Los_Angeles	SF	0
+America/Los_Angeles	LAX	0
+America/Los_Angeles	SFO	0
+America/Vancouver	Pacific Time	0
+America/Vancouver	Pacific	0
+America/Vancouver	PT	0
+America/Vancouver	PST	0
+America/Vancouver	PDT	0
+America/Vancouver	British Columbia	1
+America/Vancouver	YVR	0
+America/Denver	Mountain Time	0
+America/Denver	Mountain	0
+America/Denver	MT	0
+America/Denver	MST	0
+America/Denver	MDT	0
+America/Denver	Colorado	1
+America/Denver	Utah	1
+America/Denver	New Mexico	1
+America/Denver	Wyoming	1
+America/Denver	Montana	1
+America/Denver	Idaho	1
+America/Denver	West Texas	1
+America/Denver	DEN	0
+America/Phoenix	Arizona	1
+America/Phoenix	Mountain Time	0
+America/Phoenix	Mountain	0
+America/Phoenix	MT	0
+America/Phoenix	MST	0
+America/Chicago	Central Time	0
+America/Chicago	Central	0
+America/Chicago	CT	0
+America/Chicago	CST	0
+America/Chicago	CDT	0
+America/Chicago	Texas	1
+America/Chicago	Illinois	1
+America/Chicago	Minnesota	1
+America/Chicago	Wisconsin	1
+America/Chicago	Missouri	1
+America/Chicago	Louisiana	1
+America/Chicago	Oklahoma	1
+America/Chicago	Kansas	1
+America/Chicago	Nebraska	1
+America/Chicago	Iowa	1
+America/Chicago	Arkansas	1
+America/Chicago	Mississippi	1
+America/Chicago	Alabama	1
+America/Chicago	Tennessee	1
+America/Chicago	Chi	0
+America/Chicago	ORD	0
+America/Chicago	MDW	0
+America/Chicago	DFW	0
+America/Chicago	IAH	0
+America/Mexico_City	Central Time	0
+America/Mexico_City	Central	0
+America/Mexico_City	CT	0
+America/Mexico_City	CST	0
+America/Mexico_City	CDT	0
+America/Mexico_City	CDMX	1
+America/Mexico_City	MEX	0
+America/New_York	Eastern Time	0
+America/New_York	Eastern	0
+America/New_York	ET	0
+America/New_York	EST	0
+America/New_York	EDT	0
+America/New_York	Florida	1
+America/New_York	Georgia	1
+America/New_York	Massachusetts	1
+America/New_York	Pennsylvania	1
+America/New_York	Virginia	1
+America/New_York	New Jersey	1
+America/New_York	Maryland	1
+America/New_York	Connecticut	1
+America/New_York	Maine	1
+America/New_York	Ohio	1
+America/New_York	Michigan	1
+America/New_York	North Carolina	1
+America/New_York	South Carolina	1
+America/New_York	District of Columbia	1
+America/New_York	DC	1
+America/New_York	Delaware	1
+America/New_York	New Hampshire	1
+America/New_York	Vermont	1
+America/New_York	West Virginia	1
+America/New_York	Rhode Island	1
+America/New_York	Kentucky	1
+America/New_York	Indiana	1
+America/New_York	NYC	0
+America/New_York	NY	0
+America/New_York	JFK	0
+America/New_York	LGA	0
+America/New_York	EWR	0
+America/New_York	ATL	0
+America/New_York	BOS	0
+America/New_York	DCA	0
+America/New_York	IAD	0
+America/New_York	BWI	0
+America/Toronto	Eastern Time	0
+America/Toronto	Eastern	0
+America/Toronto	ET	0
+America/Toronto	EST	0
+America/Toronto	EDT	0
+America/Toronto	Ontario	1
+America/Toronto	Quebec	1
+America/Toronto	YYZ	0
+America/Halifax	Atlantic Time	0
+America/Halifax	Atlantic	0
+America/Halifax	AT	0
+America/Halifax	AST	0
+America/Halifax	ADT	0
+America/Halifax	Nova Scotia	1
+America/Halifax	New Brunswick	1
+America/Halifax	Prince Edward Island	1
+America/St_Johns	Newfoundland	1
+America/St_Johns	Newfoundland Time	0
+America/St_Johns	NST	0
+America/St_Johns	NDT	0
+Europe/London	Greenwich Mean Time	0
+Europe/London	British Summer Time	0
+Europe/London	GMT	0
+Europe/London	BST	0
+Europe/London	LDN	0
+Europe/London	LHR	0
+Europe/London	LGW	0
+Europe/London	STN	0
+Europe/London	Scotland	0
+Europe/Paris	Central European Time	0
+Europe/Paris	Central Europe	0
+Europe/Paris	CET	0
+Europe/Paris	CEST	0
+Europe/Paris	PAR	0
+Europe/Paris	CDG	0
+Europe/Paris	ORY	0
+Europe/Berlin	Central European Time	0
+Europe/Berlin	Central Europe	0
+Europe/Berlin	CET	0
+Europe/Berlin	CEST	0
+Europe/Berlin	BER	0
+Europe/Berlin	FRA	0
+Europe/Berlin	MUC	0
+Europe/Athens	Eastern European Time	0
+Europe/Athens	Eastern Europe	0
+Europe/Athens	EET	0
+Europe/Athens	EEST	0
+Africa/Cairo	Eastern European Time	0
+Africa/Cairo	Eastern Europe	0
+Africa/Cairo	EET	0
+Africa/Cairo	EEST	0
+Africa/Cairo	CAI	0
+Asia/Kolkata	India Standard Time	0
+Asia/Kolkata	IST	0
+Asia/Kolkata	Bombay	0
+Asia/Kolkata	Calcutta	0
+Asia/Kolkata	Madras	0
+Asia/Kolkata	BOM	0
+Asia/Kolkata	DEL	0
+Asia/Tokyo	Japan Standard Time	0
+Asia/Tokyo	JST	0
+Asia/Tokyo	TYO	0
+Asia/Tokyo	HND	0
+Asia/Tokyo	NRT	0
+Australia/Perth	Western Australia	1
+Australia/Perth	Australian Western Time	0
+Australia/Perth	AWST	0
+Australia/Adelaide	South Australia	1
+Australia/Adelaide	Northern Territory	1
+Australia/Adelaide	Australian Central Time	0
+Australia/Adelaide	Central Australia	0
+Australia/Adelaide	ACST	0
+Australia/Adelaide	ACDT	0
+Australia/Sydney	New South Wales	1
+Australia/Sydney	Victoria	1
+Australia/Sydney	Queensland	1
+Australia/Sydney	Tasmania	1
+Australia/Sydney	Australian Eastern Time	0
+Australia/Sydney	AEST	0
+Australia/Sydney	AEDT	0
+Australia/Sydney	SYD	0
+Australia/Sydney	MEL	0
+America/Sao_Paulo	SP	0
+America/Sao_Paulo	SAO	0
+America/Sao_Paulo	GRU	0
+America/Argentina/Buenos_Aires	EZE	0
+America/Santiago	SCL	0
+Europe/Amsterdam	AMS	0
+Europe/Amsterdam	Holland	0
+Europe/Madrid	MAD	0
+Europe/Madrid	BCN	0
+Europe/Rome	FCO	0
+Europe/Rome	MXP	0
+Europe/Zurich	ZRH	0
+Europe/Vienna	VIE	0
+Europe/Istanbul	IST	0
+Europe/Istanbul	SAW	0
+Europe/Kyiv	Kiev	0
+Asia/Dubai	DXB	0
+Asia/Qatar	DOH	0
+Asia/Qatar	Doha	1
+Asia/Tehran	Persia	0
+Asia/Yangon	Burma	0
+Asia/Bangkok	BKK	0
+Asia/Bangkok	Siam	0
+Asia/Jakarta	JKT	0
+Asia/Jakarta	CGK	0
+Asia/Singapore	SG	0
+Asia/Singapore	SGP	0
+Asia/Singapore	SIN	0
+Asia/Shanghai	PVG	0
+Asia/Shanghai	SHA	0
+Asia/Shanghai	Peking	0
+Asia/Hong_Kong	HK	0
+Asia/Hong_Kong	HKG	0
+Asia/Kuala_Lumpur	KL	0
+Asia/Kuala_Lumpur	KUL	0
+Asia/Seoul	ICN	0
+Asia/Seoul	GMP	0
+Asia/Colombo	Ceylon	0
+Pacific/Auckland	AKL	0
+Africa/Johannesburg	JNB	0
+Africa/Nairobi	NBO	0
+Africa/Lagos	LOS	0

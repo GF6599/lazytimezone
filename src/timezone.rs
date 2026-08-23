@@ -3344,6 +3344,31 @@ mod tests {
     }
 
     #[test]
+    fn the_catalogue_is_city_scaled_not_zone_scaled() {
+        let count = all_timezones().len();
+
+        assert!(count > 30_000, "got {count} entries");
+    }
+
+    #[test]
+    fn boston_massachusetts_is_a_real_row_not_an_alias() {
+        let boston = all_timezones()
+            .iter()
+            .find(|e| e.city == "Boston" && e.country == "United States");
+
+        assert!(boston.is_some());
+    }
+
+    #[test]
+    fn every_latitude_is_in_range() {
+        assert!(
+            all_timezones()
+                .iter()
+                .all(|e| (-90.0..=90.0).contains(&e.latitude))
+        );
+    }
+
+    #[test]
     fn equator_equinox_is_twelve_hour_day() {
         // Day 80 ≈ March 21 (vernal equinox)
         let (sunrise, sunset) = sun_window(0.0, 80);
