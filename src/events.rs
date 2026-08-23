@@ -125,38 +125,27 @@ fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
     }
 }
 
-/// Vim-style bindings: `j/k` navigate, `/` searches, `f` toggles
-/// favorites, `J/K` reorder favorites, `t` cycles themes, `c` copies,
-/// `Ctrl-l` clears any active search filter without entering search
-/// mode (shell-readline convention).
+/// Wall bindings: `h/j/k/l` move between the favorite panels, Enter
+/// promotes one to the hero clock, `f` removes it, `J/K` reorder,
+/// and `/` opens the add-city picker.
 fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
     match key.code {
         KeyCode::Char('q') => {
             app.should_quit = true;
         }
-        KeyCode::Char('j') | KeyCode::Down => app.move_down(),
-        KeyCode::Char('k') | KeyCode::Up => app.move_up(),
-        KeyCode::Char('g') | KeyCode::Home => app.home(),
-        KeyCode::Char('G') | KeyCode::End => app.end(),
-        KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => app.page_down(),
-        KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => app.page_up(),
-        // Ctrl-l: clear any active filter while staying in Normal mode.
-        // Esc only exits search mode without wiping the query, so without
-        // this binding the only way to reset a stale filter is `/` (which
-        // also re-enters search mode).
-        KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-            app.clear_search_input();
-        }
-        KeyCode::PageDown => app.page_down(),
-        KeyCode::PageUp => app.page_up(),
+        KeyCode::Char('j') | KeyCode::Down => app.panel_down(),
+        KeyCode::Char('k') | KeyCode::Up => app.panel_up(),
+        KeyCode::Char('h') | KeyCode::Left => app.panel_left(),
+        KeyCode::Char('l') | KeyCode::Right => app.panel_right(),
+        KeyCode::Char('g') | KeyCode::Home => app.panel_first(),
+        KeyCode::Char('G') | KeyCode::End => app.panel_last(),
+        KeyCode::Enter => app.promote_selected_panel(),
         KeyCode::Char('/') => app.enter_search(),
+        KeyCode::Char('f') => app.unfavorite_selected_panel(),
+        KeyCode::Char('J') => app.move_panel_later(),
+        KeyCode::Char('K') => app.move_panel_earlier(),
         KeyCode::Char('t') => app.cycle_theme(),
         KeyCode::Char('c') if !key.modifiers.contains(KeyModifiers::CONTROL) => app.copy_time(),
-        KeyCode::Char('f') => app.toggle_favorite(),
-        KeyCode::Char('F') => app.toggle_favorites_filter(),
-        KeyCode::Char('J') => app.move_favorite_down(),
-        KeyCode::Char('K') => app.move_favorite_up(),
-        KeyCode::Enter => app.select_timezone(),
         KeyCode::Char('?') => app.toggle_help(),
         _ => {}
     }
@@ -179,6 +168,8 @@ fn handle_search_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Enter => app.commit_search_result_and_exit(),
         KeyCode::Backspace => app.search_backspace(),
         KeyCode::Delete => app.search_delete(),
+        KeyCode::Up => app.move_up(),
+        KeyCode::Down => app.move_down(),
         KeyCode::Left => app.search_cursor_left(),
         KeyCode::Right => app.search_cursor_right(),
         KeyCode::Home => app.search_cursor_home(),

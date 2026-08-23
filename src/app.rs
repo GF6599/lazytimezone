@@ -12,10 +12,11 @@
 //! | Selection | `selection` (`tz` + `city_name`) | No |
 //! | Search | `input_mode`, `search_query`, `cursor_position` | No |
 //! | Theme | `theme` | Yes (`~/.config/lazytimezone/config.toml`) |
-//! | Favorites | `favorites`, `show_favorites_only` | Yes (`~/.config/lazytimezone/config.toml`) |
+//! | Favorites | `favorites`, `selected_panel` | Yes (`~/.config/lazytimezone/config.toml`) |
 //! | Feedback | `copy_flash`, `startup_messages` | No |
 
 use std::collections::HashMap;
+use std::sync::OnceLock;
 use std::time::Instant;
 
 use chrono::Utc;
@@ -35,16 +36,22 @@ use crate::timezone::{self, TimezoneEntry};
 /// and read thereafter.
 pub(crate) struct Catalogue {
     entries: &'static [TimezoneEntry],
-    search_index: SearchIndex,
+    search_index: &'static SearchIndex,
+}
+
+/// The index derives from the static catalogue, so one build serves
+/// every [`App`]. Tests construct many apps, and each rebuild costs a
+/// normalization pass over the whole catalogue.
+fn shared_search_index() -> &'static SearchIndex {
+    static INDEX: OnceLock<SearchIndex> = OnceLock::new();
+    INDEX.get_or_init(|| SearchIndex::build(timezone::all_timezones()))
 }
 
 impl Catalogue {
     pub(crate) fn new() -> Self {
-        let entries = timezone::all_timezones();
-        let search_index = SearchIndex::build(entries);
         Self {
-            entries,
-            search_index,
+            entries: timezone::all_timezones(),
+            search_index: shared_search_index(),
         }
     }
 
@@ -53,7 +60,7 @@ impl Catalogue {
     }
 
     pub(crate) fn search_index(&self) -> &SearchIndex {
-        &self.search_index
+        self.search_index
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -150,12 +157,27 @@ impl Favorites {
         &self.position
     }
 
-    pub(crate) fn top(&self, n: usize) -> impl Iterator<Item = usize> + '_ {
-        self.ordered.iter().take(n).copied()
-    }
-
     pub(crate) fn indices(&self) -> impl Iterator<Item = usize> + '_ {
         self.ordered.iter().copied()
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.ordered.len()
+    }
+
+    /// The catalogue index of the favorite at list position `pos`.
+    pub(crate) fn at(&self, pos: usize) -> Option<usize> {
+        self.ordered.get(pos).copied()
+    }
+
+    /// Adds `idx` when absent. Returns `true` when it was added.
+    pub(crate) fn add(&mut self, idx: usize) -> bool {
+        if self.position.contains_key(&idx) {
+            return false;
+        }
+        self.ordered.push(idx);
+        self.position.insert(idx, self.ordered.len() - 1);
+        true
     }
 
     /// Toggles `idx` in the favourite list. Returns `true` when the
@@ -208,10 +230,7 @@ impl Favorites {
     }
 }
 
-/// Page size used before the first frame has been drawn.
-const DEFAULT_PAGE_ROWS: usize = 10;
-
-/// A single visible row in the filtered timezone table.
+/// A single visible row of the picker list.
 ///
 /// `display_name` may differ from the entry's canonical `city` when
 /// the row matched on an alias — e.g. searching `boston` shows
@@ -362,6 +381,11 @@ pub struct App {
     pub(crate) filtered_view: FilteredView,
     /// Currently highlighted row in `filtered_view`.
     pub(crate) selected_row: usize,
+    /// Position of the selected favorite panel on the wall.
+    pub(crate) selected_panel: usize,
+    /// Panels per wall row, reported by the renderer so vertical
+    /// panel navigation knows the grid it moves through.
+    wall_columns: usize,
 
     /// The timezone whose time is shown in the big clock plus the
     /// display label it was selected under. See [`Selection`] for why
@@ -371,7 +395,6 @@ pub struct App {
     pub(crate) theme: Theme,
     /// Ordered favourites with O(1) membership lookup. See [`Favorites`].
     pub(crate) favorites: Favorites,
-    pub(crate) show_favorites_only: bool,
     /// Most recent clipboard-copy result. The renderer in
     /// [`crate::ui::draw_status_bar`] compares
     /// `flash.started_at.elapsed()` against a 3-second window each
@@ -401,13 +424,6 @@ pub struct App {
     /// Timestamp captured at construction time. Used by the UI to decide
     /// when to stop showing [`startup_messages`].
     pub(crate) started_at: Instant,
-    /// Rows the table had room for in the last rendered frame.
-    ///
-    /// Written by [`crate::ui::draw_table`] because the page size is a
-    /// property of the terminal, which `App` cannot see. The initial
-    /// value only applies to a page keypress that somehow arrives before
-    /// the first frame.
-    page_rows: usize,
 }
 
 impl App {
@@ -462,20 +478,20 @@ impl App {
             catalogue,
             filtered_view,
             selected_row: 0,
+            selected_panel: 0,
+            wall_columns: 1,
             selection: Selection {
                 tz: chrono_tz::Tz::UTC,
                 city_name: "UTC".to_string(),
             },
             theme,
             favorites,
-            show_favorites_only: false,
             copy_flash: None,
             show_help: false,
             help_scroll: 0,
             startup_messages,
             config_load_failed,
             started_at: Instant::now(),
-            page_rows: DEFAULT_PAGE_ROWS,
         }
     }
 
@@ -524,29 +540,82 @@ impl App {
         }
     }
 
-    /// Records how many rows the table can show, so a page matches what
-    /// the user is looking at.
-    pub(crate) fn set_page_rows(&mut self, rows: usize) {
-        self.page_rows = rows.max(1);
+    pub(crate) fn set_wall_columns(&mut self, columns: usize) {
+        self.wall_columns = columns.max(1);
     }
 
-    pub(crate) fn page_up(&mut self) {
-        self.selected_row = self.selected_row.saturating_sub(self.page_rows);
+    pub(crate) fn panel_left(&mut self) {
+        self.selected_panel = self.selected_panel.saturating_sub(1);
     }
 
-    pub(crate) fn page_down(&mut self) {
-        if !self.filtered_view.is_empty() {
-            self.selected_row =
-                (self.selected_row + self.page_rows).min(self.filtered_view.len() - 1);
+    pub(crate) fn panel_right(&mut self) {
+        if self.selected_panel + 1 < self.favorites.len() {
+            self.selected_panel += 1;
         }
     }
 
-    pub(crate) fn home(&mut self) {
-        self.selected_row = 0;
+    pub(crate) fn panel_up(&mut self) {
+        self.selected_panel = self.selected_panel.saturating_sub(self.wall_columns);
     }
 
-    pub(crate) fn end(&mut self) {
-        self.selected_row = self.filtered_view.len().saturating_sub(1);
+    pub(crate) fn panel_down(&mut self) {
+        let next = self.selected_panel + self.wall_columns;
+        if next < self.favorites.len() {
+            self.selected_panel = next;
+        }
+    }
+
+    pub(crate) fn panel_first(&mut self) {
+        self.selected_panel = 0;
+    }
+
+    pub(crate) fn panel_last(&mut self) {
+        self.selected_panel = self.favorites.len().saturating_sub(1);
+    }
+
+    pub(crate) fn selected_panel_entry(&self) -> Option<&TimezoneEntry> {
+        self.catalogue.get(self.favorites.at(self.selected_panel)?)
+    }
+
+    /// Makes the selected panel's city the hero clock.
+    pub(crate) fn promote_selected_panel(&mut self) {
+        if let Some(entry) = self.selected_panel_entry() {
+            self.selection.set(entry.tz, entry.city);
+        }
+    }
+
+    /// Removes the selected panel from the favorites.
+    pub(crate) fn unfavorite_selected_panel(&mut self) {
+        if let Some(idx) = self.favorites.at(self.selected_panel) {
+            self.favorites.toggle(idx);
+            self.selected_panel = self
+                .selected_panel
+                .min(self.favorites.len().saturating_sub(1));
+            self.save_config();
+            self.apply_filter();
+        }
+    }
+
+    /// Moves the selected panel one slot earlier and follows it.
+    pub(crate) fn move_panel_earlier(&mut self) {
+        if let Some(idx) = self.favorites.at(self.selected_panel)
+            && self.favorites.move_up(idx)
+        {
+            self.selected_panel -= 1;
+            self.save_config();
+            self.apply_filter();
+        }
+    }
+
+    /// Moves the selected panel one slot later and follows it.
+    pub(crate) fn move_panel_later(&mut self) {
+        if let Some(idx) = self.favorites.at(self.selected_panel)
+            && self.favorites.move_down(idx)
+        {
+            self.selected_panel += 1;
+            self.save_config();
+            self.apply_filter();
+        }
     }
 
     pub(crate) fn select_timezone(&mut self) {
@@ -622,6 +691,13 @@ impl App {
     pub(crate) fn commit_search_result_and_exit(&mut self) {
         if !self.filtered_view.is_empty() {
             self.select_timezone();
+            if let Some((idx, _)) = self.current_result() {
+                if self.favorites.add(idx) {
+                    self.save_config();
+                }
+                self.selected_panel = self.favorites.position(idx).unwrap_or(0);
+                self.apply_filter();
+            }
         }
         self.exit_search();
     }
@@ -751,15 +827,11 @@ impl App {
     /// `GMT-08:00`, and `+0530`. Exact and prefix matches rank above
     /// plain substrings.
     pub(crate) fn apply_filter(&mut self) {
-        let base_indices = self.base_indices();
+        let base_indices: Vec<usize> = (0..self.catalogue.len()).collect();
 
         if self.search_query.is_empty() {
-            if self.show_favorites_only {
-                self.set_sorted_results(base_indices);
-            } else {
-                let browse = self.browse_indices();
-                self.set_sorted_results(browse);
-            }
+            let browse = self.browse_indices();
+            self.set_sorted_results(browse);
         } else {
             let now = Utc::now();
             match self.catalogue.search_index().search(
@@ -788,49 +860,12 @@ impl App {
         self.save_config();
     }
 
-    pub(crate) fn toggle_favorites_filter(&mut self) {
-        self.show_favorites_only = !self.show_favorites_only;
-        self.apply_filter();
-    }
-
     pub(crate) fn toggle_favorite(&mut self) {
         if let Some((idx, _)) = self.current_result() {
             self.favorites.toggle(idx);
             self.save_config();
             self.apply_filter();
         }
-    }
-
-    pub(crate) fn move_favorite_up(&mut self) {
-        if let Some((idx, _)) = self.current_result()
-            && self.favorites.move_up(idx)
-        {
-            self.save_config();
-            self.apply_filter();
-            self.selected_row = self.selected_row.saturating_sub(1);
-        }
-    }
-
-    pub(crate) fn move_favorite_down(&mut self) {
-        if let Some((idx, _)) = self.current_result()
-            && self.favorites.move_down(idx)
-        {
-            self.save_config();
-            self.apply_filter();
-            if self.selected_row + 1 < self.filtered_view.len() {
-                self.selected_row += 1;
-            }
-        }
-    }
-
-    pub(crate) fn top_favorite_timezones(&self, count: usize) -> Vec<(chrono_tz::Tz, &str)> {
-        self.favorites
-            .top(count)
-            .filter_map(|idx| {
-                let entry = self.catalogue.get(idx)?;
-                Some((entry.tz, entry.city))
-            })
-            .collect()
     }
 
     pub(crate) fn is_favorite(&self, tz_index: usize) -> bool {
@@ -840,14 +875,6 @@ impl App {
     fn current_result(&self) -> Option<(usize, &'static str)> {
         let row = self.filtered_view.get(self.selected_row)?;
         Some((row.catalogue_idx, row.display_name))
-    }
-
-    fn base_indices(&self) -> Vec<usize> {
-        if self.show_favorites_only {
-            self.favorites.indices().collect()
-        } else {
-            (0..self.catalogue.len()).collect()
-        }
     }
 
     /// The unsearched list: favorites in the user's order, then the
@@ -1025,11 +1052,6 @@ mod tests {
         app.catalogue.get(row.catalogue_idx).unwrap().city
     }
 
-    fn first_tz(app: &App) -> chrono_tz::Tz {
-        let row = app.filtered_view.get(0).expect("filtered_view is empty");
-        app.catalogue.get(row.catalogue_idx).unwrap().tz
-    }
-
     fn nth_tz(app: &App, n: usize) -> chrono_tz::Tz {
         let row = app
             .filtered_view
@@ -1099,11 +1121,9 @@ mod tests {
         apply_query(&mut app, "boston");
         app.toggle_favorite();
 
-        app.toggle_favorites_filter();
-        apply_query(&mut app, "");
-
-        assert_eq!(app.filtered_view.len(), 1);
-        assert_eq!(first_city(&app), "Boston");
+        assert_eq!(app.favorites.len(), 1);
+        let entry = app.catalogue.get(app.favorites.at(0).unwrap()).unwrap();
+        assert_eq!(entry.city, "Boston");
     }
 
     #[test]
@@ -1138,13 +1158,11 @@ mod tests {
             favorites: vec![config::FavoriteEntry::Zone("Asia/Tokyo".to_string())],
             ..config::Config::default()
         };
-        let mut app = App::with_config(cfg);
+        let app = App::with_config(cfg);
 
-        app.toggle_favorites_filter();
-        apply_query(&mut app, "");
-
-        assert_eq!(app.filtered_view.len(), 1);
-        assert_eq!(first_city(&app), "Tokyo");
+        assert_eq!(app.favorites.len(), 1);
+        let entry = app.catalogue.get(app.favorites.at(0).unwrap()).unwrap();
+        assert_eq!(entry.city, "Tokyo");
     }
 
     #[test]
@@ -1236,45 +1254,6 @@ mod tests {
     }
 
     #[test]
-    fn page_up_saturates_at_zero() {
-        let mut app = test_app();
-        app.selected_row = 3;
-        app.page_up();
-        assert_eq!(app.selected_row, 0);
-    }
-
-    #[test]
-    fn page_down_clamps_to_last() {
-        let mut app = test_app();
-        let last = app.filtered_view.len() - 1;
-        app.selected_row = last - 2;
-        app.page_down();
-        assert_eq!(app.selected_row, last);
-    }
-
-    #[test]
-    fn home_and_end() {
-        let mut app = test_app();
-        app.selected_row = 50;
-        app.home();
-        assert_eq!(app.selected_row, 0);
-
-        app.end();
-        assert_eq!(app.selected_row, app.filtered_view.len() - 1);
-    }
-
-    #[test]
-    fn end_on_empty_list_is_safe() {
-        let mut app = test_app();
-        // Force an empty filter result
-        apply_query(&mut app, "zzzzzznotaquery");
-        assert!(app.filtered_view.is_empty());
-
-        app.end();
-        assert_eq!(app.selected_row, 0);
-    }
-
-    #[test]
     fn navigation_on_empty_list_is_safe() {
         let mut app = test_app();
         apply_query(&mut app, "zzzzzznotaquery");
@@ -1282,11 +1261,65 @@ mod tests {
 
         app.move_up();
         app.move_down();
-        app.page_up();
-        app.page_down();
-        app.home();
-        app.end();
         assert_eq!(app.selected_row, 0);
+    }
+
+    #[test]
+    fn panel_navigation_walks_the_grid_and_stays_in_bounds() {
+        let mut app = test_app();
+        for query in ["tokyo", "london", "paris", "denver", "cairo"] {
+            apply_query(&mut app, query);
+            app.commit_search_result_and_exit();
+        }
+        app.set_wall_columns(2);
+
+        app.panel_first();
+        assert_eq!(app.selected_panel, 0);
+        app.panel_right();
+        assert_eq!(app.selected_panel, 1);
+        app.panel_down();
+        assert_eq!(app.selected_panel, 3);
+        app.panel_up();
+        assert_eq!(app.selected_panel, 1);
+        app.panel_last();
+        assert_eq!(app.selected_panel, 4);
+        // One short row below: a vertical step with no panel is a no-op.
+        app.panel_down();
+        assert_eq!(app.selected_panel, 4);
+        app.panel_right();
+        assert_eq!(app.selected_panel, 4);
+    }
+
+    #[test]
+    fn f_removes_the_selected_panel_and_clamps_the_selection() {
+        let mut app = test_app();
+        for query in ["tokyo", "london"] {
+            apply_query(&mut app, query);
+            app.commit_search_result_and_exit();
+        }
+
+        app.panel_last();
+        app.unfavorite_selected_panel();
+
+        assert_eq!(app.favorites.len(), 1);
+        assert_eq!(app.selected_panel, 0);
+        let survivor = app.catalogue.get(app.favorites.at(0).unwrap()).unwrap();
+        assert_eq!(survivor.city, "Tokyo");
+    }
+
+    #[test]
+    fn enter_promotes_the_selected_panel_to_the_hero() {
+        let mut app = test_app();
+        for query in ["tokyo", "london"] {
+            apply_query(&mut app, query);
+            app.commit_search_result_and_exit();
+        }
+
+        app.panel_first();
+        app.promote_selected_panel();
+
+        assert_eq!(app.selection.city_name, "Tokyo");
+        assert_eq!(app.selection.tz, chrono_tz::Tz::Asia__Tokyo);
     }
 
     // ── Favorites ───────────────────────────────────────────────────
@@ -1305,30 +1338,6 @@ mod tests {
         app.toggle_favorite();
         assert!(!app.favorites.contains(idx));
         assert!(app.favorites.position(idx).is_none());
-    }
-
-    #[test]
-    fn favorites_filter_shows_only_favorites() {
-        let mut app = test_app();
-        let total = app.filtered_view.len();
-
-        // Add one favorite
-        app.selected_row = 0;
-        app.select_timezone();
-        app.toggle_favorite();
-        assert_eq!(app.filtered_view.len(), total);
-
-        // Toggle favorites-only mode. Favorites are zone-keyed, so
-        // the filter keeps every city of the favorited zone.
-        app.toggle_favorites_filter();
-        let fav_tz = app.selection.tz;
-        assert!(!app.filtered_view.is_empty());
-        assert!(app.filtered_view.len() < total);
-        assert!((0..app.filtered_view.len()).all(|n| nth_tz(&app, n) == fav_tz));
-
-        // Toggle back
-        app.toggle_favorites_filter();
-        assert_eq!(app.filtered_view.len(), total);
     }
 
     #[test]
@@ -1415,51 +1424,44 @@ mod tests {
         assert_eq!(app.selection.city_name, "Tokyo");
     }
 
-    /// Regression test: prior to commit b4b2ccf, `move_favorite_up`
-    /// and `move_favorite_down` swapped entries in `favorites` but did
-    /// not rebuild the position lookup, so the next sort used stale
-    /// positions and the visual reorder did not take effect.
-    ///
-    /// [`Favorites`] now rebuilds its position map inside every mutator,
-    /// so the invariant is structural. The assertion below pins the
-    /// user-visible sort order rather than that mechanism.
     #[test]
     fn reorder_favorites_updates_sort_order_immediately() {
         let mut app = test_app();
-
-        let favs = [
-            ("tokyo", chrono_tz::Tz::Asia__Tokyo),
-            ("london", chrono_tz::Tz::Europe__London),
-            ("paris", chrono_tz::Tz::Europe__Paris),
-        ];
-        for (query, _) in favs {
+        for query in ["tokyo", "london", "paris"] {
             apply_query(&mut app, query);
-            app.toggle_favorite();
+            app.commit_search_result_and_exit();
         }
-
-        // A zone-keyed favorite pulls up every city of its zone, so
-        // the order shows as zone blocks: compare first occurrences.
-        let first_index_of = |app: &App, tz: chrono_tz::Tz| {
-            (0..app.filtered_view.len())
-                .find(|&n| nth_tz(app, n) == tz)
-                .unwrap_or_else(|| panic!("{tz:?} not in the view"))
+        let city_at = |app: &App, pos: usize| {
+            app.catalogue
+                .get(app.favorites.at(pos).unwrap())
+                .unwrap()
+                .city
         };
+        assert_eq!(
+            [city_at(&app, 0), city_at(&app, 1), city_at(&app, 2)],
+            ["Tokyo", "London", "Paris"]
+        );
 
+        // The selection follows the panel it moved.
+        app.panel_first();
+        app.move_panel_later();
+        assert_eq!(
+            [city_at(&app, 0), city_at(&app, 1), city_at(&app, 2)],
+            ["London", "Tokyo", "Paris"]
+        );
+        assert_eq!(app.selected_panel, 1);
+
+        app.panel_last();
+        app.move_panel_earlier();
+        assert_eq!(
+            [city_at(&app, 0), city_at(&app, 1), city_at(&app, 2)],
+            ["London", "Paris", "Tokyo"]
+        );
+        assert_eq!(app.selected_panel, 1);
+
+        // The browse list leads with the favorites in that order.
         apply_query(&mut app, "");
-        assert_eq!(first_tz(&app), favs[0].1);
-        assert!(first_index_of(&app, favs[1].1) < first_index_of(&app, favs[2].1));
-
-        app.selected_row = 0;
-        app.move_favorite_down();
-
-        assert_eq!(first_tz(&app), favs[1].1);
-        assert!(first_index_of(&app, favs[0].1) < first_index_of(&app, favs[2].1));
-
-        app.selected_row = first_index_of(&app, favs[2].1);
-        app.move_favorite_up();
-
-        assert_eq!(first_tz(&app), favs[1].1);
-        assert!(first_index_of(&app, favs[2].1) < first_index_of(&app, favs[0].1));
+        assert_eq!(first_city(&app), "London");
     }
 
     // ── Search editing (paste, commit, word-delete, kill-line) ──────
