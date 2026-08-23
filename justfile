@@ -33,6 +33,16 @@ test:
 check: lint test
     cargo fmt --all -- --check
 
+# Regenerate data/cities.tsv from the GeoNames dumps
+[group('dev')]
+gen-cities:
+    mkdir -p target/geonames
+    test -f target/geonames/cities15000.zip || curl -fsSL -o target/geonames/cities15000.zip https://download.geonames.org/export/dump/cities15000.zip
+    unzip -o -q target/geonames/cities15000.zip -d target/geonames
+    test -f target/geonames/admin1CodesASCII.txt || curl -fsSL -o target/geonames/admin1CodesASCII.txt https://download.geonames.org/export/dump/admin1CodesASCII.txt
+    test -f target/geonames/countryInfo.txt || curl -fsSL -o target/geonames/countryInfo.txt https://download.geonames.org/export/dump/countryInfo.txt
+    cargo run --bin gen_cities -- target/geonames data/cities.tsv
+
 # Build release binaries and copy to dist/
 [group('deploy')]
 build:
