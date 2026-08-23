@@ -1,40 +1,40 @@
-# lazytimezone
+# 🕰️ lazytimezone
 
-A terminal UI for browsing world clocks across 217 cities, built with Rust and [Ratatui](https://ratatui.rs).
+A terminal world clock browser. Search by city, region, country, or UTC offset, then read the time as a large clock.
 
-![Rust](https://img.shields.io/badge/Rust-2024_edition-orange)
+[![ci](https://github.com/GF6599/lazytimezone/actions/workflows/ci.yml/badge.svg)](https://github.com/GF6599/lazytimezone/actions/workflows/ci.yml)
 
 ## Features
 
-- **Big clock display** with large ASCII-art time, city name, and date
-- **217 cities** spanning Pacific, Americas, Europe, Africa, Asia, and Australia
-- **Real-time search** by city, region, or UTC offset (e.g. `+5:30`, `UTC-8`, `asia +9`)
-- **6 built-in themes** — Default, Dracula, Solarized, Nord, Monokai, Gruvbox — persisted across sessions
-- **Time diff column** showing offset from your selected timezone
-- **Favorites** — pin timezones to the top of the list, persisted across sessions
-- **Favorite side clocks** — up to 2 favorite timezones shown as smaller clocks beside the main clock
-- **Clipboard copy** of the selected timezone's current time
+- **Large clock.** The time, the city, and the date, in block digits.
+- **217 cities.** The Pacific, the Americas, Europe, Africa, Asia, and Australia.
+- **Search.** By city, region, country, or UTC offset, for example `+5:30`, `UTC-8`, `asia +9`.
+- **6 themes.** The app saves your choice.
+- **Time difference column.** The offset from the city you select.
+- **Favorites.** Pin a city to the top of the list. The app saves the order.
+- **Side clocks.** Up to 2 favorites show as smaller clocks beside the main clock.
+- **Clipboard copy.** Copy the current time of the selected city.
 
-## Installation
+## Install
 
-### From source
+You must have Rust 1.85 or later, because the crate uses the 2024 edition.
 
 ```sh
-# Build release binary
 cargo build --release
-
-# Or using just
-just ship   # builds and copies the binary to ~/self-made-bin/
 ```
 
-### Requirements
+To install the binary, first make the target directory, then build and copy in one step. `~/self-made-bin` must be on your `PATH`.
 
-- Rust 2024 edition (1.85+)
-- Clipboard copy shells out to a platform tool, which must be on `PATH`:
-  `pbcopy` on macOS, `clip` on Windows, `wl-copy` or `xclip` on Linux.
-  Everything else works without them.
-- `just build` additionally needs [`cross`](https://github.com/cross-rs/cross)
-  for the Linux target and `codesign` for the macOS binary.
+```sh
+mkdir -p ~/self-made-bin
+just ship
+```
+
+`just ship` builds a macOS binary and a Linux binary, so it also needs
+[`cross`](https://github.com/cross-rs/cross) and `codesign`. Use
+`cargo build --release` to build for your own platform only.
+
+Clipboard copy calls a platform tool, which must be on `PATH`: `pbcopy` on macOS, `clip` on Windows, `wl-copy` or `xclip` on Linux. Every other feature works without one.
 
 ## Usage
 
@@ -42,9 +42,9 @@ just ship   # builds and copies the binary to ~/self-made-bin/
 lazytimezone
 ```
 
-### Keybindings
+Press `?` in the app for the same key list, plus the search syntax.
 
-#### Normal mode
+### Normal mode
 
 | Key | Action |
 |---|---|
@@ -54,82 +54,73 @@ lazytimezone
 | `G` / `End` | Jump to bottom |
 | `Ctrl-d` / `Page Down` | Page down |
 | `Ctrl-u` / `Page Up` | Page up |
-| `Enter` | Select timezone (updates clock and diff column) |
-| `f` | Toggle favorite on selected timezone |
-| `F` | Toggle favorites-only filter |
-| `J` | Move favorite down in order |
-| `K` | Move favorite up in order |
+| `Enter` | Select the city, which sets the main clock and the difference column |
+| `f` | Toggle favorite on the selected city |
+| `F` | Toggle the favorites-only filter |
+| `J` | Move the favorite down in the order |
+| `K` | Move the favorite up in the order |
 | `/` | Enter search mode |
-| `Ctrl-l` | Clear active search filter |
-| `t` | Cycle theme |
-| `c` | Copy time to clipboard |
-| `?` | Toggle help overlay (`↑` / `↓` scroll it) |
+| `Ctrl-l` | Clear the active search filter |
+| `t` | Cycle the theme |
+| `c` | Copy the time to the clipboard |
+| `?` | Toggle the help overlay. `Up` and `Down` scroll it |
 | `q` / `Ctrl-c` | Quit |
 
-#### Search mode
+### Search mode
 
 | Key | Action |
 |---|---|
-| Type | Filter timezones |
-| `←` / `→` | Move cursor |
-| `Home` / `End` | Jump to start / end (also `Ctrl-a` / `Ctrl-e`) |
-| `Backspace` | Delete previous character |
-| `Delete` | Delete character under cursor |
-| `Ctrl-w` | Delete previous word |
-| `Ctrl-k` | Delete to end of line |
-| `Ctrl-u` | Clear search |
-| `Ctrl-f` | Toggle favorite on the highlighted row |
-| `Enter` | Pick the highlighted row and exit search |
-| `Esc` | Exit search without picking |
+| Type | Filter the cities |
+| `Left` / `Right` | Move the cursor |
+| `Home` / `End` | Jump to the start or the end, also `Ctrl-a` / `Ctrl-e` |
+| `Backspace` | Delete the previous character |
+| `Delete` | Delete the character under the cursor |
+| `Ctrl-w` | Delete the previous word |
+| `Ctrl-k` | Delete to the end of the line |
+| `Ctrl-u` | Clear the search |
+| `Ctrl-f` | Toggle favorite on the highlighted city |
+| `Enter` | Pick the highlighted city and exit the search |
+| `Esc` | Exit the search without a pick |
 
-Search is case-insensitive with AND logic across whitespace-separated terms. It ignores punctuation, understands IANA timezone IDs, and also indexes common area keywords such as state names and timezone-family labels. Offset searches use each timezone's current UTC offset, so DST-aware cities move seasonally.
+### Search syntax
 
-When a search hits an alias city or a displayable geographic keyword, the table shows that matched label even if the underlying timezone entry is grouped under a representative city.
+Search is not case-sensitive. It applies AND logic across the terms that whitespace separates, and it ignores punctuation. It accepts an IANA timezone identifier, and it also indexes area keywords such as a state name or a timezone-family label.
+
+An offset search uses the current UTC offset of each city. A city that observes daylight saving time therefore moves between the seasons.
+
+A search can match an alias city or a geographic keyword. The table then shows the label that matched, even when the entry is grouped under a representative city.
 
 | Query | Matches |
 |---|---|
 | `london` | London |
 | `asia` | All Asian timezones |
 | `america/new_york` | New York |
-| `boston` | Boston (America/New_York) |
-| `st johns` | `St. John's` entries |
-| `texas` | Texas (mapped to U.S. Central Time) |
-| `eastern time` | New York / Toronto |
-| `+5:30` | UTC+5:30 (Mumbai) |
-| `+0530` | UTC+5:30 (Mumbai, Colombo) |
-| `UTC-10` | UTC-10 timezones (Honolulu) |
-| `GMT-10:00` | UTC-10 timezones (Honolulu) |
-| `united states` | USA timezones |
-| `asia +9` | Asian cities at UTC+9 (Tokyo, Seoul) |
+| `boston` | Boston, which is `America/New_York` |
+| `st johns` | The `St. John's` entries |
+| `texas` | Texas, which maps to United States Central Time |
+| `eastern time` | New York and Toronto |
+| `+5:30` | The UTC+5:30 timezones, such as Mumbai |
+| `+0530` | The UTC+5:30 timezones, such as Mumbai and Colombo |
+| `UTC-10` | The UTC-10 timezones, such as Honolulu |
+| `GMT-10:00` | The UTC-10 timezones, such as Honolulu |
+| `united states` | The United States timezones |
+| `asia +9` | The Asian cities at UTC+9, such as Tokyo and Seoul |
 
-## Themes
+## Configuration
 
-Cycle through themes with `t`. Theme and favorites are saved to `~/.config/lazytimezone/config.toml`.
+Press `t` to cycle the theme. The cycle order is Default, Dracula, Solarized, Nord, Monokai, and Gruvbox.
 
-- **Default** — terminal colors with cyan accents
-- **Dracula** — purple/blue dark theme
-- **Solarized** — high-contrast light/dark
-- **Nord** — arctic blue palette
-- **Monokai** — classic editor colors
-- **Gruvbox** — retro groove palette
-
-## Architecture
-
-The application follows a single-owner state model: `App` holds all mutable state, the event loop calls `events::handle_events` to mutate it, then `ui::draw` reads it to render each frame. No shared or global state.
+The app writes the theme and the favorites to `~/.config/lazytimezone/config.toml`. When `$XDG_CONFIG_HOME` is set, the app writes to `$XDG_CONFIG_HOME/lazytimezone/config.toml` instead.
 
 ## Development
 
 ```sh
-just              # list every recipe
-just run          # run the app
-just check        # the full gate: clippy, tests, formatting
-just fmt          # format in place
-just build        # build release binaries into dist/
-just ship         # build, then copy to ~/self-made-bin/
+just          # list every recipe
+just check    # the quality gate: clippy, then the tests, then a format check
 ```
 
-`just check` is what CI runs. Run it before pushing.
+`just check` is what CI runs, so run it before you push. To run the same checks on every commit, install the hooks once with `pre-commit install`.
 
 ## License
 
-MIT
+MIT.
