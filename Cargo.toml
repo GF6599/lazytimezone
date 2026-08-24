@@ -2,6 +2,8 @@
 name = "lazytimezone"
 version = "0.1.0"
 edition = "2024"
+# gen_cities exists as a second binary, so a bare cargo run needs this.
+default-run = "lazytimezone"
 license = "MIT"
 
 [[bin]]
