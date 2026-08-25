@@ -6,8 +6,8 @@ A terminal world clock browser. Search by city, region, country, or UTC offset, 
 
 ## Features
 
-- **Large clock.** The time, the city, and the date, in block digits.
-- **Favorite wall.** Each favorite city is a framed panel with its own time, date, and offset from the main clock. Move between panels, promote one to the main clock, and reorder them. The app saves the wall.
+- **Large clock.** The time, the city, and the date, in block digits. The digits grow to full height on a large terminal.
+- **Favorite wall.** Each favorite city is a framed panel with its own time, date, and offset from the main clock. The panels stretch to the terminal width, and a tall terminal adds the timezone and the sunrise and sunset times. Move between panels, promote one to the main clock, and reorder them. The app saves the wall.
 - **34,000 cities.** Every GeoNames place above 15,000 people, with its state and country.
 - **Add-city search.** Press `/`, type a city, a state, a country, or a UTC offset, and pick a result. Examples: `+5:30`, `UTC-8`, `portland maine`, `asia +9`.
 - **6 themes.** The app saves your choice.
