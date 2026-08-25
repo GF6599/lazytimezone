@@ -19,13 +19,16 @@
 //! └──────────────────────────────────────────────┘
 //! ```
 //!
-//! The hero clock adapts to terminal width: narrow terminals
-//! (<60 cols) show a plain-text fallback, wider ones use
-//! [`BigText`](tui_big_text::BigText). The add-city picker renders
-//! as a centered modal over the wall while search mode is active.
+//! The hero clock adapts to the terminal: full-height block digits
+//! on a large terminal, half-height ones on a mid-size one, a plain
+//! text line where neither fits. The favorite wall stretches its
+//! panel grid to the frame edges and gives each panel more rows when
+//! the height allows. The add-city picker renders as a centered
+//! modal over the wall while search mode is active.
 
 use chrono::offset::Offset;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
+use chrono_tz::Tz;
 
 use ratatui::{
     Frame,
@@ -43,7 +46,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, CopyStatus, InputMode};
 use crate::theme::ThemeColors;
-use crate::timezone::{format_utc_offset, is_daytime_at, is_daytime_at_latitude};
+use crate::timezone::{format_utc_offset, is_daytime_at, is_daytime_at_latitude, sun_window};
 
 /// Top-level render entry point — splits the frame into five vertical
 /// zones and delegates to specialised draw functions.
@@ -54,18 +57,19 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     let tc = app.theme.colors();
     let now = Utc::now();
 
+    let (hero, hero_height) = hero_variant(frame.area());
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // title bar
-            Constraint::Length(8), // hero clock
-            Constraint::Min(4),    // favorite wall
-            Constraint::Length(1), // status bar
+            Constraint::Length(1),           // title bar
+            Constraint::Length(hero_height), // hero clock
+            Constraint::Min(0),              // favorite wall
+            Constraint::Length(1),           // status bar
         ])
         .split(frame.area());
 
     draw_title_bar(frame, app, outer[0], &tc);
-    draw_hero_clock(frame, app, &now, outer[1], &tc);
+    draw_hero_clock(frame, app, &now, outer[1], hero, &tc);
     draw_wall(frame, app, &now, outer[2], &tc);
     draw_status_bar(frame, app, outer[3], &tc);
 
@@ -244,27 +248,46 @@ fn draw_title_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
     frame.render_widget(theme, chunks[1]);
 }
 
-/// Renders the large ASCII-art clock with optional side clocks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeroVariant {
+    FullArt,
+    HalfArt,
+    Text,
+}
+
+/// Picks the largest hero clock the terminal can carry, returning the
+/// variant and the rows the hero zone claims from the vertical layout.
+///
+/// Full-height art needs 64 columns for eight 8-cell glyphs and must
+/// leave the wall at least two panel rows; half-height art wants the
+/// same width at half the rows; anything smaller gets a text line.
+fn hero_variant(area: Rect) -> (HeroVariant, u16) {
+    if area.width >= 66 && area.height >= 21 {
+        (HeroVariant::FullArt, 11)
+    } else if area.width >= 66 && area.height >= 14 {
+        (HeroVariant::HalfArt, 8)
+    } else {
+        (HeroVariant::Text, 4)
+    }
+}
+
+/// Renders the hero clock at the size [`hero_variant`] chose.
 ///
 /// ## Day/night colouring
 ///
 /// Daytime uses `accent` (bright), nighttime uses `accent_secondary`
 /// (dim). The day/night decision delegates to
 /// [`is_daytime_at`](crate::timezone::is_daytime_at), which computes
-/// sunrise/sunset from the city's curated latitude — so high-latitude
-/// cities like Reykjavík correctly stay "night" through a winter
-/// noon-twilight, and "day" through a polar summer night.
-///
-/// ## Side clocks
-///
-/// When the terminal is wide enough (>60 + 24n cols), up to 2
-/// favourite timezones are shown as smaller Quadrant-pixel clocks
-/// beside the main HalfHeight clock.
+/// sunrise/sunset from the city's catalogue latitude — so
+/// high-latitude cities like Reykjavík correctly stay "night"
+/// through a winter noon-twilight, and "day" through a polar summer
+/// night.
 fn draw_hero_clock(
     frame: &mut Frame,
     app: &App,
     utc_now: &DateTime<Utc>,
     area: Rect,
+    variant: HeroVariant,
     tc: &ThemeColors,
 ) {
     let now = utc_now.with_timezone(&app.selection.tz);
@@ -279,14 +302,15 @@ fn draw_hero_clock(
     let date_str = now.format("%A, %B %d, %Y").to_string();
     let offset_secs = now.offset().fix().local_minus_utc();
     let meta = format!(
-        "{} \u{00b7} {} \u{00b7} {}",
+        "{} \u{b7} {} \u{b7} {}",
         app.selection.city_name,
         date_str,
         format_utc_offset(offset_secs)
     );
 
-    if area.width < 60 {
+    if variant == HeroVariant::Text {
         let lines = vec![
+            Line::from(""),
             Line::from(Span::styled(
                 time_str,
                 Style::default()
@@ -302,22 +326,33 @@ fn draw_hero_clock(
         return;
     }
 
+    // font8x8 digits keep their descender row blank, so full-size art
+    // is 7 rows of ink out of the 8-row glyph grid.
+    let (pixel_size, art_rows) = match variant {
+        HeroVariant::FullArt => (PixelSize::Full, 7),
+        _ => (PixelSize::HalfHeight, 4),
+    };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(5), Constraint::Length(2)])
+        .constraints([
+            Constraint::Length(1),        // gap under the title bar
+            Constraint::Length(art_rows), // block digits
+            Constraint::Length(1),        // gap
+            Constraint::Length(1),        // meta line
+        ])
         .split(area);
 
     // tui-big-text renders every glyph 8 cells wide, so the art can
     // be centered arithmetically: the widget itself is left-aligned.
     let art_width = (time_str.chars().count() as u16) * 8;
     let clock_area = Rect {
-        x: chunks[0].x + chunks[0].width.saturating_sub(art_width) / 2,
-        width: art_width.min(chunks[0].width),
-        ..chunks[0]
+        x: chunks[1].x + chunks[1].width.saturating_sub(art_width) / 2,
+        width: art_width.min(chunks[1].width),
+        ..chunks[1]
     };
 
     let big_text = BigText::builder()
-        .pixel_size(PixelSize::HalfHeight)
+        .pixel_size(pixel_size)
         .style(Style::default().fg(clock_color).bg(tc.bg))
         .lines(vec![time_str.into()])
         .build();
@@ -329,16 +364,21 @@ fn draw_hero_clock(
     )))
     .alignment(Alignment::Center)
     .style(Style::default().bg(tc.bg));
-    frame.render_widget(meta_line, chunks[1]);
+    frame.render_widget(meta_line, chunks[3]);
 }
 
-const PANEL_WIDTH: u16 = 26;
-const PANEL_HEIGHT: u16 = 4;
+const PANEL_MIN_WIDTH: u16 = 26;
+const PANEL_MIN_HEIGHT: u16 = 4;
+const PANEL_MAX_HEIGHT: u16 = 6;
 
 /// Renders the favorite wall: one framed panel per favorite, in the
 /// user's order, wrapped into as many columns as the width allows.
 /// The grid geometry is reported back to the app so `j`/`k` know how
 /// far one vertical step moves.
+///
+/// Columns share the width remainder so the grid reaches the right
+/// edge, panels grow toward [`PANEL_MAX_HEIGHT`] when the rows fit,
+/// and a grid that fits entirely centers itself vertically.
 fn draw_wall(
     frame: &mut Frame,
     app: &mut App,
@@ -349,25 +389,39 @@ fn draw_wall(
     // One cell of left margin lines the wall up with the hero text,
     // and each grid cell keeps one gutter column so panel frames do
     // not weld into a single rule.
-    let columns = (area.width.saturating_sub(1) / PANEL_WIDTH).max(1) as usize;
+    let available = area.width.saturating_sub(1);
+    let columns = (available / PANEL_MIN_WIDTH).max(1) as usize;
     app.set_wall_columns(columns);
 
     let count = app.favorites.len();
     if count == 0 {
-        let hint = Paragraph::new(vec![
-            Line::from(""),
-            Line::from(Span::styled(
-                "press / to add a city",
-                Style::default().fg(tc.muted),
-            )),
-        ])
+        let hint_area = Rect {
+            y: area.y + area.height / 2,
+            height: 1.min(area.height),
+            ..area
+        };
+        let hint = Paragraph::new(Span::styled(
+            "press / to add a city",
+            Style::default().fg(tc.muted),
+        ))
         .alignment(Alignment::Center)
         .style(Style::default().bg(tc.bg));
-        frame.render_widget(hint, area);
+        frame.render_widget(hint, hint_area);
         return;
     }
 
-    let visible_rows = (area.height / PANEL_HEIGHT).max(1) as usize;
+    let grid_rows = count.div_ceil(columns);
+    let panel_height = (area.height / grid_rows as u16).clamp(PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT);
+    let visible_rows = (area.height / panel_height).max(1) as usize;
+    let top_pad = if grid_rows <= visible_rows {
+        (area.height - grid_rows as u16 * panel_height) / 2
+    } else {
+        0
+    };
+
+    let base_width = available / columns as u16;
+    let wide_columns = (available % columns as u16) as usize;
+
     let selected_grid_row = app.selected_panel / columns;
     // Scroll only far enough to reveal the selection.
     let top_row = selected_grid_row.saturating_sub(visible_rows.saturating_sub(1));
@@ -375,12 +429,16 @@ fn draw_wall(
     let first = top_row * columns;
     for (slot, panel_pos) in (first..count).take(visible_rows * columns).enumerate() {
         let grid_row = (slot / columns) as u16;
-        let grid_col = (slot % columns) as u16;
+        let grid_col = slot % columns;
+        let x_offset: u16 = (0..grid_col)
+            .map(|c| base_width + u16::from(c < wide_columns))
+            .sum();
+        let cell_width = base_width + u16::from(grid_col < wide_columns);
         let rect = Rect {
-            x: area.x + 1 + grid_col * PANEL_WIDTH,
-            y: area.y + grid_row * PANEL_HEIGHT,
-            width: PANEL_WIDTH - 1,
-            height: PANEL_HEIGHT,
+            x: area.x + 1 + x_offset,
+            y: area.y + top_pad + grid_row * panel_height,
+            width: cell_width.saturating_sub(1),
+            height: panel_height,
         };
         if rect.bottom() > area.bottom() || rect.right() > area.right() {
             continue;
@@ -442,7 +500,7 @@ fn draw_favorite_panel(
     } else {
         format_diff(offset_secs, hero_offset)
     };
-    let body = vec![
+    let mut body = vec![
         Line::from(Span::styled(
             local.format("%H:%M:%S").to_string(),
             time_style,
@@ -455,6 +513,18 @@ fn draw_favorite_panel(
             ),
         ]),
     ];
+    if inner.height >= 3 {
+        body.push(Line::from(vec![
+            Span::styled(format_utc_offset(offset_secs), Style::default().fg(tc.info)),
+            Span::styled(
+                format!(" \u{00b7} {}", entry.tz.name()),
+                Style::default().fg(tc.muted),
+            ),
+        ]));
+    }
+    if inner.height >= 4 {
+        body.push(sun_line(entry.latitude, &local, tc));
+    }
     frame.render_widget(
         Paragraph::new(body).style(Style::default().bg(tc.bg)),
         inner,
@@ -744,6 +814,30 @@ fn format_diff(offset_secs: i32, selected_offset_secs: i32) -> Cow<'static, str>
     }
 }
 
+/// One muted line naming the panel's sun window, with the polar cases
+/// spelled out instead of the degenerate clock times they produce.
+fn sun_line(latitude: f64, local: &DateTime<Tz>, tc: &ThemeColors) -> Line<'static> {
+    let (sunrise, sunset) = sun_window(latitude, local.ordinal());
+    let text: Cow<'static, str> = if sunset - sunrise >= 24.0 {
+        Cow::Borrowed("sun up all day")
+    } else if sunset <= sunrise {
+        Cow::Borrowed("sun down all day")
+    } else {
+        Cow::Owned(format!(
+            "rise {} \u{00b7} set {}",
+            format_sun_time(sunrise),
+            format_sun_time(sunset)
+        ))
+    };
+    Line::from(Span::styled(text, Style::default().fg(tc.muted)))
+}
+
+/// Formats fractional hours of local clock time as `HH:MM`.
+fn format_sun_time(hours: f64) -> String {
+    let total_minutes = (hours * 60.0).round() as u32;
+    format!("{:02}:{:02}", (total_minutes / 60) % 24, total_minutes % 60)
+}
+
 /// Truncates `s` to at most `max_cols` display columns (unicode-width
 /// aware), appending an ellipsis when truncated. Wide chars (CJK) and
 /// combining marks are accounted for so the result never overflows the
@@ -847,12 +941,14 @@ mod tests {
 
         let buffer = render_buffer(&mut app, 80, 24);
 
-        // The wall starts under the title bar (1) and hero clock (8).
-        let panel_top_left = buffer[(1, 9)].clone();
+        // 80x24 gives a full-art hero (11 rows under the title), one
+        // 6-row panel row centered in the 11-row wall (2 rows of pad),
+        // and a 27-cell first column (79 cells split 3 ways, 1 spare).
+        let panel_top_left = buffer[(1, 14)].clone();
         assert_eq!(panel_top_left.symbol(), "\u{250c}");
         assert_eq!(panel_top_left.fg, star);
         // The unselected panel keeps the plain border.
-        let neighbour_top_left = buffer[(1 + PANEL_WIDTH, 9)].clone();
+        let neighbour_top_left = buffer[(28, 14)].clone();
         assert_eq!(neighbour_top_left.symbol(), "\u{250c}");
         assert_eq!(neighbour_top_left.fg, border);
     }
@@ -1049,6 +1145,19 @@ mod tests {
             );
         }
         assert!(rendered.contains("UTC"), "got:\n{rendered}");
+    }
+
+    #[test]
+    fn the_hero_art_only_renders_where_its_64_columns_fit() {
+        let mut app = wall_app(&["tokyo"]);
+
+        // 64 columns hold the art with no margin, which reads as
+        // clipped against the frame; the gate asks for 66.
+        let narrow = render_app(&mut app, 64, 24).join("\n");
+        assert!(!narrow.contains('\u{2588}'), "got:\n{narrow}");
+
+        let wide = render_app(&mut app, 66, 24).join("\n");
+        assert!(wide.contains('\u{2588}'), "got:\n{wide}");
     }
 
     #[test]
