@@ -891,6 +891,28 @@ mod tests {
             .collect()
     }
 
+    /// Measures the hero art as (rows with block glyphs, widest ink
+    /// span in cells), so a test can tell one art scale from another.
+    fn hero_ink(rows: &[String]) -> (usize, usize) {
+        let is_block = |c: char| matches!(c, '\u{2588}' | '\u{2580}' | '\u{2584}');
+        let mut ink_rows = 0;
+        let mut min_col = usize::MAX;
+        let mut max_col = 0;
+        for row in rows {
+            let mut inked = false;
+            for (col, c) in row.chars().enumerate() {
+                if is_block(c) {
+                    inked = true;
+                    min_col = min_col.min(col);
+                    max_col = max_col.max(col);
+                }
+            }
+            ink_rows += usize::from(inked);
+        }
+        let span = if ink_rows == 0 { 0 } else { max_col - min_col + 1 };
+        (ink_rows, span)
+    }
+
     /// A wall app with one favorite per query, added through the
     /// picker flow the user would take.
     fn wall_app(queries: &[&str]) -> App {
@@ -1158,6 +1180,44 @@ mod tests {
 
         let wide = render_app(&mut app, 66, 24).join("\n");
         assert!(wide.contains('\u{2588}'), "got:\n{wide}");
+    }
+
+    #[test]
+    fn the_hero_digits_double_on_a_large_terminal() {
+        let mut app = wall_app(&["tokyo"]);
+
+        let rows = render_app(&mut app, 140, 30);
+
+        let (ink_rows, span) = hero_ink(&rows);
+        assert!(
+            ink_rows >= 12,
+            "the art spans only {ink_rows} rows:\n{}",
+            rows.join("\n")
+        );
+        assert!(
+            span >= 100,
+            "the art spans only {span} cells:\n{}",
+            rows.join("\n")
+        );
+    }
+
+    #[test]
+    fn the_hero_digits_triple_on_a_huge_terminal() {
+        let mut app = wall_app(&["tokyo"]);
+
+        let rows = render_app(&mut app, 200, 48);
+
+        let (ink_rows, span) = hero_ink(&rows);
+        assert!(
+            ink_rows >= 18,
+            "the art spans only {ink_rows} rows:\n{}",
+            rows.join("\n")
+        );
+        assert!(
+            span >= 150,
+            "the art spans only {span} cells:\n{}",
+            rows.join("\n")
+        );
     }
 
     #[test]
