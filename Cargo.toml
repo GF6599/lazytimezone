@@ -15,7 +15,7 @@ ratatui = { version = "0.30", default-features = false, features = ["crossterm"]
 crossterm = "0.29"
 chrono = { version = "0.4", features = ["clock"] }
 chrono-tz = "0.10"
-tui-big-text = "0.8"
+font8x8 = "0.3"
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 unicode-width = "0.2"

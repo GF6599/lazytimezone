@@ -19,9 +19,10 @@
 //! └──────────────────────────────────────────────┘
 //! ```
 //!
-//! The hero clock adapts to the terminal: full-height block digits
-//! on a large terminal, half-height ones on a mid-size one, a plain
-//! text line where neither fits. The favorite wall stretches its
+//! The hero clock adapts to the terminal: the block digits step up
+//! in scale as the terminal grows, shrink to half height on a
+//! mid-size one, and drop to a plain text line where no art fits.
+//! The favorite wall stretches its
 //! panel grid to the frame edges and gives each panel more rows when
 //! the height allows. The add-city picker renders as a centered
 //! modal over the wall while search mode is active.
@@ -40,7 +41,7 @@ use ratatui::{
 };
 use std::borrow::Cow;
 
-use tui_big_text::{BigText, PixelSize};
+use font8x8::{BASIC_FONTS, UnicodeFonts};
 
 use unicode_width::UnicodeWidthStr;
 
@@ -250,25 +251,88 @@ fn draw_title_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HeroVariant {
-    FullArt,
-    HalfArt,
+    Art {
+        cells_per_px: u16,
+        half_rows_per_px: u16,
+    },
     Text,
+}
+
+/// font8x8 digits keep their descender row blank, so the art draws 7
+/// of the 8 glyph pixel rows.
+const DIGIT_PX_ROWS: u16 = 7;
+
+/// The hero art ladder, largest first: cells per pixel across, half
+/// cells per pixel down, then the terminal size the rung needs. Width
+/// covers the 64-pixel time string plus one margin cell per side.
+/// Height leaves the wall at least two panel rows, except the
+/// half-height rung, which squeezes the wall to one row rather than
+/// dropping the art entirely.
+const HERO_LADDER: [(u16, u16, u16, u16); 4] = [
+    (3, 6, 194, 35),
+    (2, 4, 130, 28),
+    (1, 2, 66, 21),
+    (1, 1, 66, 14),
+];
+
+fn hero_art_rows(half_rows_per_px: u16) -> u16 {
+    (DIGIT_PX_ROWS * half_rows_per_px).div_ceil(2)
 }
 
 /// Picks the largest hero clock the terminal can carry, returning the
 /// variant and the rows the hero zone claims from the vertical layout.
-///
-/// Full-height art needs 64 columns for eight 8-cell glyphs and must
-/// leave the wall at least two panel rows; half-height art wants the
-/// same width at half the rows; anything smaller gets a text line.
 fn hero_variant(area: Rect) -> (HeroVariant, u16) {
-    if area.width >= 66 && area.height >= 21 {
-        (HeroVariant::FullArt, 11)
-    } else if area.width >= 66 && area.height >= 14 {
-        (HeroVariant::HalfArt, 8)
-    } else {
-        (HeroVariant::Text, 4)
+    for &(cells_per_px, half_rows_per_px, min_width, min_height) in &HERO_LADDER {
+        if area.width >= min_width && area.height >= min_height {
+            let art = HeroVariant::Art {
+                cells_per_px,
+                half_rows_per_px,
+            };
+            return (art, hero_art_rows(half_rows_per_px) + 4);
+        }
     }
+    (HeroVariant::Text, 4)
+}
+
+/// Renders `text` as half-block art from the font8x8 glyphs, at
+/// `cells_per_px` cells per pixel across and `half_rows_per_px` half
+/// cells per pixel down, so one renderer serves every ladder rung.
+fn big_digit_lines(
+    text: &str,
+    cells_per_px: u16,
+    half_rows_per_px: u16,
+    style: Style,
+) -> Vec<Line<'static>> {
+    let glyphs: Vec<[u8; 8]> = text
+        .chars()
+        .map(|c| BASIC_FONTS.get(c).unwrap_or([0; 8]))
+        .collect();
+    let glyph_width = 8 * cells_per_px as usize;
+    let width = glyphs.len() * glyph_width;
+    let half_rows = (DIGIT_PX_ROWS * half_rows_per_px) as usize;
+
+    let px_on = |half_row: usize, col: usize| -> bool {
+        if half_row >= half_rows {
+            return false;
+        }
+        let px_row = half_row / half_rows_per_px as usize;
+        let px_col = (col % glyph_width) / cells_per_px as usize;
+        (glyphs[col / glyph_width][px_row] >> px_col) & 1 == 1
+    };
+
+    (0..half_rows.div_ceil(2))
+        .map(|row| {
+            let cells: String = (0..width)
+                .map(|col| match (px_on(2 * row, col), px_on(2 * row + 1, col)) {
+                    (true, true) => '\u{2588}',
+                    (true, false) => '\u{2580}',
+                    (false, true) => '\u{2584}',
+                    (false, false) => ' ',
+                })
+                .collect();
+            Line::from(Span::styled(cells, style))
+        })
+        .collect()
 }
 
 /// Renders the hero clock at the size [`hero_variant`] chose.
@@ -308,7 +372,11 @@ fn draw_hero_clock(
         format_utc_offset(offset_secs)
     );
 
-    if variant == HeroVariant::Text {
+    let HeroVariant::Art {
+        cells_per_px,
+        half_rows_per_px,
+    } = variant
+    else {
         let lines = vec![
             Line::from(""),
             Line::from(Span::styled(
@@ -324,14 +392,9 @@ fn draw_hero_clock(
             .style(Style::default().bg(tc.bg));
         frame.render_widget(p, area);
         return;
-    }
-
-    // font8x8 digits keep their descender row blank, so full-size art
-    // is 7 rows of ink out of the 8-row glyph grid.
-    let (pixel_size, art_rows) = match variant {
-        HeroVariant::FullArt => (PixelSize::Full, 7),
-        _ => (PixelSize::HalfHeight, 4),
     };
+
+    let art_rows = hero_art_rows(half_rows_per_px);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -342,21 +405,23 @@ fn draw_hero_clock(
         ])
         .split(area);
 
-    // tui-big-text renders every glyph 8 cells wide, so the art can
-    // be centered arithmetically: the widget itself is left-aligned.
-    let art_width = (time_str.chars().count() as u16) * 8;
+    // Every glyph renders at a fixed width, so the left-aligned art
+    // can be centered arithmetically.
+    let art_width = (time_str.chars().count() as u16) * 8 * cells_per_px;
     let clock_area = Rect {
         x: chunks[1].x + chunks[1].width.saturating_sub(art_width) / 2,
         width: art_width.min(chunks[1].width),
         ..chunks[1]
     };
 
-    let big_text = BigText::builder()
-        .pixel_size(pixel_size)
-        .style(Style::default().fg(clock_color).bg(tc.bg))
-        .lines(vec![time_str.into()])
-        .build();
-    frame.render_widget(big_text, clock_area);
+    let art = Paragraph::new(big_digit_lines(
+        &time_str,
+        cells_per_px,
+        half_rows_per_px,
+        Style::default().fg(clock_color).bg(tc.bg),
+    ))
+    .style(Style::default().bg(tc.bg));
+    frame.render_widget(art, clock_area);
 
     let meta_line = Paragraph::new(Line::from(Span::styled(
         meta,
@@ -909,7 +974,11 @@ mod tests {
             }
             ink_rows += usize::from(inked);
         }
-        let span = if ink_rows == 0 { 0 } else { max_col - min_col + 1 };
+        let span = if ink_rows == 0 {
+            0
+        } else {
+            max_col - min_col + 1
+        };
         (ink_rows, span)
     }
 
