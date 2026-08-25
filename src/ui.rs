@@ -1018,6 +1018,62 @@ mod tests {
         );
     }
 
+    #[test]
+    fn the_hero_clock_fills_a_tall_terminal_with_full_height_digits() {
+        let mut app = wall_app(&["tokyo"]);
+
+        let rows = render_app(&mut app, 100, 40);
+
+        let ink_rows = rows
+            .iter()
+            .take(13)
+            .filter(|row| row.contains('\u{2588}'))
+            .count();
+        assert!(
+            ink_rows >= 6,
+            "the hero art spans only {ink_rows} rows:\n{}",
+            rows.join("\n")
+        );
+    }
+
+    #[test]
+    fn the_hero_clock_drops_the_art_on_a_short_terminal() {
+        let mut app = wall_app(&["tokyo"]);
+
+        let rendered = render_app(&mut app, 80, 12).join("\n");
+
+        for glyph in ['\u{2588}', '\u{2580}', '\u{2584}'] {
+            assert!(
+                !rendered.contains(glyph),
+                "block art on a 12-row terminal:\n{rendered}"
+            );
+        }
+        assert!(rendered.contains("UTC"), "got:\n{rendered}");
+    }
+
+    #[test]
+    fn the_wall_panels_stretch_to_the_right_edge() {
+        let mut app = wall_app(&["tokyo", "london", "paris", "denver"]);
+
+        let buffer = render_buffer(&mut app, 80, 24);
+
+        // A stretched grid puts the rightmost panel border one gutter
+        // cell in from the frame edge, mirroring the left margin.
+        let found = (0..buffer.area.height).any(|y| buffer[(78, y)].symbol() == "\u{2510}");
+        assert!(found, "no panel corner lands beside the right edge");
+    }
+
+    #[test]
+    fn a_tall_panel_shows_the_zone_and_the_sun_window() {
+        let mut app = wall_app(&["tokyo"]);
+
+        let rendered = render_app(&mut app, 80, 30).join("\n");
+
+        assert!(rendered.contains("Asia/Tokyo"), "got:\n{rendered}");
+        assert!(rendered.contains("rise "), "got:\n{rendered}");
+        assert!(rendered.contains("set "), "got:\n{rendered}");
+    }
+
     /// A binding can reach the overlay and never reach the README, which
     /// is what happened to Ctrl-w, Ctrl-k and Ctrl-f. The README wraps
     /// every key in backticks, so the check can be exact.
