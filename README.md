@@ -4,6 +4,8 @@ A terminal world clock browser. Search by city, region, country, or UTC offset, 
 
 [![ci](https://github.com/GF6599/lazytimezone/actions/workflows/ci.yml/badge.svg)](https://github.com/GF6599/lazytimezone/actions/workflows/ci.yml)
 
+![lazytimezone demo](doc/demo.gif)
+
 ## Features
 
 - **Large clock.** The time, the city, and the date, in block digits. The digits scale up with the terminal size.
