@@ -4,12 +4,19 @@
 //!
 //! ```toml
 //! theme = "Nord"
-//! favorites = ["Asia/Tokyo", "Europe/London"]
+//!
+//! [[favorites]]
+//! city = "Boston"
+//! admin1 = "Massachusetts"
+//! cc = "US"
 //! ```
 //!
-//! On first launch after the migration, legacy plain-text files (`theme`
-//! and `favorites`) are imported automatically, and removed once the
-//! unified file is safely written.
+//! A favorite from the pre-city format, a bare IANA zone string such
+//! as `"Asia/Tokyo"`, still parses ([`FavoriteEntry::Zone`]) and is
+//! resolved to the zone's major city at load. On first launch after
+//! the migration, legacy plain-text files (`theme` and `favorites`)
+//! are imported automatically, and removed once the unified file is
+//! safely written.
 //!
 //! ## API shape
 //!
@@ -32,7 +39,22 @@ pub struct Config {
     #[serde(default = "default_theme")]
     pub theme: String,
     #[serde(default)]
-    pub favorites: Vec<String>,
+    pub favorites: Vec<FavoriteEntry>,
+}
+
+/// One favorite in the config file.
+///
+/// `Zone` is the pre-city format. It still deserializes so an old
+/// config keeps its favorites, and saving writes the `City` form.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum FavoriteEntry {
+    City {
+        city: String,
+        admin1: String,
+        cc: String,
+    },
+    Zone(String),
 }
 
 fn default_theme() -> String {
@@ -222,8 +244,9 @@ fn migrate_legacy(app_dir: &Path) -> (Config, Vec<PathBuf>) {
             read_files.push(favorites_path);
             contents
                 .lines()
-                .map(|l| l.trim().to_string())
+                .map(str::trim)
                 .filter(|l| !l.is_empty())
+                .map(|l| FavoriteEntry::Zone(l.to_string()))
                 .collect()
         }
         Err(_) => Vec::new(),
@@ -304,7 +327,35 @@ mod tests {
         let (cfg, _) = try_load(&tmp.config_path()).unwrap();
 
         assert_eq!(cfg.theme, "Nord");
-        assert_eq!(cfg.favorites, vec!["Asia/Tokyo", "Europe/London"]);
+        assert_eq!(
+            cfg.favorites,
+            vec![
+                FavoriteEntry::Zone("Asia/Tokyo".to_string()),
+                FavoriteEntry::Zone("Europe/London".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn city_favorites_round_trip_through_toml() {
+        let tmp = TempConfig::new();
+        let cfg = Config {
+            theme: "Nord".to_string(),
+            favorites: vec![
+                FavoriteEntry::City {
+                    city: "Boston".to_string(),
+                    admin1: "Massachusetts".to_string(),
+                    cc: "US".to_string(),
+                },
+                FavoriteEntry::Zone("Asia/Tokyo".to_string()),
+            ],
+        };
+
+        try_save(&tmp.config_path(), &cfg).unwrap();
+        let (loaded, warnings) = try_load(&tmp.config_path()).unwrap();
+
+        assert!(warnings.is_empty());
+        assert_eq!(loaded.favorites, cfg.favorites);
     }
 
     #[test]

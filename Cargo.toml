@@ -2,6 +2,8 @@
 name = "lazytimezone"
 version = "0.1.0"
 edition = "2024"
+# gen_cities exists as a second binary, so a bare cargo run needs this.
+default-run = "lazytimezone"
 license = "MIT"
 
 [[bin]]
@@ -13,10 +15,15 @@ ratatui = { version = "0.30", default-features = false, features = ["crossterm"]
 crossterm = "0.29"
 chrono = { version = "0.4", features = ["clock"] }
 chrono-tz = "0.10"
-tui-big-text = "0.8"
+font8x8 = "0.3"
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 unicode-width = "0.2"
+
+[profile.test]
+# The scoring loop walks 34k entries per keystroke, and the picker
+# tests type whole queries. Unoptimized, the suite takes 40 s.
+opt-level = 2
 
 [profile.release]
 lto = true

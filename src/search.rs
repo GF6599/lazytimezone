@@ -22,38 +22,33 @@
 //!
 //! ## Scoring model
 //!
-//! Two complementary passes feed a single sum-then-tiebreak rank:
+//! One weight table ([`FIELD_WEIGHTS`]) drives everything. Each field
+//! carries exact/prefix/contains weights, and two passes share them:
 //!
-//! 1. **Phrase pass** ([`PHRASE_WEIGHTS`]) scores the entire normalized
-//!    query against each field of an entry and keeps the single best
-//!    field score. Rewards "looks like one of our labels" matches —
-//!    e.g. `"new york"` exactly hits the city haystack `"new york"`.
-//! 2. **Per-term pass** ([`TERM_WEIGHTS`]) runs the same field walk
-//!    once per whitespace-split term and **requires every term to find
-//!    a non-zero match somewhere**. That enforces AND semantics across
-//!    terms (e.g. `"asia tokyo"` only matches entries that score on
-//!    both `asia` and `tokyo`). Per-term hits across all terms are
-//!    summed.
+//! 1. **Phrase pass** scores the entire normalized query against each
+//!    field and keeps the single best score, so "new york" exactly
+//!    hitting a city haystack outranks scattered word hits.
+//! 2. **Per-term pass** scores each whitespace-split term the same
+//!    way, requires every term to hit somewhere (AND semantics), and
+//!    contributes at half weight, so one strong term cannot outrank a
+//!    whole-query phrase match.
 //!
-//! The final entry score is `phrase_best + sum_of_term_bests`, with a
-//! small [`FAVORITE_TIEBREAKER_BONUS`] added for favourited entries so
-//! that two entries scoring identically rank favourites first. The bonus
-//! is intentionally tiny — it breaks ties only, it does not override
-//! genuine relevance differences (a non-favourite with even one extra
-//! contains-match still ranks above a favourite).
+//! The sum then gains a log-scale population bonus
+//! ([`population_score`]), which is what ranks New York City above
+//! York for "york"-shaped queries, and a small
+//! [`FAVORITE_TIEBREAKER_BONUS`] so equal scores favour favourites.
+//! Ties break by population, then name.
 
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use crate::timezone::{
+    SupplementalSearchTerm, TimezoneEntry, city_search_aliases, country_search_aliases,
+    format_utc_offset, region_of, zone_search_terms,
+};
 use chrono::DateTime;
 use chrono::Utc;
 use chrono::offset::Offset;
-use chrono_tz::Tz;
-
-use crate::timezone::{
-    SupplementalSearchTerm, TimezoneEntry, country_search_aliases, format_utc_offset,
-    supplemental_search_terms,
-};
 
 /// Minimum query length required for a contains-style (substring) match.
 ///
@@ -107,7 +102,7 @@ impl SearchIndex {
     /// for the unfiltered catalogue, or just the favorites' indices when
     /// the favorites-only filter is active.
     ///
-    /// `favorite_positions` maps each favorite [`Tz`] to its
+    /// `favorite_positions` maps each favorite catalogue index to its
     /// user-ordered position; only `contains_key` is used here (the
     /// position itself drives the unfiltered sort, not the scored
     /// search).
@@ -117,7 +112,7 @@ impl SearchIndex {
         entries: &[TimezoneEntry],
         base_indices: &[usize],
         now: &DateTime<Utc>,
-        favorite_positions: &HashMap<Tz, usize>,
+        favorite_positions: &HashMap<usize, usize>,
     ) -> Option<Vec<(usize, &'static str, u32)>> {
         let query = SearchQuery::new(query_text);
         if query.terms.is_empty() {
@@ -149,9 +144,14 @@ impl SearchIndex {
                     if term_score == 0 {
                         return None;
                     }
-                    score += term_score;
+                    // Halved so a single strong per-term hit cannot
+                    // outrank a whole-query phrase match: "york" alone
+                    // in "america/new_york" must not lift York past
+                    // New York City.
+                    score += term_score / 2;
                 }
-                if favorite_positions.contains_key(&entry.tz) {
+                score += self.entries[i].pop_score;
+                if favorite_positions.contains_key(&i) {
                     score += FAVORITE_TIEBREAKER_BONUS;
                 }
                 let display_name = best_display_name(entry, &self.entries[i], &query);
@@ -160,7 +160,11 @@ impl SearchIndex {
             .collect();
 
         scored.sort_by(|a, b| {
+            // Population separates the hundreds of rows a zone-wide
+            // phrase like "eastern time" matches equally: the big
+            // cities are what such a query means.
             b.2.cmp(&a.2)
+                .then_with(|| entries[b.0].population.cmp(&entries[a.0].population))
                 .then_with(|| a.1.cmp(b.1))
                 .then_with(|| entries[a.0].city.cmp(entries[b.0].city))
         });
@@ -203,28 +207,33 @@ struct TimezoneSearchData {
     country: String,
     region: String,
     timezone_words: String,
+    state: String,
     aliases: Vec<SearchText>,
     country_aliases: Vec<String>,
     keywords: Vec<SearchKeyword>,
+    pop_score: u32,
 }
 
 impl TimezoneSearchData {
     fn new(entry: &TimezoneEntry) -> Self {
-        // TODO: non-ASCII chars currently normalize to whitespace
-        // (e.g. "São Paulo" → "s o paulo"). Both sides of the comparison
-        // are normalized identically so search still works, but
-        // diacritic-typers rank lower than ASCII-typers for the same
-        // city. Fix would be Unicode-aware folding (e.g. via the
-        // unicode-normalization crate).
         Self {
             city: SearchText::new(entry.city),
             country: normalize_search_text(entry.country),
-            region: normalize_search_text(entry.region),
+            region: normalize_search_text(region_of(entry.tz)),
             timezone_words: normalize_search_text(&entry.tz.to_string()),
-            aliases: entry
-                .aliases
-                .iter()
-                .map(|alias| SearchText::new(alias))
+            state: normalize_search_text(entry.admin1),
+            // Per-city aliases: the ASCII transliteration plus the
+            // curated nicknames, exonyms, and landmarks. Other cities
+            // in the zone are catalogue rows now, not aliases.
+            aliases: (!entry.ascii.is_empty())
+                .then(|| SearchText::new(entry.ascii))
+                .into_iter()
+                .chain(
+                    city_search_aliases(entry.city, entry.cc)
+                        .iter()
+                        .copied()
+                        .map(SearchText::new),
+                )
                 .filter(|alias| !alias.normalized.is_empty())
                 .collect(),
             country_aliases: country_search_aliases(entry.country)
@@ -232,14 +241,23 @@ impl TimezoneSearchData {
                 .map(|alias| normalize_search_text(alias))
                 .filter(|alias| !alias.is_empty())
                 .collect(),
-            keywords: supplemental_search_terms(entry)
+            keywords: zone_search_terms(entry.tz)
                 .iter()
                 .copied()
                 .map(SearchKeyword::new)
                 .filter(|term| !term.text.normalized.is_empty())
                 .collect(),
+            pop_score: population_score(entry.population),
         }
     }
+}
+
+/// Log-scale population bonus, so a metropolis with a prefix match
+/// can outrank a town with an exact one: typing "york" without "new"
+/// still means New York City to most people. 15k people score 18,
+/// one million 54, and the scale caps at 84.
+fn population_score(population: u64) -> u32 {
+    (6 * population.max(1).ilog2().saturating_sub(10)).min(84)
 }
 
 struct SearchQuery {
@@ -296,15 +314,14 @@ impl FieldWeights {
 
 /// Which field of an entry is being scored.
 ///
-/// The same eight fields are scored in both passes — only the weights
-/// differ — so a single enum drives both [`PHRASE_WEIGHTS`] and
-/// [`TERM_WEIGHTS`]. The order of the table entries doubles as the
-/// human-readable priority order: city outranks aliases outranks
-/// keywords, and so on.
+/// One table drives the phrase pass, the per-term pass, and nothing
+/// else. The order of the entries doubles as the human-readable
+/// priority order: city outranks aliases outranks state, and so on.
 #[derive(Copy, Clone, Debug)]
 enum Field {
     City,
     Aliases,
+    State,
     Keywords,
     TzWords,
     Country,
@@ -313,9 +330,7 @@ enum Field {
     Offset,
 }
 
-/// Weights applied when matching the entire normalized query against
-/// each field (phrase-match pass).
-const PHRASE_WEIGHTS: [(Field, FieldWeights); 8] = [
+const FIELD_WEIGHTS: [(Field, FieldWeights); 9] = [
     (
         Field::City,
         FieldWeights {
@@ -333,59 +348,47 @@ const PHRASE_WEIGHTS: [(Field, FieldWeights); 8] = [
         },
     ),
     (
+        Field::State,
+        FieldWeights {
+            exact: 150,
+            prefix: 115,
+            contains: 75,
+        },
+    ),
+    (
         Field::Keywords,
         FieldWeights {
-            exact: 175,
-            prefix: 130,
-            contains: 85,
-        },
-    ),
-    (
-        Field::TzWords,
-        FieldWeights {
-            exact: 170,
-            prefix: 125,
-            contains: 85,
-        },
-    ),
-    (
-        Field::Country,
-        FieldWeights {
-            exact: 135,
+            exact: 140,
             prefix: 105,
             contains: 70,
         },
     ),
     (
-        Field::CountryAliases,
+        Field::TzWords,
         FieldWeights {
-            exact: 125,
+            exact: 130,
+            prefix: 100,
+            contains: 70,
+        },
+    ),
+    (
+        Field::Country,
+        FieldWeights {
+            exact: 120,
             prefix: 95,
             contains: 65,
         },
     ),
     (
-        Field::Region,
+        Field::CountryAliases,
         FieldWeights {
             exact: 110,
-            prefix: 80,
-            contains: 55,
+            prefix: 85,
+            contains: 60,
         },
     ),
     (
-        Field::Offset,
-        FieldWeights {
-            exact: 120,
-            prefix: 95,
-            contains: 70,
-        },
-    ),
-];
-
-/// Weights applied per-term during the AND-across-terms pass.
-const TERM_WEIGHTS: [(Field, FieldWeights); 8] = [
-    (
-        Field::City,
+        Field::Region,
         FieldWeights {
             exact: 100,
             prefix: 75,
@@ -393,80 +396,14 @@ const TERM_WEIGHTS: [(Field, FieldWeights); 8] = [
         },
     ),
     (
-        Field::Aliases,
-        FieldWeights {
-            exact: 90,
-            prefix: 68,
-            contains: 45,
-        },
-    ),
-    (
-        Field::Keywords,
-        FieldWeights {
-            exact: 85,
-            prefix: 64,
-            contains: 42,
-        },
-    ),
-    (
-        Field::TzWords,
-        FieldWeights {
-            exact: 85,
-            prefix: 65,
-            contains: 45,
-        },
-    ),
-    (
-        Field::Country,
-        FieldWeights {
-            exact: 60,
-            prefix: 45,
-            contains: 30,
-        },
-    ),
-    (
-        Field::CountryAliases,
-        FieldWeights {
-            exact: 55,
-            prefix: 42,
-            contains: 28,
-        },
-    ),
-    (
-        Field::Region,
-        FieldWeights {
-            exact: 50,
-            prefix: 38,
-            contains: 25,
-        },
-    ),
-    (
         Field::Offset,
         FieldWeights {
-            exact: 70,
-            prefix: 55,
-            contains: 40,
+            exact: 150,
+            prefix: 120,
+            contains: 80,
         },
     ),
 ];
-
-/// Weights used when picking the alias label to render in the table.
-///
-/// Mirrors the structure of [`PHRASE_WEIGHTS`]/[`TERM_WEIGHTS`] so the
-/// "which label matched best" decision uses the same scale as the
-/// outer ranking — the numbers happen to equal `City` from each table
-/// because the label scorer only ever looks at one normalized field at
-/// a time.
-const DISPLAY_PHRASE_WEIGHTS: FieldWeights = FieldWeights {
-    exact: 220,
-    prefix: 165,
-    contains: 105,
-};
-const DISPLAY_TERM_WEIGHTS: FieldWeights = FieldWeights {
-    exact: 100,
-    prefix: 75,
-    contains: 50,
-};
 
 // ── Scoring ─────────────────────────────────────────────────────────
 
@@ -478,11 +415,11 @@ fn score_phrase_match(
     if query.normalized.is_empty() {
         return 0;
     }
-    score_against_haystack(&query.normalized, search, offset_terms, &PHRASE_WEIGHTS)
+    score_against_haystack(&query.normalized, search, offset_terms, &FIELD_WEIGHTS)
 }
 
 fn score_search_term(term: &str, search: &TimezoneSearchData, offset_terms: &[String]) -> u32 {
-    score_against_haystack(term, search, offset_terms, &TERM_WEIGHTS)
+    score_against_haystack(term, search, offset_terms, &FIELD_WEIGHTS)
 }
 
 /// Walks every field in `weights` (in declaration order, which is the
@@ -497,7 +434,7 @@ fn score_against_haystack(
     query: &str,
     search: &TimezoneSearchData,
     offset_terms: &[String],
-    weights: &[(Field, FieldWeights); 8],
+    weights: &[(Field, FieldWeights); 9],
 ) -> u32 {
     let mut best = 0;
     for (field, w) in weights {
@@ -516,6 +453,7 @@ fn score_against_haystack(
                 query,
                 *w,
             ),
+            Field::State => score_field(&search.state, query, *w),
             Field::TzWords => score_field(&search.timezone_words, query, *w),
             Field::Country => score_field(&search.country, query, *w),
             Field::CountryAliases => {
@@ -529,53 +467,36 @@ fn score_against_haystack(
     best
 }
 
+/// Chooses the label the table shows for a matched row: the city,
+/// unless the whole query is an exact or prefix match of an alias or
+/// a displayable zone phrase and the city itself matches no better.
+/// Per-term hits never relabel a row, so "eastern time" keeps "New
+/// York City" instead of surfacing "Times Square".
 fn best_display_name(
     entry: &TimezoneEntry,
     search: &TimezoneSearchData,
     query: &SearchQuery,
 ) -> &'static str {
-    let city_score = display_match_score(&search.city.normalized, query);
-    let alias_match = best_search_text_match(search.aliases.iter(), query);
-    let keyword_match = best_search_text_match(
+    let quality = |candidate: &str| match MatchKind::classify(candidate, &query.normalized) {
+        Some(MatchKind::Exact) => 2,
+        Some(MatchKind::Prefix) => 1,
+        _ => 0,
+    };
+    let city_quality = quality(&search.city.normalized);
+    let displayable = search.aliases.iter().chain(
         search
             .keywords
             .iter()
             .filter(|keyword| keyword.display_in_results)
             .map(|keyword| &keyword.text),
-        query,
     );
-    let best_non_city = alias_match
-        .into_iter()
-        .chain(keyword_match)
+    let best = displayable
+        .map(|candidate| (candidate.raw, quality(&candidate.normalized)))
         .max_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(b.0)));
-
-    match best_non_city {
-        Some((label, score)) if score > city_score && score > 0 => label,
+    match best {
+        Some((label, label_quality)) if label_quality > city_quality && label_quality > 0 => label,
         _ => entry.city,
     }
-}
-
-fn best_search_text_match<'a>(
-    candidates: impl IntoIterator<Item = &'a SearchText>,
-    query: &SearchQuery,
-) -> Option<(&'static str, u32)> {
-    candidates
-        .into_iter()
-        .map(|candidate| {
-            (
-                candidate.raw,
-                display_match_score(&candidate.normalized, query),
-            )
-        })
-        .max_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(b.0)))
-}
-
-fn display_match_score(field: &str, query: &SearchQuery) -> u32 {
-    let mut score = score_field(field, &query.normalized, DISPLAY_PHRASE_WEIGHTS);
-    for term in &query.terms {
-        score += score_field(field, term, DISPLAY_TERM_WEIGHTS);
-    }
-    score
 }
 
 fn best_score<'a>(
@@ -704,6 +625,45 @@ fn offset_search_terms(total_secs: i32) -> Vec<String> {
         .collect()
 }
 
+/// Maps a lowercased Latin character with a diacritic to its ASCII
+/// base letters, so "Z\u{fc}rich" and "zurich" normalize identically.
+/// Characters outside the table keep the pre-existing behavior of
+/// acting as separators.
+fn fold_diacritic(ch: char) -> Option<&'static str> {
+    Some(match ch {
+        '\u{e0}'..='\u{e5}' | '\u{101}' | '\u{103}' | '\u{105}' => "a",
+        '\u{e6}' => "ae",
+        '\u{e7}' | '\u{107}' | '\u{109}' | '\u{10b}' | '\u{10d}' => "c",
+        '\u{10f}' | '\u{111}' | '\u{f0}' => "d",
+        '\u{e8}'..='\u{eb}' | '\u{113}' | '\u{115}' | '\u{117}' | '\u{119}' | '\u{11b}' => "e",
+        '\u{11d}' | '\u{11f}' | '\u{121}' | '\u{123}' => "g",
+        '\u{125}' | '\u{127}' => "h",
+        '\u{ec}'..='\u{ef}' | '\u{129}' | '\u{12b}' | '\u{12d}' | '\u{12f}' | '\u{131}' => "i",
+        '\u{135}' => "j",
+        '\u{137}' => "k",
+        '\u{13a}' | '\u{13c}' | '\u{13e}' | '\u{140}' | '\u{142}' => "l",
+        '\u{f1}' | '\u{144}' | '\u{146}' | '\u{148}' => "n",
+        '\u{f2}'..='\u{f6}' | '\u{f8}' | '\u{14d}' | '\u{14f}' | '\u{151}' => "o",
+        '\u{153}' => "oe",
+        '\u{155}' | '\u{157}' | '\u{159}' => "r",
+        '\u{15b}' | '\u{15d}' | '\u{15f}' | '\u{161}' | '\u{219}' => "s",
+        '\u{df}' => "ss",
+        '\u{163}' | '\u{165}' | '\u{167}' | '\u{21b}' => "t",
+        '\u{fe}' => "th",
+        '\u{f9}'..='\u{fc}'
+        | '\u{169}'
+        | '\u{16b}'
+        | '\u{16d}'
+        | '\u{16f}'
+        | '\u{171}'
+        | '\u{173}' => "u",
+        '\u{175}' => "w",
+        '\u{fd}' | '\u{ff}' | '\u{177}' => "y",
+        '\u{17a}' | '\u{17c}' | '\u{17e}' => "z",
+        _ => return None,
+    })
+}
+
 fn normalize_search_text(value: &str) -> String {
     let mut normalized = String::with_capacity(value.len());
     let mut last_was_space = true;
@@ -712,6 +672,11 @@ fn normalize_search_text(value: &str) -> String {
     while let Some(ch) = chars.next() {
         let next_is_digit = chars.peek().is_some_and(|next| next.is_ascii_digit());
         for lower in ch.to_lowercase() {
+            if let Some(folded) = fold_diacritic(lower) {
+                normalized.push_str(folded);
+                last_was_space = false;
+                continue;
+            }
             match lower {
                 'a'..='z' | '0'..='9' | '+' => {
                     normalized.push(lower);
@@ -744,6 +709,8 @@ mod tests {
     // rationale on why production lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
+    use chrono_tz::Tz;
+
     use super::*;
 
     // ── normalize_search_text ──────────────────────────────────────
@@ -751,10 +718,10 @@ mod tests {
     #[test]
     fn normalize_lowercases_and_collapses_whitespace() {
         assert_eq!(normalize_search_text("Asia/Tokyo  "), "asia tokyo");
-        // Non-ASCII letters (like 'ã') are not in the allow-list and so
-        // collapse to a space — São Paulo searches as "s o paulo".
-        // Diacritic-stripping would be a separate, intentional change.
-        assert_eq!(normalize_search_text("  São Paulo  "), "s o paulo");
+        // Latin diacritics fold to their ASCII base letters, so typed
+        // and stored forms meet on one spelling.
+        assert_eq!(normalize_search_text("  São Paulo  "), "sao paulo");
+        assert_eq!(normalize_search_text("Zürich"), "zurich");
         assert_eq!(normalize_search_text("UTC"), "utc");
         assert_eq!(normalize_search_text(""), "");
     }
@@ -919,7 +886,7 @@ mod tests {
         index: &SearchIndex,
         entries: &[TimezoneEntry],
         query: &str,
-        favorites: &HashMap<Tz, usize>,
+        favorites: &HashMap<usize, usize>,
     ) -> Option<Vec<(usize, &'static str, u32)>> {
         let base: Vec<usize> = (0..entries.len()).collect();
         let now = Utc::now();
@@ -958,7 +925,7 @@ mod tests {
 
         // Favourite Tokyo only.
         let mut favorites = HashMap::new();
-        favorites.insert(Tz::Asia__Tokyo, 0usize);
+        favorites.insert(tokyo_idx, 0usize);
 
         // Query "new york" — Tokyo gets no match, New York gets a strong
         // exact-city match. Despite the favourite bonus, New York wins:
@@ -985,7 +952,7 @@ mod tests {
             .position(|e| e.tz == Tz::Australia__Sydney)
             .expect("Sydney in catalogue");
         let mut favs2 = HashMap::new();
-        favs2.insert(Tz::Australia__Sydney, 0usize);
+        favs2.insert(sydney_idx, 0usize);
 
         let with_bonus = run_search(&index, entries, "australia", &favs2).expect("non-empty");
         let without_bonus =

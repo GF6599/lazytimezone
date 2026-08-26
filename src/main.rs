@@ -12,12 +12,13 @@
 //!              ├── ui        App state → ratatui Frame rendering
 //!              ├── config    TOML persistence (~/.config/lazytimezone/config.toml)
 //!              ├── theme     Color palettes
-//!              └── timezone  Static catalogue of 217 world cities
+//!              └── timezone  Generated catalogue of 34k world cities
 //! ```
 //!
 //! State flows unidirectionally: [`events`] mutates [`app::App`], then
-//! [`ui::draw`] reads it to produce the next frame. No shared or global
-//! state — everything lives in the single [`app::App`] instance.
+//! [`ui::draw`] reads it to produce the next frame. Mutable state all
+//! lives in the single [`app::App`] instance; the catalogue and its
+//! search index are immutable statics.
 
 mod app;
 mod clipboard;

@@ -6,14 +6,12 @@ A terminal world clock browser. Search by city, region, country, or UTC offset, 
 
 ## Features
 
-- **Large clock.** The time, the city, and the date, in block digits.
-- **217 cities.** The Pacific, the Americas, Europe, Africa, Asia, and Australia.
-- **Search.** By city, region, country, or UTC offset, for example `+5:30`, `UTC-8`, `asia +9`.
+- **Large clock.** The time, the city, and the date, in block digits. The digits scale up with the terminal size.
+- **Favorite wall.** Each favorite city is a framed panel with its own time, date, and offset from the main clock. The panels stretch to the terminal width, and a tall terminal adds the timezone and the sunrise and sunset times. Move between panels, promote one to the main clock, and reorder them. The app saves the wall.
+- **34,000 cities.** Every GeoNames place above 15,000 people, with its state and country.
+- **Add-city search.** Press `/`, type a city, a state, a country, or a UTC offset, and pick a result. Examples: `+5:30`, `UTC-8`, `portland maine`, `asia +9`.
 - **6 themes.** The app saves your choice.
-- **Time difference column.** The offset from the city you select.
-- **Favorites.** Pin a city to the top of the list. The app saves the order.
-- **Side clocks.** Up to 2 favorites show as smaller clocks beside the main clock.
-- **Clipboard copy.** Copy the current time of the selected city.
+- **Clipboard copy.** Copy the current time of the main clock.
 
 ## Install
 
@@ -48,21 +46,16 @@ Press `?` in the app for the same key list, plus the search syntax.
 
 | Key | Action |
 |---|---|
-| `j` / `Down` | Move down |
-| `k` / `Up` | Move up |
-| `g` / `Home` | Jump to top |
-| `G` / `End` | Jump to bottom |
-| `Ctrl-d` / `Page Down` | Page down |
-| `Ctrl-u` / `Page Up` | Page up |
-| `Enter` | Select the city, which sets the main clock and the difference column |
-| `f` | Toggle favorite on the selected city |
-| `F` | Toggle the favorites-only filter |
-| `J` | Move the favorite down in the order |
-| `K` | Move the favorite up in the order |
-| `/` | Enter search mode |
-| `Ctrl-l` | Clear the active search filter |
+| `h` / `j` / `k` / `l` | Move between panels, also the arrow keys (`Left` / `Down` / `Up` / `Right`) |
+| `g` / `Home` | Jump to the first panel |
+| `G` / `End` | Jump to the last panel |
+| `Enter` | Show the panel's city on the big clock |
+| `/` | Open the add-city search |
+| `f` | Remove the selected panel |
+| `J` | Move the panel later in the order |
+| `K` | Move the panel earlier in the order |
 | `t` | Cycle the theme |
-| `c` | Copy the time to the clipboard |
+| `c` | Copy the big clock's time to the clipboard |
 | `?` | Toggle the help overlay. `Up` and `Down` scroll it |
 | `q` / `Ctrl-c` | Quit |
 
@@ -71,6 +64,7 @@ Press `?` in the app for the same key list, plus the search syntax.
 | Key | Action |
 |---|---|
 | `Type` | Filter the cities |
+| `Up` / `Down` | Move through the results |
 | `Left` / `Right` | Move the cursor |
 | `Home` / `End` | Jump to the start or the end, also `Ctrl-a` / `Ctrl-e` |
 | `Backspace` | Delete the previous character |
@@ -79,8 +73,8 @@ Press `?` in the app for the same key list, plus the search syntax.
 | `Ctrl-k` | Delete to the end of the line |
 | `Ctrl-u` | Clear the search |
 | `Ctrl-f` | Toggle favorite on the highlighted city |
-| `Enter` | Pick the highlighted city and exit the search |
-| `Esc` | Exit the search without a pick |
+| `Enter` | Add the highlighted city to the wall and close the search |
+| `Esc` | Close the search without a pick |
 
 ### Search syntax
 
@@ -123,4 +117,4 @@ just check    # the quality gate: clippy, then the tests, then a format check
 
 ## License
 
-MIT.
+MIT. The city catalogue in `data/cities.tsv` derives from [GeoNames](https://www.geonames.org/), licensed CC BY 4.0.

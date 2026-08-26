@@ -8,52 +8,46 @@
 //!
 //! ```text
 //! ┌──────────────────────────────────────────────┐
-//! │ Title bar (1 row)        theme label (right) │
-//! ├──────────────────────┬───────────────────────┤
-//! │ Big clock (5 rows)   │ Side clocks (favs)    │
-//! │ City + date (2 rows) │                       │
-//! ├──────────────────────┴───────────────────────┤
-//! │ Search bar (3 rows, bordered)                │
+//! │ Title bar (1 row)                            │
 //! ├──────────────────────────────────────────────┤
-//! │ Timezone table (fills remaining space)       │
-//! │  City │ Country │ Region │ Time │ UTC │ Diff │
+//! │ Hero clock: block-digit time, city, date     │
+//! ├──────────────────────────────────────────────┤
+//! │ Favorite wall: one framed panel per favorite │
+//! │  ┌ Tokyo ─────┐ ┌ London ────┐               │
 //! ├──────────────────────────────────────────────┤
 //! │ Status bar (1 row)                           │
 //! └──────────────────────────────────────────────┘
 //! ```
 //!
-//! The big clock area adapts to terminal width: narrow terminals
-//! (<60 cols) show a plain-text fallback, wider ones use
-//! [`BigText`](tui_big_text::BigText) with up to 2 side clocks for
-//! favourite timezones.
+//! The hero clock adapts to the terminal: the block digits step up
+//! in scale as the terminal grows, shrink to half height on a
+//! mid-size one, and drop to a plain text line where no art fits.
+//! The favorite wall stretches its
+//! panel grid to the frame edges and gives each panel more rows when
+//! the height allows. The add-city picker renders as a centered
+//! modal over the wall while search mode is active.
 
 use chrono::offset::Offset;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
+use chrono_tz::Tz;
 
 use ratatui::{
     Frame,
+    layout::Alignment,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, Borders, Cell, Clear, Paragraph, Row, Scrollbar, ScrollbarOrientation,
-        ScrollbarState, Table, TableState,
-    },
+    widgets::{Block, Borders, Clear, Paragraph},
 };
 use std::borrow::Cow;
 
-use tui_big_text::{BigText, PixelSize};
+use font8x8::{BASIC_FONTS, UnicodeFonts};
 
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, CopyStatus, InputMode};
 use crate::theme::ThemeColors;
-use crate::timezone::{format_utc_offset, is_daytime_at, is_daytime_at_latitude};
-
-/// Rows of the table area consumed by non-data chrome: top border,
-/// header row, bottom border. Used to size the viewport and decide
-/// whether the scrollbar is needed.
-const TABLE_CHROME_ROWS: usize = 3;
+use crate::timezone::{format_utc_offset, is_daytime_at, is_daytime_at_latitude, sun_window};
 
 /// Top-level render entry point — splits the frame into five vertical
 /// zones and delegates to specialised draw functions.
@@ -64,23 +58,25 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     let tc = app.theme.colors();
     let now = Utc::now();
 
+    let (hero, hero_height) = hero_variant(frame.area());
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // title bar
-            Constraint::Length(7), // big clock
-            Constraint::Length(3), // search bar
-            Constraint::Min(8),    // timezone table
-            Constraint::Length(1), // status bar
+            Constraint::Length(1),           // title bar
+            Constraint::Length(hero_height), // hero clock
+            Constraint::Min(0),              // favorite wall
+            Constraint::Length(1),           // status bar
         ])
         .split(frame.area());
 
     draw_title_bar(frame, app, outer[0], &tc);
-    draw_big_clock(frame, app, &now, outer[1], &tc);
-    draw_search_bar(frame, app, outer[2], &tc);
-    draw_table(frame, app, &now, outer[3], &tc);
-    draw_status_bar(frame, app, outer[4], &tc);
+    draw_hero_clock(frame, app, &now, outer[1], hero, &tc);
+    draw_wall(frame, app, &now, outer[2], &tc);
+    draw_status_bar(frame, app, outer[3], &tc);
 
+    if app.input_mode == InputMode::Search {
+        draw_picker(frame, app, &now, frame.area(), &tc);
+    }
     if app.show_help {
         draw_help_popup(frame, app, frame.area(), &tc);
     }
@@ -96,23 +92,21 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 /// app yet. Both lists are hand-written, so
 /// `every_help_binding_appears_in_the_readme` holds them together.
 const NORMAL_MODE_HELP: &[(&str, &str)] = &[
-    ("j / k / Up / Down", "Move up / down"),
-    ("g / G", "Jump to top / bottom"),
-    ("Ctrl-d / Ctrl-u", "Page down / up"),
-    ("Enter", "Select timezone (set as main clock)"),
-    ("/", "Enter search mode"),
-    ("Ctrl-l", "Clear active search filter"),
-    ("f", "Toggle favorite on selected row"),
-    ("F", "Toggle favorites-only filter"),
-    ("J / K", "Move favorite down / up in order"),
+    ("h / j / k / l", "Move between panels (also the arrows)"),
+    ("g / G", "Jump to first / last panel"),
+    ("Enter", "Show the panel's city on the big clock"),
+    ("/", "Open the add-city search"),
+    ("f", "Remove the selected panel"),
+    ("J / K", "Move the panel later / earlier in the order"),
     ("t", "Cycle theme"),
-    ("c", "Copy selected time to clipboard"),
+    ("c", "Copy the big clock's time to clipboard"),
     ("?", "Toggle this help"),
     ("q / Ctrl-c", "Quit"),
 ];
 
 const SEARCH_MODE_HELP: &[(&str, &str)] = &[
-    ("Type", "Filter timezones (AND across terms)"),
+    ("Type", "Filter the cities (AND across terms)"),
+    ("Up / Down", "Move through the results"),
     ("Left / Right", "Move cursor"),
     ("Home / End", "Jump to start / end (also Ctrl-a / Ctrl-e)"),
     ("Backspace / Delete", "Delete previous / next char"),
@@ -120,8 +114,8 @@ const SEARCH_MODE_HELP: &[(&str, &str)] = &[
     ("Ctrl-k", "Delete to end of line"),
     ("Ctrl-u", "Clear search"),
     ("Ctrl-f", "Toggle favorite on highlighted row"),
-    ("Enter", "Pick highlighted row and exit"),
-    ("Esc", "Exit without picking"),
+    ("Enter", "Add the highlighted city and close"),
+    ("Esc", "Close without adding"),
 ];
 
 /// Bold accent heading that opens each of the overlay's three sections.
@@ -255,27 +249,109 @@ fn draw_title_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
     frame.render_widget(theme, chunks[1]);
 }
 
-/// Renders the large ASCII-art clock with optional side clocks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeroVariant {
+    Art {
+        cells_per_px: u16,
+        half_rows_per_px: u16,
+    },
+    Text,
+}
+
+/// font8x8 digits keep their descender row blank, so the art draws 7
+/// of the 8 glyph pixel rows.
+const DIGIT_PX_ROWS: u16 = 7;
+
+/// The hero art ladder, largest first: cells per pixel across, half
+/// cells per pixel down, then the terminal size the rung needs. Width
+/// covers the 64-pixel time string plus one margin cell per side.
+/// Height leaves the wall at least two panel rows, except the
+/// half-height rung, which squeezes the wall to one row rather than
+/// dropping the art entirely.
+const HERO_LADDER: [(u16, u16, u16, u16); 4] = [
+    (3, 6, 194, 35),
+    (2, 4, 130, 28),
+    (1, 2, 66, 21),
+    (1, 1, 66, 14),
+];
+
+fn hero_art_rows(half_rows_per_px: u16) -> u16 {
+    (DIGIT_PX_ROWS * half_rows_per_px).div_ceil(2)
+}
+
+/// Picks the largest hero clock the terminal can carry, returning the
+/// variant and the rows the hero zone claims from the vertical layout.
+fn hero_variant(area: Rect) -> (HeroVariant, u16) {
+    for &(cells_per_px, half_rows_per_px, min_width, min_height) in &HERO_LADDER {
+        if area.width >= min_width && area.height >= min_height {
+            let art = HeroVariant::Art {
+                cells_per_px,
+                half_rows_per_px,
+            };
+            return (art, hero_art_rows(half_rows_per_px) + 4);
+        }
+    }
+    (HeroVariant::Text, 4)
+}
+
+/// Renders `text` as half-block art from the font8x8 glyphs, at
+/// `cells_per_px` cells per pixel across and `half_rows_per_px` half
+/// cells per pixel down, so one renderer serves every ladder rung.
+fn big_digit_lines(
+    text: &str,
+    cells_per_px: u16,
+    half_rows_per_px: u16,
+    style: Style,
+) -> Vec<Line<'static>> {
+    let glyphs: Vec<[u8; 8]> = text
+        .chars()
+        .map(|c| BASIC_FONTS.get(c).unwrap_or([0; 8]))
+        .collect();
+    let glyph_width = 8 * cells_per_px as usize;
+    let width = glyphs.len() * glyph_width;
+    let half_rows = (DIGIT_PX_ROWS * half_rows_per_px) as usize;
+
+    let px_on = |half_row: usize, col: usize| -> bool {
+        if half_row >= half_rows {
+            return false;
+        }
+        let px_row = half_row / half_rows_per_px as usize;
+        let px_col = (col % glyph_width) / cells_per_px as usize;
+        (glyphs[col / glyph_width][px_row] >> px_col) & 1 == 1
+    };
+
+    (0..half_rows.div_ceil(2))
+        .map(|row| {
+            let cells: String = (0..width)
+                .map(|col| match (px_on(2 * row, col), px_on(2 * row + 1, col)) {
+                    (true, true) => '\u{2588}',
+                    (true, false) => '\u{2580}',
+                    (false, true) => '\u{2584}',
+                    (false, false) => ' ',
+                })
+                .collect();
+            Line::from(Span::styled(cells, style))
+        })
+        .collect()
+}
+
+/// Renders the hero clock at the size [`hero_variant`] chose.
 ///
 /// ## Day/night colouring
 ///
 /// Daytime uses `accent` (bright), nighttime uses `accent_secondary`
 /// (dim). The day/night decision delegates to
 /// [`is_daytime_at`](crate::timezone::is_daytime_at), which computes
-/// sunrise/sunset from the city's curated latitude — so high-latitude
-/// cities like Reykjavík correctly stay "night" through a winter
-/// noon-twilight, and "day" through a polar summer night.
-///
-/// ## Side clocks
-///
-/// When the terminal is wide enough (>60 + 24n cols), up to 2
-/// favourite timezones are shown as smaller Quadrant-pixel clocks
-/// beside the main HalfHeight clock.
-fn draw_big_clock(
+/// sunrise/sunset from the city's catalogue latitude — so
+/// high-latitude cities like Reykjavík correctly stay "night"
+/// through a winter noon-twilight, and "day" through a polar summer
+/// night.
+fn draw_hero_clock(
     frame: &mut Frame,
     app: &App,
     utc_now: &DateTime<Utc>,
     area: Rect,
+    variant: HeroVariant,
     tc: &ThemeColors,
 ) {
     let now = utc_now.with_timezone(&app.selection.tz);
@@ -288,411 +364,416 @@ fn draw_big_clock(
 
     let time_str = now.format("%H:%M:%S").to_string();
     let date_str = now.format("%A, %B %d, %Y").to_string();
+    let offset_secs = now.offset().fix().local_minus_utc();
+    let meta = format!(
+        "{} \u{b7} {} \u{b7} {}",
+        app.selection.city_name,
+        date_str,
+        format_utc_offset(offset_secs)
+    );
 
-    if area.width < 60 {
+    let HeroVariant::Art {
+        cells_per_px,
+        half_rows_per_px,
+    } = variant
+    else {
         let lines = vec![
+            Line::from(""),
             Line::from(Span::styled(
-                format!("  {}", time_str),
+                time_str,
                 Style::default()
                     .fg(clock_color)
                     .add_modifier(Modifier::BOLD),
             )),
-            Line::from(Span::styled(
-                format!("  {} - {}", app.selection.city_name, date_str),
-                Style::default().fg(tc.muted),
-            )),
+            Line::from(Span::styled(meta, Style::default().fg(tc.muted))),
         ];
-        let p = Paragraph::new(lines).style(Style::default().bg(tc.bg));
+        let p = Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .style(Style::default().bg(tc.bg));
         frame.render_widget(p, area);
         return;
-    }
-
-    // Determine how many side clocks fit: each needs ~24 cols
-    let side_clock_width: u16 = 24;
-    let main_min_width: u16 = 60;
-    // Fetch extra candidates so filtering out the selected tz still leaves up to 2
-    let fav_tzs = app.top_favorite_timezones(4);
-    let side_tzs: Vec<_> = fav_tzs
-        .iter()
-        .filter(|(tz, _)| *tz != app.selection.tz)
-        .take(2)
-        .collect();
-    let available_for_sides = area.width.saturating_sub(main_min_width);
-    let max_sides = (available_for_sides / side_clock_width) as usize;
-    let num_sides = max_sides.min(side_tzs.len());
-
-    // Split horizontally: main clock | side clocks
-    let h_constraints = if num_sides > 0 {
-        vec![
-            Constraint::Min(main_min_width),
-            Constraint::Length(side_clock_width * num_sides as u16),
-        ]
-    } else {
-        vec![Constraint::Min(main_min_width)]
-    };
-    let h_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(h_constraints)
-        .split(area);
-
-    // Draw main clock
-    let main_area = h_chunks[0];
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(5), Constraint::Length(2)])
-        .split(main_area);
-
-    let clock_area = Rect {
-        x: chunks[0].x + 2,
-        width: chunks[0].width.saturating_sub(2),
-        ..chunks[0]
     };
 
-    let big_text = BigText::builder()
-        .pixel_size(PixelSize::HalfHeight)
-        .style(Style::default().fg(clock_color).bg(tc.bg))
-        .lines(vec![time_str.into()])
-        .build();
-    frame.render_widget(big_text, clock_area);
-
-    let date_line = Paragraph::new(Line::from(Span::styled(
-        format!("  {} - {}", app.selection.city_name, date_str),
-        Style::default().fg(tc.muted),
-    )))
-    .style(Style::default().bg(tc.bg));
-    frame.render_widget(date_line, chunks[1]);
-
-    // Draw side clocks
-    if num_sides > 0 {
-        let side_area = h_chunks[1];
-        let side_constraints: Vec<Constraint> = (0..num_sides)
-            .map(|_| Constraint::Length(side_clock_width))
-            .collect();
-        let side_chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(side_constraints)
-            .split(side_area);
-
-        for (i, &&(tz, city)) in side_tzs.iter().take(num_sides).enumerate() {
-            draw_side_clock(frame, utc_now, tz, city, side_chunks[i], tc);
-        }
-    }
-}
-
-/// Renders a single favourite side clock: city label, Quadrant-pixel
-/// time, and abbreviated date, separated by a vertical border line.
-fn draw_side_clock(
-    frame: &mut Frame,
-    utc_now: &DateTime<Utc>,
-    tz: chrono_tz::Tz,
-    city: &str,
-    area: Rect,
-    tc: &ThemeColors,
-) {
-    let local = utc_now.with_timezone(&tz);
-    let is_day = is_daytime_at(tz, &local);
-    let time_color = if is_day {
-        tc.accent
-    } else {
-        tc.accent_secondary
-    };
-
-    let time_str = local.format("%H:%M").to_string();
-    let date_str = local.format("%a, %b %d").to_string();
-
-    // Layout: city label (1 row) | big text (4 rows) | date (1 row)
+    let art_rows = hero_art_rows(half_rows_per_px);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // city label
-            Constraint::Length(4), // quadrant big text
-            Constraint::Length(1), // date
-            Constraint::Min(0),    // absorb remainder
+            Constraint::Length(1),        // gap under the title bar
+            Constraint::Length(art_rows), // block digits
+            Constraint::Length(1),        // gap
+            Constraint::Length(1),        // meta line
         ])
         .split(area);
 
-    // City label with left border indicator
-    let city_line = Paragraph::new(Line::from(vec![
-        Span::styled(" \u{2502} ", Style::default().fg(tc.border)),
-        Span::styled(
-            city,
-            Style::default().fg(tc.star).add_modifier(Modifier::BOLD),
-        ),
-    ]))
-    .style(Style::default().bg(tc.bg));
-    frame.render_widget(city_line, chunks[0]);
-
-    // BigText clock in Quadrant size
-    let clock_inner = Rect {
-        x: chunks[1].x + 3,
-        width: chunks[1].width.saturating_sub(3),
+    // Every glyph renders at a fixed width, so the left-aligned art
+    // can be centered arithmetically.
+    let art_width = (time_str.chars().count() as u16) * 8 * cells_per_px;
+    let clock_area = Rect {
+        x: chunks[1].x + chunks[1].width.saturating_sub(art_width) / 2,
+        width: art_width.min(chunks[1].width),
         ..chunks[1]
     };
-    let big_text = BigText::builder()
-        .pixel_size(PixelSize::Quadrant)
-        .style(Style::default().fg(time_color).bg(tc.bg))
-        .lines(vec![time_str.into()])
-        .build();
-    frame.render_widget(big_text, clock_inner);
 
-    // Date line
-    let date_line = Paragraph::new(Line::from(vec![
-        Span::styled(" \u{2502} ", Style::default().fg(tc.border)),
-        Span::styled(date_str, Style::default().fg(tc.muted)),
-    ]))
+    let art = Paragraph::new(big_digit_lines(
+        &time_str,
+        cells_per_px,
+        half_rows_per_px,
+        Style::default().fg(clock_color).bg(tc.bg),
+    ))
     .style(Style::default().bg(tc.bg));
-    frame.render_widget(date_line, chunks[2]);
+    frame.render_widget(art, clock_area);
+
+    let meta_line = Paragraph::new(Line::from(Span::styled(
+        meta,
+        Style::default().fg(tc.muted),
+    )))
+    .alignment(Alignment::Center)
+    .style(Style::default().bg(tc.bg));
+    frame.render_widget(meta_line, chunks[3]);
 }
 
-fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
-    let border_color = match app.input_mode {
-        InputMode::Search => tc.accent,
-        InputMode::Normal => tc.border,
-    };
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(border_color))
-        .title(" Search ")
-        .title_style(Style::default().fg(tc.title));
+const PANEL_MIN_WIDTH: u16 = 26;
+const PANEL_MIN_HEIGHT: u16 = 4;
+const PANEL_MAX_HEIGHT: u16 = 6;
 
-    // Inner width is `area.width - 2` (one column for each border).
-    let inner_width = area.width.saturating_sub(2);
-
-    // Compute horizontal scroll so the cursor stays visible. The
-    // cursor column is the display width of the query slice up to
-    // `cursor_position`. If it exceeds inner_width, we scroll right
-    // by `cursor_col - inner_width + 1` so the cursor sits one column
-    // inside the right border.
-    let cursor_col = app.search_query[..app.cursor_position].width() as u16;
-    let scroll_x = cursor_col.saturating_sub(inner_width.saturating_sub(1));
-
-    // Three states drive the input contents:
-    //  * Normal mode + empty query   → muted "type / to search..." prompt.
-    //  * Search mode + empty query   → muted syntax hint sitting AFTER the
-    //                                  cursor (which still anchors at col 0).
-    //                                  Hint disappears the moment a character
-    //                                  is typed because we take the
-    //                                  non-empty-query branch below.
-    //  * any query                   → render the query in `fg` colour.
-    let line: Line = if app.search_query.is_empty() {
-        if app.input_mode == InputMode::Search {
-            Line::from(Span::styled(
-                "city, country, +5:30",
-                Style::default().fg(tc.muted),
-            ))
-        } else {
-            Line::from(Span::styled(
-                "type / to search...",
-                Style::default().fg(tc.muted),
-            ))
-        }
-    } else {
-        Line::from(Span::styled(&app.search_query, Style::default().fg(tc.fg)))
-    };
-
-    let p = Paragraph::new(line)
-        .block(block)
-        .style(Style::default().bg(tc.bg))
-        .scroll((0, scroll_x));
-    frame.render_widget(p, area);
-
-    if app.input_mode == InputMode::Search {
-        let visible_col = cursor_col.saturating_sub(scroll_x);
-        // Clamp to inside the right border so we never render past it.
-        let max_x = area.x + area.width.saturating_sub(1);
-        let x = (area.x + 1 + visible_col).min(max_x);
-        let y = area.y + 1;
-        frame.set_cursor_position((x, y));
-    }
-}
-
-/// Renders the scrollable timezone table with manual viewport
-/// management.
+/// Renders the favorite wall: one framed panel per favorite, in the
+/// user's order, wrapped into as many columns as the width allows.
+/// The grid geometry is reported back to the app so `j`/`k` know how
+/// far one vertical step moves.
 ///
-/// ## Why manual viewport instead of ratatui's built-in scroll?
-///
-/// We only build `Row` widgets for the visible slice of
-/// `filtered_view`, keeping render cost O(visible) rather than
-/// O(total). The `TableState` selection index is then offset by
-/// the viewport start so the highlight tracks correctly.
-fn draw_table(frame: &mut Frame, app: &mut App, now: &DateTime<Utc>, area: Rect, tc: &ThemeColors) {
-    // An empty body with no explanation reads as a broken app rather
-    // than an active filter.
-    // Title still reads "0/N timezones" so the count is unambiguous.
-    if app.filtered_view.is_empty() {
-        let count_text = table_title(app);
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(tc.border))
-            .title(count_text)
-            .title_style(Style::default().fg(tc.fg));
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
+/// Columns share the width remainder so the grid reaches the right
+/// edge, panels grow toward [`PANEL_MAX_HEIGHT`] when the rows fit,
+/// and a grid that fits entirely centers itself vertically.
+fn draw_wall(
+    frame: &mut Frame,
+    app: &mut App,
+    utc_now: &DateTime<Utc>,
+    area: Rect,
+    tc: &ThemeColors,
+) {
+    // One cell of left margin lines the wall up with the hero text,
+    // and each grid cell keeps one gutter column so panel frames do
+    // not weld into a single rule.
+    let available = area.width.saturating_sub(1);
+    let columns = (available / PANEL_MIN_WIDTH).max(1) as usize;
+    app.set_wall_columns(columns);
 
-        // Vertically centre the hint inside the table body.
-        let pad_top = inner.height.saturating_sub(1) / 2;
+    let count = app.favorites.len();
+    if count == 0 {
         let hint_area = Rect {
-            x: inner.x,
-            y: inner.y + pad_top,
-            width: inner.width,
-            height: 1.min(inner.height),
+            y: area.y + area.height / 2,
+            height: 1.min(area.height),
+            ..area
         };
-        let msg = empty_table_hint(&app.search_query, app.show_favorites_only);
-        let p = Paragraph::new(Line::from(Span::styled(msg, Style::default().fg(tc.muted))))
-            .alignment(ratatui::layout::Alignment::Center)
-            .style(Style::default().bg(tc.bg));
-        frame.render_widget(p, hint_area);
+        let hint = Paragraph::new(Span::styled(
+            "press / to add a city",
+            Style::default().fg(tc.muted),
+        ))
+        .alignment(Alignment::Center)
+        .style(Style::default().bg(tc.bg));
+        frame.render_widget(hint, hint_area);
         return;
     }
 
-    let selected_offset_secs = now
+    let grid_rows = count.div_ceil(columns);
+    let panel_height = (area.height / grid_rows as u16).clamp(PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT);
+    let visible_rows = (area.height / panel_height).max(1) as usize;
+    let top_pad = if grid_rows <= visible_rows {
+        (area.height - grid_rows as u16 * panel_height) / 2
+    } else {
+        0
+    };
+
+    let base_width = available / columns as u16;
+    let wide_columns = (available % columns as u16) as usize;
+
+    let selected_grid_row = app.selected_panel / columns;
+    // Scroll only far enough to reveal the selection.
+    let top_row = selected_grid_row.saturating_sub(visible_rows.saturating_sub(1));
+
+    let first = top_row * columns;
+    for (slot, panel_pos) in (first..count).take(visible_rows * columns).enumerate() {
+        let grid_row = (slot / columns) as u16;
+        let grid_col = slot % columns;
+        let x_offset: u16 = (0..grid_col)
+            .map(|c| base_width + u16::from(c < wide_columns))
+            .sum();
+        let cell_width = base_width + u16::from(grid_col < wide_columns);
+        let rect = Rect {
+            x: area.x + 1 + x_offset,
+            y: area.y + top_pad + grid_row * panel_height,
+            width: cell_width.saturating_sub(1),
+            height: panel_height,
+        };
+        if rect.bottom() > area.bottom() || rect.right() > area.right() {
+            continue;
+        }
+        draw_favorite_panel(frame, app, utc_now, panel_pos, rect, tc);
+    }
+}
+
+fn draw_favorite_panel(
+    frame: &mut Frame,
+    app: &App,
+    utc_now: &DateTime<Utc>,
+    panel_pos: usize,
+    rect: Rect,
+    tc: &ThemeColors,
+) {
+    let Some(idx) = app.favorites.at(panel_pos) else {
+        return;
+    };
+    let Some(entry) = app.catalogue.get(idx) else {
+        return;
+    };
+    let selected = panel_pos == app.selected_panel;
+    let local = utc_now.with_timezone(&entry.tz);
+    let is_day = is_daytime_at_latitude(entry.latitude, &local);
+
+    let border_color = if selected { tc.accent } else { tc.border };
+    let title_style = if selected {
+        Style::default().fg(tc.accent).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(tc.fg)
+    };
+    let title = format!(
+        " {} ",
+        truncate_display(entry.city, rect.width.saturating_sub(4) as usize)
+    );
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(border_color))
+        .title(title)
+        .title_style(title_style)
+        .style(Style::default().bg(tc.bg));
+    let inner = block.inner(rect);
+    frame.render_widget(block, rect);
+
+    let time_style = if is_day {
+        Style::default().fg(tc.good).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(tc.muted).add_modifier(Modifier::BOLD)
+    };
+    let hero_offset = utc_now
         .with_timezone(&app.selection.tz)
         .offset()
         .fix()
         .local_minus_utc();
+    let offset_secs = local.offset().fix().local_minus_utc();
+    let diff: Cow<'static, str> = if entry.tz == app.selection.tz {
+        Cow::Borrowed("---")
+    } else {
+        format_diff(offset_secs, hero_offset)
+    };
+    let mut body = vec![
+        Line::from(Span::styled(
+            local.format("%H:%M:%S").to_string(),
+            time_style,
+        )),
+        Line::from(vec![
+            Span::styled(diff, Style::default().fg(tc.info)),
+            Span::styled(
+                local.format(" \u{00b7} %a %d %b").to_string(),
+                Style::default().fg(tc.muted),
+            ),
+        ]),
+    ];
+    if inner.height >= 3 {
+        body.push(Line::from(vec![
+            Span::styled(format_utc_offset(offset_secs), Style::default().fg(tc.info)),
+            Span::styled(
+                format!(" \u{00b7} {}", entry.tz.name()),
+                Style::default().fg(tc.muted),
+            ),
+        ]));
+    }
+    if inner.height >= 4 {
+        body.push(sun_line(entry.latitude, &local, tc));
+    }
+    frame.render_widget(
+        Paragraph::new(body).style(Style::default().bg(tc.bg)),
+        inner,
+    );
 
-    let header_cells = [
-        "City",
-        "Country",
-        "Region",
-        "Local Time",
-        "UTC Offset",
-        "Diff",
-    ]
-    .iter()
-    .map(|h| Cell::from(*h).style(Style::default().fg(tc.accent).add_modifier(Modifier::BOLD)));
-    let header = Row::new(header_cells).height(1);
+    // Corner marks are the region-scale form of the [ ] marker: the
+    // selected panel lights its top-left and bottom-right corners.
+    if selected {
+        let mark = Style::default().fg(tc.star);
+        if let Some(cell) = frame.buffer_mut().cell_mut((rect.x, rect.y)) {
+            cell.set_style(mark);
+        }
+        let (bx, by) = (
+            rect.right().saturating_sub(1),
+            rect.bottom().saturating_sub(1),
+        );
+        if let Some(cell) = frame.buffer_mut().cell_mut((bx, by)) {
+            cell.set_style(mark);
+        }
+    }
+}
 
-    let total_rows = app.filtered_view.len();
-    let viewport = TableViewport::new(area.height, total_rows, app.selected_row);
-    app.set_page_rows(viewport.capacity);
+const PICKER_WIDTH: u16 = 56;
+const PICKER_HEIGHT: u16 = 16;
 
-    // Loop-invariant styles — `Style` is `Copy`, so hoisting avoids
-    // rebuilding identical structs once per visible row per frame.
-    let muted_style = Style::default().fg(tc.muted);
-    let info_style = Style::default().fg(tc.info);
-    let fg_style = Style::default().fg(tc.fg);
-    let star_style = Style::default().fg(tc.star);
-    // Day/night time colours: both branches of the per-row ternary
-    // collapse to one of these two styles, so build them once outside
-    // the loop instead of materialising a fresh `Style` per row.
-    let day_time_style = Style::default().fg(tc.good);
-    let night_time_style = Style::default().fg(tc.muted);
+/// The add-city modal: query line on top, ranked matches below, the
+/// match count cut into the bottom rule. `Enter` adds the marked row
+/// to the wall.
+fn draw_picker(
+    frame: &mut Frame,
+    app: &mut App,
+    utc_now: &DateTime<Utc>,
+    area: Rect,
+    tc: &ThemeColors,
+) {
+    let width = PICKER_WIDTH.min(area.width.saturating_sub(2)).max(20);
+    let height = PICKER_HEIGHT.min(area.height.saturating_sub(2)).max(5);
+    let popup = centered_rect(width, height, area);
+    frame.render_widget(Clear, popup);
 
-    // The search query is invariant across every visible row, so
-    // lowercase it once per frame instead of inside `city_name_spans`
-    // for every row. Empty result means "no highlight" downstream.
-    let needle_lc = app.search_query.trim().to_lowercase();
-    let needle_lc: &str = needle_lc.as_str();
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(tc.accent))
+        .title(" add city ")
+        .title_style(Style::default().fg(tc.title))
+        .title_bottom(
+            Line::from(Span::styled(
+                format!(" {} matches ", app.filtered_view.len()),
+                Style::default().fg(tc.muted),
+            ))
+            .right_aligned(),
+        )
+        .style(Style::default().bg(tc.bg));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    if inner.height == 0 {
+        return;
+    }
 
-    let rows: Vec<Row> = app.filtered_view.rows()[viewport.start..viewport.end]
+    // Query line, with the same horizontal scroll rule the old search
+    // bar used: the cursor stays one column inside the right edge.
+    let input_width = inner.width.saturating_sub(2);
+    let cursor_col = app.search_query[..app.cursor_position].width() as u16;
+    let scroll_x = cursor_col.saturating_sub(input_width.saturating_sub(1));
+    let query_line: Line = if app.search_query.is_empty() {
+        Line::from(vec![
+            Span::styled("> ", Style::default().fg(tc.accent)),
+            Span::styled(
+                "city \u{00b7} state \u{00b7} +5:30",
+                Style::default().fg(tc.muted),
+            ),
+        ])
+    } else {
+        Line::from(vec![
+            Span::styled("> ", Style::default().fg(tc.accent)),
+            Span::styled(&app.search_query, Style::default().fg(tc.fg)),
+        ])
+    };
+    let input_area = Rect { height: 1, ..inner };
+    frame.render_widget(Paragraph::new(query_line).scroll((0, scroll_x)), input_area);
+    let visible_col = cursor_col.saturating_sub(scroll_x);
+    let max_x = inner.x + inner.width.saturating_sub(1);
+    frame.set_cursor_position(((inner.x + 2 + visible_col).min(max_x), inner.y));
+
+    let list_area = Rect {
+        y: inner.y + 1,
+        height: inner.height.saturating_sub(1),
+        ..inner
+    };
+    if app.filtered_view.is_empty() {
+        let hint = if app.search_query.is_empty() {
+            "no cities"
+        } else {
+            "no matches \u{00b7} try: city \u{00b7} +5:30 \u{00b7} asia"
+        };
+        frame.render_widget(
+            Paragraph::new(Span::styled(hint, Style::default().fg(tc.muted))),
+            list_area,
+        );
+        return;
+    }
+
+    let capacity = list_area.height as usize;
+    let start = if app.selected_row < capacity {
+        0
+    } else {
+        app.selected_row + 1 - capacity
+    };
+    let rows = app.filtered_view.rows();
+    let lines: Vec<Line> = rows
         .iter()
-        .map(|row| {
-            let idx = row.catalogue_idx;
-            let display_name = row.display_name;
-            // `filtered_view` is constructed exclusively from
-            // `0..catalogue.len()` indices in `App::set_sorted_results`
-            // and is invalidated on every catalogue change, so this
-            // lookup cannot return `None` in well-formed states. The
-            // `expect` documents the invariant rather than papering
-            // over a fallible call.
-            #[allow(
-                clippy::expect_used,
-                reason = "filtered_view indices are derived from the catalogue itself; see set_sorted_results"
-            )]
-            let entry = app
-                .catalogue
-                .get(idx)
-                .expect("filtered_view row references a valid catalogue index");
-            let local = now.with_timezone(&entry.tz);
-            let offset_secs = local.offset().fix().local_minus_utc();
-            let is_day = is_daytime_at_latitude(entry.latitude, &local);
-
-            let time_str = local.format("%H:%M:%S").to_string();
-            let time_style = if is_day {
-                day_time_style
-            } else {
-                night_time_style
-            };
-
-            let utc_offset = format_utc_offset(offset_secs);
-            let diff: Cow<'static, str> = if entry.tz == app.selection.tz {
-                Cow::Borrowed("---")
-            } else {
-                format_diff(offset_secs, selected_offset_secs)
-            };
-
-            let is_fav = app.is_favorite(idx);
-            // Only the first occurrence of the whole query string is
-            // highlighted. Per-term highlighting for a multi-term AND
-            // query is deliberately not attempted.
-            let name_spans = city_name_spans(display_name, needle_lc, tc, fg_style);
-            let city_cell = if is_fav {
-                let mut spans = Vec::with_capacity(name_spans.len() + 1);
-                spans.push(Span::styled("\u{2605} ", star_style));
-                spans.extend(name_spans);
-                Cell::from(Line::from(spans))
-            } else {
-                Cell::from(Line::from(name_spans))
-            };
-
-            Row::new(vec![
-                city_cell,
-                Cell::from(entry.country).style(muted_style),
-                Cell::from(entry.region).style(muted_style),
-                Cell::from(time_str).style(time_style),
-                Cell::from(utc_offset).style(muted_style),
-                Cell::from(diff).style(info_style),
-            ])
+        .enumerate()
+        .skip(start)
+        .take(capacity)
+        .map(|(n, row)| {
+            picker_row(
+                app,
+                utc_now,
+                n,
+                row.catalogue_idx,
+                row.display_name,
+                list_area.width,
+                tc,
+            )
         })
         .collect();
+    frame.render_widget(Paragraph::new(lines), list_area);
+}
 
-    let count_text = table_title(app);
+/// One picker row: `[label]` in the marker pair when it is the one
+/// the Enter key would take, a plain padded label otherwise, and the
+/// city's current time against the right edge.
+fn picker_row<'a>(
+    app: &App,
+    utc_now: &DateTime<Utc>,
+    n: usize,
+    idx: usize,
+    display_name: &'static str,
+    width: u16,
+    tc: &ThemeColors,
+) -> Line<'a> {
+    let Some(entry) = app.catalogue.get(idx) else {
+        return Line::from("");
+    };
+    let selected = n == app.selected_row;
+    let local = utc_now.with_timezone(&entry.tz);
+    let time = local.format("%H:%M").to_string();
 
-    let widths = [
-        Constraint::Percentage(30), // city
-        Constraint::Ratio(1, 7),    // country
-        Constraint::Ratio(1, 7),    // region
-        Constraint::Ratio(1, 7),    // local time
-        Constraint::Ratio(1, 7),    // utc offset
-        Constraint::Ratio(1, 7),    // diff
-    ];
-
-    let table = Table::new(rows, widths)
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(tc.border))
-                .title(count_text)
-                .title_style(Style::default().fg(tc.fg)),
-        )
-        .row_highlight_style(
-            Style::default()
-                .fg(tc.highlight_fg)
-                .bg(tc.highlight_bg)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("\u{25b6} ");
-
-    let mut state = TableState::default();
-    if !app.filtered_view.is_empty() {
-        state.select(Some(app.selected_row.saturating_sub(viewport.start)));
+    let mut label = display_name.to_string();
+    if !entry.admin1.is_empty() {
+        label.push_str(", ");
+        label.push_str(entry.admin1);
     }
+    label.push_str(" \u{00b7} ");
+    label.push_str(entry.cc);
 
-    frame.render_stateful_widget(table, area, &mut state);
+    let star = if app.is_favorite(idx) {
+        "\u{2605} "
+    } else {
+        ""
+    };
+    // Brackets replace padding: every row reserves the two marker
+    // cells, so labels do not shift as the mark moves.
+    let budget = width.saturating_sub(2 + time.len() as u16 + 1 + star.width() as u16) as usize;
+    let label = truncate_display(&label, budget).into_owned();
+    let pad = budget.saturating_sub(label.width());
 
-    if total_rows > viewport.capacity {
-        let mut scrollbar_state =
-            ScrollbarState::new(app.filtered_view.len()).position(app.selected_row);
-        frame.render_stateful_widget(
-            Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                .begin_symbol(Some("\u{2191}"))
-                .end_symbol(Some("\u{2193}")),
-            area,
-            &mut scrollbar_state,
-        );
-    }
+    let (open, close, label_style) = if selected {
+        (
+            "[",
+            "]",
+            Style::default().fg(tc.accent).add_modifier(Modifier::BOLD),
+        )
+    } else {
+        (" ", " ", Style::default().fg(tc.fg))
+    };
+    Line::from(vec![
+        Span::styled(open, Style::default().fg(tc.star)),
+        Span::styled(star, Style::default().fg(tc.star)),
+        Span::styled(label, label_style),
+        Span::styled(close, Style::default().fg(tc.star)),
+        Span::raw(" ".repeat(pad)),
+        Span::styled(format!(" {time}"), Style::default().fg(tc.muted)),
+    ])
 }
 
 fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
@@ -716,9 +797,9 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
     //     narrow screens — the bindings stay visible when space is tight.
     //   * Stays under ~100 chars so it survives terminal widths down to ~80.
     let hints = match app.input_mode {
-        InputMode::Normal => " q:quit  /:search  f:fav  t:theme  c:copy  ?:help",
+        InputMode::Normal => " q:quit  /:add  f:remove  J/K:reorder  t:theme  ?:help",
         InputMode::Search => {
-            " Esc/Enter:close  Ctrl-u:clear  hint: city \u{00b7} +5:30 \u{00b7} asia"
+            " Enter:add  Esc:close  Ctrl-u:clear  hint: city \u{00b7} +5:30 \u{00b7} asia"
         }
     };
     let hint_span = Span::styled(hints, Style::default().fg(tc.muted));
@@ -776,66 +857,6 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
 // Formatting helpers
 // ============================================================================
 
-/// The rows the table can show, and which slice of the list it shows.
-///
-/// One derivation feeds the row slice, the highlight offset and the
-/// scrollbar. Recomputing the capacity separately let the scrollbar
-/// disagree with the body about how many rows fit.
-#[derive(Debug, PartialEq, Eq)]
-struct TableViewport {
-    start: usize,
-    end: usize,
-    capacity: usize,
-}
-
-impl TableViewport {
-    fn new(area_height: u16, total_rows: usize, selected: usize) -> Self {
-        let capacity = (area_height as usize)
-            .saturating_sub(TABLE_CHROME_ROWS)
-            .max(1);
-        let start = if total_rows <= capacity || selected < capacity {
-            0
-        } else {
-            selected + 1 - capacity
-        };
-        Self {
-            start,
-            end: (start + capacity).min(total_rows),
-            capacity,
-        }
-    }
-}
-
-fn table_title(app: &App) -> String {
-    let star = if app.show_favorites_only {
-        "\u{2605} "
-    } else {
-        ""
-    };
-    format!(
-        " {}/{} timezones {star}",
-        app.filtered_view.len(),
-        app.catalogue.len()
-    )
-}
-
-/// The query is truncated to ~24 display columns so a long paste cannot
-/// push the advice off the end of the line.
-fn empty_table_hint(query: &str, favorites_only: bool) -> String {
-    match (query.is_empty(), favorites_only) {
-        (true, true) => "No favourites yet. Press F to show everything, f to add one.".to_string(),
-        (false, true) => format!(
-            "No favourite matches \"{}\". Press F to search everything.",
-            truncate_display(query, 24)
-        ),
-        (false, false) => format!(
-            "No matches for \"{}\". Try a city, country, or +5:30.",
-            truncate_display(query, 24)
-        ),
-        (true, false) => "No timezones to show.".to_string(),
-    }
-}
-
 /// Formats the hour difference between two UTC offsets.
 ///
 /// Returns `"0h"` when offsets are identical but timezones differ
@@ -858,54 +879,28 @@ fn format_diff(offset_secs: i32, selected_offset_secs: i32) -> Cow<'static, str>
     }
 }
 
-/// Splits a city display name into `Span`s so the first case-insensitive
-/// occurrence of `needle_lc` renders in `fg_style` while the surrounding
-/// text dims to `muted`. Pure visual affordance — when the needle is
-/// empty, or not found, returns a single `fg_style` span (the prior
-/// behaviour).
-///
-/// `needle_lc` is the **already-trimmed, already-lowercased** search
-/// query — the caller hoists the `trim().to_lowercase()` out of the
-/// per-row hot loop because the query is invariant across rows in a
-/// single frame.
-///
-/// The search engine matches more broadly than substring (aliases,
-/// offsets, regions), so a substring miss is expected — the row still
-/// shows up, just without highlight. That's fine: this is cosmetic only.
-fn city_name_spans<'a>(
-    display_name: &'a str,
-    needle_lc: &str,
-    tc: &ThemeColors,
-    fg_style: Style,
-) -> Vec<Span<'a>> {
-    if needle_lc.is_empty() {
-        return vec![Span::styled(display_name, fg_style)];
-    }
-    let haystack_lc = display_name.to_lowercase();
-    let Some(start) = haystack_lc.find(needle_lc) else {
-        return vec![Span::styled(display_name, fg_style)];
+/// One muted line naming the panel's sun window, with the polar cases
+/// spelled out instead of the degenerate clock times they produce.
+fn sun_line(latitude: f64, local: &DateTime<Tz>, tc: &ThemeColors) -> Line<'static> {
+    let (sunrise, sunset) = sun_window(latitude, local.ordinal());
+    let text: Cow<'static, str> = if sunset - sunrise >= 24.0 {
+        Cow::Borrowed("sun up all day")
+    } else if sunset <= sunrise {
+        Cow::Borrowed("sun down all day")
+    } else {
+        Cow::Owned(format!(
+            "rise {} \u{00b7} set {}",
+            format_sun_time(sunrise),
+            format_sun_time(sunset)
+        ))
     };
-    // `to_lowercase` can change byte length (e.g. ß → ss), making indices
-    // from the lowercased string unsafe against the original. Fall back to
-    // the un-highlighted span when the haystack changed length under
-    // case-folding so we never split mid-UTF-8.
-    if haystack_lc.len() != display_name.len() {
-        return vec![Span::styled(display_name, fg_style)];
-    }
-    let end = start + needle_lc.len();
-    if !display_name.is_char_boundary(start) || !display_name.is_char_boundary(end) {
-        return vec![Span::styled(display_name, fg_style)];
-    }
-    let muted = Style::default().fg(tc.muted);
-    let mut spans = Vec::with_capacity(3);
-    if start > 0 {
-        spans.push(Span::styled(&display_name[..start], muted));
-    }
-    spans.push(Span::styled(&display_name[start..end], fg_style));
-    if end < display_name.len() {
-        spans.push(Span::styled(&display_name[end..], muted));
-    }
-    spans
+    Line::from(Span::styled(text, Style::default().fg(tc.muted)))
+}
+
+/// Formats fractional hours of local clock time as `HH:MM`.
+fn format_sun_time(hours: f64) -> String {
+    let total_minutes = (hours * 60.0).round() as u32;
+    format!("{:02}:{:02}", (total_minutes / 60) % 24, total_minutes % 60)
 }
 
 /// Truncates `s` to at most `max_cols` display columns (unicode-width
@@ -943,19 +938,15 @@ mod tests {
     use super::*;
     use crate::config;
 
-    /// Renders the table alone, not the surrounding frame, as one
-    /// string per buffer row.
-    fn render_table(app: &mut App, width: u16, height: u16) -> Vec<String> {
+    fn render_buffer(app: &mut App, width: u16, height: u16) -> ratatui::buffer::Buffer {
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
-        let now = Utc::now();
-        let tc = app.theme.colors();
-        terminal
-            .draw(|frame| {
-                let area = frame.area();
-                draw_table(frame, app, &now, area, &tc);
-            })
-            .unwrap();
-        let buffer = terminal.backend().buffer().clone();
+        terminal.draw(|frame| draw(frame, app)).unwrap();
+        terminal.backend().buffer().clone()
+    }
+
+    /// Renders the whole frame as one string per buffer row.
+    fn render_app(app: &mut App, width: u16, height: u16) -> Vec<String> {
+        let buffer = render_buffer(app, width, height);
         (0..buffer.area.height)
             .map(|y| {
                 (0..buffer.area.width)
@@ -965,127 +956,167 @@ mod tests {
             .collect()
     }
 
+    /// Measures the hero art as (rows with block glyphs, widest ink
+    /// span in cells), so a test can tell one art scale from another.
+    fn hero_ink(rows: &[String]) -> (usize, usize) {
+        let is_block = |c: char| matches!(c, '\u{2588}' | '\u{2580}' | '\u{2584}');
+        let mut ink_rows = 0;
+        let mut min_col = usize::MAX;
+        let mut max_col = 0;
+        for row in rows {
+            let mut inked = false;
+            for (col, c) in row.chars().enumerate() {
+                if is_block(c) {
+                    inked = true;
+                    min_col = min_col.min(col);
+                    max_col = max_col.max(col);
+                }
+            }
+            ink_rows += usize::from(inked);
+        }
+        let span = if ink_rows == 0 {
+            0
+        } else {
+            max_col - min_col + 1
+        };
+        (ink_rows, span)
+    }
+
+    /// A wall app with one favorite per query, added through the
+    /// picker flow the user would take.
+    fn wall_app(queries: &[&str]) -> App {
+        let mut app = App::with_config(config::Config::default());
+        for query in queries {
+            app.enter_search();
+            for c in query.chars() {
+                app.search_input(c);
+            }
+            app.commit_search_result_and_exit();
+        }
+        app
+    }
+
     fn test_app() -> App {
         App::with_config(config::Config::default())
+    }
+
+    #[test]
+    fn the_empty_wall_says_how_to_add_a_city() {
+        let mut app = test_app();
+
+        let rendered = render_app(&mut app, 80, 24).join("\n");
+
+        assert!(
+            rendered.contains("press / to add a city"),
+            "got:\n{rendered}"
+        );
+    }
+
+    #[test]
+    fn the_wall_shows_a_panel_per_favorite() {
+        let mut app = wall_app(&["tokyo", "london"]);
+
+        let rendered = render_app(&mut app, 80, 24).join("\n");
+
+        assert!(rendered.contains(" Tokyo "), "got:\n{rendered}");
+        assert!(rendered.contains(" London "), "got:\n{rendered}");
+        assert!(!rendered.contains("press / to add a city"));
+    }
+
+    #[test]
+    fn the_selected_panel_lights_its_corners_in_the_marker_colour() {
+        let mut app = wall_app(&["tokyo", "london"]);
+        app.panel_first();
+        let star = app.theme.colors().star;
+        let border = app.theme.colors().border;
+
+        let buffer = render_buffer(&mut app, 80, 24);
+
+        // 80x24 gives a full-art hero (11 rows under the title), one
+        // 6-row panel row centered in the 11-row wall (2 rows of pad),
+        // and a 27-cell first column (79 cells split 3 ways, 1 spare).
+        let panel_top_left = buffer[(1, 14)].clone();
+        assert_eq!(panel_top_left.symbol(), "\u{250c}");
+        assert_eq!(panel_top_left.fg, star);
+        // The unselected panel keeps the plain border.
+        let neighbour_top_left = buffer[(28, 14)].clone();
+        assert_eq!(neighbour_top_left.symbol(), "\u{250c}");
+        assert_eq!(neighbour_top_left.fg, border);
+    }
+
+    #[test]
+    fn the_picker_lists_matches_and_the_count() {
+        let mut app = test_app();
+        app.enter_search();
+        for c in "boston".chars() {
+            app.search_input(c);
+        }
+
+        let rendered = render_app(&mut app, 80, 24).join("\n");
+
+        assert!(rendered.contains(" add city "), "got:\n{rendered}");
+        assert!(
+            rendered.contains("Boston, Massachusetts"),
+            "got:\n{rendered}"
+        );
+        assert!(rendered.contains("matches"), "got:\n{rendered}");
+    }
+
+    #[test]
+    fn the_picker_marks_the_row_enter_would_take() {
+        let mut app = test_app();
+        app.enter_search();
+        for c in "boston".chars() {
+            app.search_input(c);
+        }
+        let tc = app.theme.colors();
+
+        let buffer = render_buffer(&mut app, 80, 24);
+
+        let mut found = false;
+        for y in 0..buffer.area.height {
+            for x in 0..buffer.area.width {
+                let cell = &buffer[(x, y)];
+                if cell.symbol() == "[" {
+                    assert_eq!(
+                        cell.fg, tc.star,
+                        "the marker pair renders in the marker colour"
+                    );
+                    let label = &buffer[(x + 1, y)];
+                    assert_eq!(
+                        label.fg, tc.accent,
+                        "the marked label renders in the accent"
+                    );
+                    found = true;
+                }
+            }
+        }
+        assert!(found, "no marker rendered for the selected row");
     }
 
     #[test]
     fn a_query_that_matches_nothing_suggests_the_search_syntax() {
         let mut app = test_app();
         app.enter_search();
-        for c in "zzzznotacity".chars() {
+        for c in "zzzzznotacity".chars() {
             app.search_input(c);
         }
 
-        let rendered = render_table(&mut app, 80, 12).join("\n");
+        let rendered = render_app(&mut app, 80, 24).join("\n");
 
-        assert!(rendered.contains("No matches"), "got:\n{rendered}");
+        assert!(rendered.contains("no matches"), "got:\n{rendered}");
+        assert!(rendered.contains("+5:30"), "got:\n{rendered}");
     }
 
     #[test]
-    fn an_empty_favourites_filter_says_how_to_add_one() {
-        let mut app = test_app();
-        app.toggle_favorites_filter();
-        assert!(app.filtered_view.is_empty());
+    fn the_wall_scrolls_to_keep_the_selected_panel_visible() {
+        let mut app = wall_app(&["tokyo", "london", "paris", "denver", "cairo", "sydney"]);
+        // One column and room for two panel rows force scrolling.
+        app.panel_last();
 
-        let rendered = render_table(&mut app, 80, 12).join("\n");
+        let rendered = render_app(&mut app, 30, 20).join("\n");
 
-        assert!(
-            rendered.contains('f'),
-            "an empty favourites list must not render as a blank table:\n{rendered}"
-        );
-        assert!(
-            rendered.to_lowercase().contains("favourite")
-                || rendered.to_lowercase().contains("favorite"),
-            "got:\n{rendered}"
-        );
-    }
-
-    #[test]
-    fn an_unmatched_query_inside_the_favourites_filter_names_the_way_out() {
-        let mut app = test_app();
-        app.toggle_favorites_filter();
-        app.enter_search();
-        for c in "tokyo".chars() {
-            app.search_input(c);
-        }
-
-        let rendered = render_table(&mut app, 80, 12).join("\n");
-
-        assert!(rendered.contains("Press F"), "got:\n{rendered}");
-    }
-
-    #[test]
-    fn the_viewport_scrolls_only_far_enough_to_reveal_the_selection() {
-        let at_top = TableViewport::new(12, 217, 0);
-        assert_eq!((at_top.start, at_top.end, at_top.capacity), (0, 9, 9));
-
-        let at_bottom = TableViewport::new(12, 217, 216);
-        assert_eq!((at_bottom.start, at_bottom.end), (208, 217));
-
-        let last_fully_visible = TableViewport::new(12, 217, 8);
-        assert_eq!(last_fully_visible.start, 0);
-    }
-
-    #[test]
-    fn a_viewport_shorter_than_its_chrome_still_reports_one_row() {
-        // The layout keeps the table at 6 rows or more today, so this
-        // pins the floor rather than describing a reachable state.
-        for height in 0..=TABLE_CHROME_ROWS as u16 {
-            let viewport = TableViewport::new(height, 217, 0);
-            assert_eq!(viewport.capacity, 1, "height {height}");
-            assert_eq!(viewport.end - viewport.start, 1, "height {height}");
-        }
-    }
-
-    #[test]
-    fn a_list_shorter_than_the_viewport_is_shown_whole() {
-        let viewport = TableViewport::new(20, 3, 2);
-
-        assert_eq!((viewport.start, viewport.end), (0, 3));
-    }
-
-    #[test]
-    fn an_empty_list_yields_an_empty_slice() {
-        let viewport = TableViewport::new(20, 0, 0);
-
-        assert_eq!((viewport.start, viewport.end), (0, 0));
-    }
-
-    #[test]
-    fn the_favourites_filter_marks_the_title_in_both_empty_and_full_states() {
-        let mut app = test_app();
-        assert!(!table_title(&app).contains('\u{2605}'));
-
-        app.toggle_favorites_filter();
-
-        assert!(table_title(&app).contains('\u{2605}'));
-        let rendered = render_table(&mut app, 80, 12).join("\n");
-        assert!(rendered.contains('\u{2605}'), "got:\n{rendered}");
-    }
-
-    #[test]
-    fn a_page_moves_by_the_number_of_rows_actually_on_screen() {
-        let mut app = test_app();
-        // A 12-row area leaves 9 rows for data after the chrome.
-        render_table(&mut app, 80, 12);
-
-        app.page_down();
-
-        assert_eq!(app.selected_row, 9);
-    }
-
-    #[test]
-    fn paging_back_returns_to_where_it_started() {
-        let mut app = test_app();
-        render_table(&mut app, 80, 20);
-
-        app.page_down();
-        app.page_down();
-        app.page_up();
-        app.page_up();
-
-        assert_eq!(app.selected_row, 0);
+        assert!(rendered.contains(" Sydney "), "got:\n{rendered}");
     }
 
     fn render_help(app: &mut App, width: u16, height: u16) -> Vec<String> {
@@ -1157,16 +1188,128 @@ mod tests {
     }
 
     #[test]
-    fn the_row_count_in_the_title_reflects_the_filter() {
+    fn the_picker_count_reflects_the_filter() {
         let mut app = test_app();
         app.enter_search();
         for c in "tokyo".chars() {
             app.search_input(c);
         }
 
-        let rendered = render_table(&mut app, 80, 12).join("\n");
+        let rendered = render_app(&mut app, 80, 24).join("\n");
 
-        assert!(rendered.contains("1/217"), "got:\n{rendered}");
+        let filtered = app.filtered_view.len();
+        assert!(filtered < crate::timezone::all_timezones().len());
+        assert!(
+            rendered.contains(&format!("{filtered} matches")),
+            "got:\n{rendered}"
+        );
+    }
+
+    #[test]
+    fn the_hero_clock_fills_a_tall_terminal_with_full_height_digits() {
+        let mut app = wall_app(&["tokyo"]);
+
+        let rows = render_app(&mut app, 100, 40);
+
+        let ink_rows = rows
+            .iter()
+            .take(13)
+            .filter(|row| row.contains('\u{2588}'))
+            .count();
+        assert!(
+            ink_rows >= 6,
+            "the hero art spans only {ink_rows} rows:\n{}",
+            rows.join("\n")
+        );
+    }
+
+    #[test]
+    fn the_hero_clock_drops_the_art_on_a_short_terminal() {
+        let mut app = wall_app(&["tokyo"]);
+
+        let rendered = render_app(&mut app, 80, 12).join("\n");
+
+        for glyph in ['\u{2588}', '\u{2580}', '\u{2584}'] {
+            assert!(
+                !rendered.contains(glyph),
+                "block art on a 12-row terminal:\n{rendered}"
+            );
+        }
+        assert!(rendered.contains("UTC"), "got:\n{rendered}");
+    }
+
+    #[test]
+    fn the_hero_art_only_renders_where_its_64_columns_fit() {
+        let mut app = wall_app(&["tokyo"]);
+
+        // 64 columns hold the art with no margin, which reads as
+        // clipped against the frame; the gate asks for 66.
+        let narrow = render_app(&mut app, 64, 24).join("\n");
+        assert!(!narrow.contains('\u{2588}'), "got:\n{narrow}");
+
+        let wide = render_app(&mut app, 66, 24).join("\n");
+        assert!(wide.contains('\u{2588}'), "got:\n{wide}");
+    }
+
+    #[test]
+    fn the_hero_digits_double_on_a_large_terminal() {
+        let mut app = wall_app(&["tokyo"]);
+
+        let rows = render_app(&mut app, 140, 30);
+
+        let (ink_rows, span) = hero_ink(&rows);
+        assert!(
+            ink_rows >= 12,
+            "the art spans only {ink_rows} rows:\n{}",
+            rows.join("\n")
+        );
+        assert!(
+            span >= 100,
+            "the art spans only {span} cells:\n{}",
+            rows.join("\n")
+        );
+    }
+
+    #[test]
+    fn the_hero_digits_triple_on_a_huge_terminal() {
+        let mut app = wall_app(&["tokyo"]);
+
+        let rows = render_app(&mut app, 200, 48);
+
+        let (ink_rows, span) = hero_ink(&rows);
+        assert!(
+            ink_rows >= 18,
+            "the art spans only {ink_rows} rows:\n{}",
+            rows.join("\n")
+        );
+        assert!(
+            span >= 150,
+            "the art spans only {span} cells:\n{}",
+            rows.join("\n")
+        );
+    }
+
+    #[test]
+    fn the_wall_panels_stretch_to_the_right_edge() {
+        let mut app = wall_app(&["tokyo", "london", "paris", "denver"]);
+
+        let buffer = render_buffer(&mut app, 80, 24);
+
+        // A stretched grid puts the rightmost panel border one gutter
+        // cell in from the frame edge, mirroring the left margin.
+        let found = (0..buffer.area.height).any(|y| buffer[(78, y)].symbol() == "\u{2510}");
+        assert!(found, "no panel corner lands beside the right edge");
+    }
+
+    #[test]
+    fn a_tall_panel_shows_the_zone_and_the_sun_window() {
+        let mut app = wall_app(&["tokyo"]);
+
+        let rendered = render_app(&mut app, 80, 30).join("\n");
+
+        assert!(rendered.contains("Asia/Tokyo"), "got:\n{rendered}");
+        assert!(rendered.contains("rise "), "got:\n{rendered}");
+        assert!(rendered.contains("set "), "got:\n{rendered}");
     }
 
     /// A binding can reach the overlay and never reach the README, which
