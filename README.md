@@ -15,22 +15,19 @@ A terminal world clock browser. Search by city, region, country, or UTC offset, 
 
 ## Install
 
-You must have Rust 1.85 or later, because the crate uses the 2024 edition.
+Homebrew, on macOS. Homebrew serves lazytimezone as a cask, and a cask does not install on Linux:
 
 ```sh
-cargo build --release
+brew install --cask GF6599/tap/lazytimezone
 ```
 
-To install the binary, first make the target directory, then build and copy in one step. `~/self-made-bin` must be on your `PATH`.
+With a Rust toolchain, 1.85 or later, because the crate uses the 2024 edition. The `--bin` flag matters: the crate carries a second binary that regenerates the city catalogue, and a bare install would add it too.
 
 ```sh
-mkdir -p ~/self-made-bin
-just ship
+cargo install --git https://github.com/GF6599/lazytimezone --bin lazytimezone
 ```
 
-`just ship` builds a macOS binary and a Linux binary, so it also needs
-[`cross`](https://github.com/cross-rs/cross) and `codesign`. Use
-`cargo build --release` to build for your own platform only.
+Or take a binary from the [releases page](https://github.com/GF6599/lazytimezone/releases). Archives exist for macOS and Linux, on amd64 and arm64, and `checksums.txt` covers every archive in the release.
 
 Clipboard copy calls a platform tool, which must be on `PATH`: `pbcopy` on macOS, `clip` on Windows, `wl-copy` or `xclip` on Linux. Every other feature works without one.
 
