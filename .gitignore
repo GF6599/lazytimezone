@@ -1,6 +1,7 @@
 # Build artifacts
 /target/
 /dist/
+.zig-cache/
 
 # Cargo lock (binary project - include it; remove this line if you prefer not to)
 # Cargo.lock is committed for binary projects per Cargo convention
