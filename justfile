@@ -10,6 +10,14 @@ default:
 run *args:
     cargo run -- {{ args }}
 
+# Record doc/demo.gif from demo.tape. The tape keeps its config under
+# /tmp/lazytimezone-demo-config, which a fresh recording must not inherit.
+[group('run')]
+demo:
+    rm -rf /tmp/lazytimezone-demo-config
+    cargo build --release
+    vhs demo.tape
+
 # Lint with the same denial level CI uses
 [group('dev')]
 lint:
