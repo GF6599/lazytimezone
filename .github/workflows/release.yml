@@ -18,7 +18,10 @@ jobs:
 
   release:
     needs: check
-    runs-on: ubuntu-24.04
+    # The darwin targets link CoreFoundation, which only the macOS SDK
+    # provides, so the job runs on macOS and zig cross-links the linux
+    # targets instead.
+    runs-on: macos-15
     permissions:
       contents: write
     steps:
