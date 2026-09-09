@@ -1017,6 +1017,39 @@ mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
     use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+
+    /// Keeps a test's saves away from the user's real config file.
+    struct TempConfigPath {
+        root: PathBuf,
+    }
+
+    impl TempConfigPath {
+        fn new() -> Self {
+            let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+            let root = std::env::temp_dir().join(format!(
+                "lazytimezone-app-test-{}-{}",
+                std::process::id(),
+                id
+            ));
+            fs::create_dir_all(&root).unwrap();
+            Self { root }
+        }
+
+        fn path(&self) -> PathBuf {
+            self.root.join("config.toml")
+        }
+    }
+
+    impl Drop for TempConfigPath {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
 
     fn test_app() -> App {
         App::with_config(config::Config::default())
@@ -1162,6 +1195,24 @@ mod tests {
 
         assert_eq!(app.favorites.len(), 1);
         let entry = app.catalogue.get(app.favorites.at(0).unwrap()).unwrap();
+        assert_eq!(entry.city, "Tokyo");
+    }
+
+    #[test]
+    fn a_favorite_added_in_one_session_is_on_the_wall_in_the_next_at_the_given_path() {
+        let tmp = TempConfigPath::new();
+        let mut first = App::new(Some(tmp.path()));
+        apply_query(&mut first, "tokyo");
+        first.commit_search_result_and_exit();
+        drop(first);
+
+        let second = App::new(Some(tmp.path()));
+
+        assert_eq!(second.favorites.len(), 1);
+        let entry = second
+            .catalogue
+            .get(second.favorites.at(0).unwrap())
+            .unwrap();
         assert_eq!(entry.city, "Tokyo");
     }
 
