@@ -19,6 +19,7 @@ font8x8 = "0.3"
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 unicode-width = "0.2"
+clap = { version = "4.6.6", features = ["derive"] }
 
 [profile.test]
 # The scoring loop walks 34k entries per keystroke, and the picker
