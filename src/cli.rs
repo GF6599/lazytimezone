@@ -1,3 +1,29 @@
+//! Command-line arguments, parsed before the terminal is touched so
+//! help, version and usage errors print to a normal shell.
+
+use std::path::PathBuf;
+
+use clap::Parser;
+
+use crate::config;
+
+#[derive(Debug, Parser)]
+#[command(version, about)]
+pub(crate) struct Cli {
+    /// Config file to read and write.
+    ///
+    /// Defaults to $XDG_CONFIG_HOME/lazytimezone/config.toml, or
+    /// ~/.config/lazytimezone/config.toml when that variable is unset.
+    #[arg(short, long, value_name = "PATH")]
+    config: Option<PathBuf>,
+}
+
+impl Cli {
+    pub(crate) fn config_path(&self) -> Option<PathBuf> {
+        self.config.clone().or_else(config::default_path)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]

@@ -7,6 +7,7 @@
 //! ```text
 //! main ─► run_tui() ─► loop { draw → handle_events → check quit }
 //!              │
+//!              ├── cli       Command-line arguments
 //!              ├── app       Core state: selection, search, favorites, theme
 //!              ├── events    Keyboard input → App mutations
 //!              ├── ui        App state → ratatui Frame rendering
@@ -30,8 +31,13 @@ mod theme;
 mod timezone;
 mod ui;
 
+use std::path::PathBuf;
+
+use clap::Parser;
+
 fn main() -> std::io::Result<()> {
-    run_tui()
+    let cli = cli::Cli::parse();
+    run_tui(cli.config_path())
 }
 
 /// Initialises the terminal, runs the event loop, and restores the terminal
@@ -43,7 +49,7 @@ fn main() -> std::io::Result<()> {
 /// ## Errors
 ///
 /// Propagates I/O errors from terminal setup, rendering, or event polling.
-fn run_tui() -> std::io::Result<()> {
+fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
     // ratatui::init() enables raw mode, enters the alternate screen, AND
     // installs a panic hook that calls ratatui::restore() before unwinding,
     // so a panic inside ui::draw can no longer leave the user's shell
@@ -62,7 +68,7 @@ fn run_tui() -> std::io::Result<()> {
     // `?` propagation from terminal.draw or handle_events flows through
     // `result` instead of skipping the restore() call below.
     let result = (|| -> std::io::Result<()> {
-        let mut app = app::App::new(config::default_path());
+        let mut app = app::App::new(config_path);
         let mut events = events::TerminalEvents;
 
         // Tick rate matches the clock's display granularity (1 s).

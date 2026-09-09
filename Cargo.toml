@@ -5,6 +5,7 @@ edition = "2024"
 # gen_cities exists as a second binary, so a bare cargo run needs this.
 default-run = "lazytimezone"
 license = "MIT"
+description = "A terminal world clock browser with search by city, region, or UTC offset"
 
 [[bin]]
 name = "lazytimezone"
