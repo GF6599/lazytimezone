@@ -61,7 +61,7 @@ fn run_tui() -> std::io::Result<()> {
     // `?` propagation from terminal.draw or handle_events flows through
     // `result` instead of skipping the restore() call below.
     let result = (|| -> std::io::Result<()> {
-        let mut app = app::App::new();
+        let mut app = app::App::new(config::default_path());
         let mut events = events::TerminalEvents;
 
         // Tick rate matches the clock's display granularity (1 s).
