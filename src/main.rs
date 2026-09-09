@@ -21,6 +21,7 @@
 //! search index are immutable statics.
 
 mod app;
+mod cli;
 mod clipboard;
 mod config;
 mod events;
