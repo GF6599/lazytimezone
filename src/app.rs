@@ -16,6 +16,7 @@
 //! | Feedback | `copy_flash`, `startup_messages` | No |
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::time::Instant;
 
@@ -421,15 +422,17 @@ pub struct App {
     /// overwrite the user's broken file before they can fix it. Cleared
     /// only by a successful reload (currently: process restart).
     pub(crate) config_load_failed: bool,
+    /// Where [`App::save_config`] writes. `None` disables saving.
+    config_path: Option<PathBuf>,
     /// Timestamp captured at construction time. Used by the UI to decide
     /// when to stop showing [`startup_messages`].
     pub(crate) started_at: Instant,
 }
 
 impl App {
-    pub(crate) fn new() -> Self {
-        let (cfg, startup_messages, config_load_failed) = match config::default_path() {
-            Some(path) => match config::try_load(&path) {
+    pub(crate) fn new(config_path: Option<PathBuf>) -> Self {
+        let (cfg, startup_messages, config_load_failed) = match &config_path {
+            Some(path) => match config::try_load(path) {
                 Ok((cfg, warnings)) => {
                     let messages = warnings.into_iter().map(|w| w.0).collect();
                     (cfg, messages, false)
@@ -442,18 +445,19 @@ impl App {
             },
             None => (config::Config::default(), Vec::new(), false),
         };
-        Self::with_config_state(cfg, startup_messages, config_load_failed)
+        Self::with_config_state(cfg, startup_messages, config_load_failed, config_path)
     }
 
     #[cfg(test)]
     pub(crate) fn with_config(cfg: config::Config) -> Self {
-        Self::with_config_state(cfg, Vec::new(), false)
+        Self::with_config_state(cfg, Vec::new(), false, None)
     }
 
     fn with_config_state(
         cfg: config::Config,
         startup_messages: Vec<String>,
         config_load_failed: bool,
+        config_path: Option<PathBuf>,
     ) -> Self {
         let catalogue = Catalogue::new();
         let theme = Theme::from_label(&cfg.theme);
@@ -491,6 +495,7 @@ impl App {
             help_scroll: 0,
             startup_messages,
             config_load_failed,
+            config_path,
             started_at: Instant::now(),
         }
     }
@@ -950,7 +955,7 @@ impl App {
         if self.config_load_failed {
             return;
         }
-        let Some(path) = config::default_path() else {
+        let Some(path) = &self.config_path else {
             return;
         };
         let cfg = config::Config {
@@ -963,7 +968,7 @@ impl App {
         // the message through `startup_messages` to the status bar
         // instead. Don't block subsequent saves; only the most recent
         // failure is retained.
-        if let Err(e) = config::try_save(&path, &cfg) {
+        if let Err(e) = config::try_save(path, &cfg) {
             let msg = format!("Config save failed: {e}");
             // Replace any prior save-error so the status bar shows the
             // most recent failure rather than stale text.
@@ -1017,6 +1022,38 @@ mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
     use super::*;
+    use std::fs;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+
+    /// Keeps a test's saves away from the user's real config file.
+    struct TempConfigPath {
+        root: PathBuf,
+    }
+
+    impl TempConfigPath {
+        fn new() -> Self {
+            let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+            let root = std::env::temp_dir().join(format!(
+                "lazytimezone-app-test-{}-{}",
+                std::process::id(),
+                id
+            ));
+            fs::create_dir_all(&root).unwrap();
+            Self { root }
+        }
+
+        fn path(&self) -> PathBuf {
+            self.root.join("config.toml")
+        }
+    }
+
+    impl Drop for TempConfigPath {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
 
     fn test_app() -> App {
         App::with_config(config::Config::default())
@@ -1162,6 +1199,24 @@ mod tests {
 
         assert_eq!(app.favorites.len(), 1);
         let entry = app.catalogue.get(app.favorites.at(0).unwrap()).unwrap();
+        assert_eq!(entry.city, "Tokyo");
+    }
+
+    #[test]
+    fn a_favorite_added_in_one_session_is_on_the_wall_in_the_next_at_the_given_path() {
+        let tmp = TempConfigPath::new();
+        let mut first = App::new(Some(tmp.path()));
+        apply_query(&mut first, "tokyo");
+        first.commit_search_result_and_exit();
+        drop(first);
+
+        let second = App::new(Some(tmp.path()));
+
+        assert_eq!(second.favorites.len(), 1);
+        let entry = second
+            .catalogue
+            .get(second.favorites.at(0).unwrap())
+            .unwrap();
         assert_eq!(entry.city, "Tokyo");
     }
 

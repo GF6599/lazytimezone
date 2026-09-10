@@ -37,7 +37,10 @@ Clipboard copy calls a platform tool, which must be on `PATH`: `pbcopy` on macOS
 
 ```sh
 lazytimezone
+lazytimezone --config /path/to/config.toml
 ```
+
+`--config <path>`, or `-c`, reads and writes that file instead of the default. `--help` lists every flag.
 
 Press `?` in the app for the same key list, plus the search syntax.
 
@@ -103,7 +106,7 @@ A search can match an alias city or a geographic keyword. The table then shows t
 
 Press `t` to cycle the theme. The cycle order is Default, Dracula, Solarized, Nord, Monokai, and Gruvbox.
 
-The app writes the theme and the favorites to `~/.config/lazytimezone/config.toml`. When `$XDG_CONFIG_HOME` is set, the app writes to `$XDG_CONFIG_HOME/lazytimezone/config.toml` instead.
+The app writes the theme and the favorites to `~/.config/lazytimezone/config.toml`. When `$XDG_CONFIG_HOME` is set, the app writes to `$XDG_CONFIG_HOME/lazytimezone/config.toml` instead. Pass `--config <path>` to read and write a different file, for example one file per project or a scratch file for a test run.
 
 ## Development
 
