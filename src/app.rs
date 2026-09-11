@@ -93,21 +93,27 @@ impl Default for Catalogue {
 pub(crate) struct Favorites {
     ordered: Vec<usize>,
     position: HashMap<usize, usize>,
+    /// Config entries no catalogue row matched, each with the index it
+    /// held in the saved list. Held so a save can write them back
+    /// rather than destroy them. Built in ascending index order, which
+    /// [`to_config`](Self::to_config) relies on when it splices them in.
+    unresolved: Vec<(usize, config::FavoriteEntry)>,
 }
 
 impl Favorites {
     /// Resolves the config entries against the catalogue. A `City`
     /// entry names one row, a legacy `Zone` entry resolves to the
-    /// zone's most populous city. The second return value lists the
-    /// entries that no longer match a catalogue row, so the caller
-    /// can say so instead of dropping them silently.
+    /// zone's most populous city. An entry no row matches is kept
+    /// aside for the next save and named in the second return value,
+    /// so the caller can report it.
     pub(crate) fn from_config(
         items: &[config::FavoriteEntry],
         entries: &[TimezoneEntry],
     ) -> (Self, Vec<String>) {
         let mut ordered = Vec::new();
-        let mut dropped = Vec::new();
-        for item in items {
+        let mut unresolved = Vec::new();
+        let mut unmatched = Vec::new();
+        for (position, item) in items.iter().enumerate() {
             let resolved = match item {
                 config::FavoriteEntry::City { city, admin1, cc } => entries
                     .iter()
@@ -120,19 +126,31 @@ impl Favorites {
             match resolved {
                 Some(idx) if !ordered.contains(&idx) => ordered.push(idx),
                 Some(_) => {}
-                None => dropped.push(match item {
-                    config::FavoriteEntry::City { city, .. } => city.clone(),
-                    config::FavoriteEntry::Zone(zone) => zone.clone(),
-                }),
+                None => {
+                    unresolved.push((position, item.clone()));
+                    unmatched.push(match item {
+                        config::FavoriteEntry::City { city, .. } => city.clone(),
+                        config::FavoriteEntry::Zone(zone) => zone.clone(),
+                    });
+                }
             }
         }
         let position = ordered.iter().enumerate().map(|(i, &e)| (e, i)).collect();
-        (Self { ordered, position }, dropped)
+        (
+            Self {
+                ordered,
+                position,
+                unresolved,
+            },
+            unmatched,
+        )
     }
 
-    /// Serializes back to the on-disk `City` form.
+    /// Serializes back to the on-disk `City` form, with every entry the
+    /// catalogue could not match returned to the place it came from.
     pub(crate) fn to_config(&self, entries: &[TimezoneEntry]) -> Vec<config::FavoriteEntry> {
-        self.ordered
+        let mut out: Vec<config::FavoriteEntry> = self
+            .ordered
             .iter()
             .filter_map(|&idx| entries.get(idx))
             .map(|e| config::FavoriteEntry::City {
@@ -140,7 +158,12 @@ impl Favorites {
                 admin1: e.admin1.to_string(),
                 cc: e.cc.to_string(),
             })
-            .collect()
+            .collect();
+        for (position, entry) in &self.unresolved {
+            let at = (*position).min(out.len());
+            out.insert(at, entry.clone());
+        }
+        out
     }
 
     pub(crate) fn contains(&self, idx: usize) -> bool {
@@ -461,12 +484,10 @@ impl App {
     ) -> Self {
         let catalogue = Catalogue::new();
         let theme = Theme::from_label(&cfg.theme);
-        let (favorites, dropped) = Favorites::from_config(&cfg.favorites, catalogue.entries());
+        let (favorites, unmatched) = Favorites::from_config(&cfg.favorites, catalogue.entries());
         let mut startup_messages = startup_messages;
-        for name in dropped {
-            startup_messages.push(format!(
-                "Dropped favorite {name}: not in the city catalogue"
-            ));
+        for name in unmatched {
+            startup_messages.push(format!("Favorite {name} is not in the city catalogue"));
         }
 
         let mut indices = Self::browse_indices_for(&favorites);
@@ -1200,6 +1221,40 @@ mod tests {
         assert_eq!(app.favorites.len(), 1);
         let entry = app.catalogue.get(app.favorites.at(0).unwrap()).unwrap();
         assert_eq!(entry.city, "Tokyo");
+    }
+
+    #[test]
+    fn a_favorite_the_catalogue_cannot_match_stays_in_the_config_file() {
+        let tmp = TempConfigPath::new();
+        let renamed = config::FavoriteEntry::City {
+            city: "Tokyo".to_string(),
+            admin1: "Renamed Prefecture".to_string(),
+            cc: "JP".to_string(),
+        };
+        config::try_save(
+            &tmp.path(),
+            &config::Config {
+                theme: "Default".to_string(),
+                favorites: vec![renamed.clone()],
+            },
+        )
+        .unwrap();
+
+        let mut app = App::new(Some(tmp.path()));
+        apply_query(&mut app, "london");
+        app.commit_search_result_and_exit();
+
+        assert_eq!(
+            app.favorites.len(),
+            1,
+            "an unmatched favorite has no catalogue row, so it cannot be a panel"
+        );
+        let (saved, _) = config::try_load(&tmp.path()).unwrap();
+        assert!(
+            saved.favorites.contains(&renamed),
+            "a favorite the catalogue cannot match must survive the save, got {:?}",
+            saved.favorites
+        );
     }
 
     #[test]
