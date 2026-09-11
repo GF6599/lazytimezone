@@ -1203,6 +1203,35 @@ mod tests {
     }
 
     #[test]
+    fn a_favorite_the_catalogue_cannot_match_stays_in_the_config_file() {
+        let tmp = TempConfigPath::new();
+        let renamed = config::FavoriteEntry::City {
+            city: "Tokyo".to_string(),
+            admin1: "Renamed Prefecture".to_string(),
+            cc: "JP".to_string(),
+        };
+        config::try_save(
+            &tmp.path(),
+            &config::Config {
+                theme: "Default".to_string(),
+                favorites: vec![renamed.clone()],
+            },
+        )
+        .unwrap();
+
+        let mut app = App::new(Some(tmp.path()));
+        apply_query(&mut app, "london");
+        app.commit_search_result_and_exit();
+
+        let (saved, _) = config::try_load(&tmp.path()).unwrap();
+        assert!(
+            saved.favorites.contains(&renamed),
+            "a favorite the catalogue cannot match must survive the save, got {:?}",
+            saved.favorites
+        );
+    }
+
+    #[test]
     fn a_favorite_added_in_one_session_is_on_the_wall_in_the_next_at_the_given_path() {
         let tmp = TempConfigPath::new();
         let mut first = App::new(Some(tmp.path()));
