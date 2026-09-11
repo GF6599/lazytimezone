@@ -672,4 +672,59 @@ mod tests {
             );
         }
     }
+
+    /// One zone for each way the catalogue can miss a settlement that
+    /// the main GeoNames dump leaves out: an island group, a territory
+    /// capital, and a United States sub-zone.
+    #[test]
+    fn the_catalogue_reaches_zones_the_main_dump_leaves_out() {
+        let zones = [
+            "Pacific/Chatham",
+            "Pacific/Chuuk",
+            "Pacific/Kiritimati",
+            "Pacific/Easter",
+            "America/Iqaluit",
+            "America/Indiana/Vevay",
+        ];
+
+        for zone in zones {
+            let tz: Tz = zone.parse().expect("the test names a real zone");
+            assert!(
+                all_timezones().iter().any(|e| e.tz == tz),
+                "{zone} has no catalogue row"
+            );
+        }
+    }
+
+    /// Kiritimati has no administrative seat in the GeoNames data, so
+    /// the largest settlement is the only sound choice. London Village
+    /// is a close second and would collide with `Europe/London`.
+    #[test]
+    fn a_zone_with_no_seat_takes_its_largest_settlement() {
+        let tz: Tz = "Pacific/Kiritimati".parse().expect("a real zone");
+
+        let cities: Vec<&str> = all_timezones()
+            .iter()
+            .filter(|e| e.tz == tz)
+            .map(|e| e.city)
+            .collect();
+
+        assert_eq!(cities, ["Tabwakea Village"]);
+    }
+
+    /// GeoNames puts two Auckland suburbs in `Pacific/Chatham`, and each
+    /// is far larger than the one real island settlement. A row chosen
+    /// by population alone therefore names the wrong place.
+    #[test]
+    fn the_chatham_row_is_the_island_settlement() {
+        let tz: Tz = "Pacific/Chatham".parse().expect("a real zone");
+
+        let cities: Vec<&str> = all_timezones()
+            .iter()
+            .filter(|e| e.tz == tz)
+            .map(|e| e.city)
+            .collect();
+
+        assert_eq!(cities, ["Waitangi"]);
+    }
 }
