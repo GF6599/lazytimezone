@@ -2,138 +2,150 @@
 # Regenerate with: just gen-cities
 # name	ascii	admin1	country	cc	latitude	population	tz
 Shanghai		Shanghai	China	CN	31.22	24874500	Asia/Shanghai
+Chongqing		Chongqing	China	CN	29.56	22000000	Asia/Shanghai
+Chengdu		Sichuan	China	CN	30.67	20937757	Asia/Shanghai
 Beijing		Beijing	China	CN	39.91	18960744	Asia/Shanghai
+Guangzhou		Guangdong	China	CN	23.12	18676605	Asia/Shanghai
 Shenzhen		Guangdong	China	CN	22.55	17494398	Asia/Shanghai
-Guangzhou		Guangdong	China	CN	23.12	16096724	Asia/Shanghai
 Kinshasa		Kinshasa	Democratic Republic of the Congo	CD	-4.33	16000000	Africa/Kinshasa
 Istanbul		Istanbul	Turkey	TR	41.01	15701602	Europe/Istanbul
 Lagos		Lagos	Nigeria	NG	6.45	15388000	Africa/Lagos
 Ho Chi Minh City		Ho Chi Minh City (HCMC)	Vietnam	VN	10.82	14002598	Asia/Ho_Chi_Minh
-Chengdu		Sichuan	China	CN	30.67	13568357	Asia/Shanghai
+Tianjin		Tianjin	China	CN	39.14	13866009	Asia/Shanghai
+Wuhan		Hubei	China	CN	30.58	13739000	Asia/Shanghai
 Lahore		Punjab	Pakistan	PK	31.56	13004135	Asia/Karachi
+Xi’an	Xi'an	Shaanxi	China	CN	34.26	12952907	Asia/Shanghai
 Mumbai		Maharashtra	India	IN	19.07	12691836	Asia/Kolkata
 São Paulo	Sao Paulo	São Paulo	Brazil	BR	-23.55	12400232	America/Sao_Paulo
 Mexico City		Mexico City	Mexico	MX	19.43	12294193	America/Mexico_City
+Hangzhou		Zhejiang	China	CN	30.29	11936010	Asia/Shanghai
 Karachi		Sindh	Pakistan	PK	24.86	11624219	Asia/Karachi
-Tianjin		Tianjin	China	CN	39.14	11090314	Asia/Shanghai
 Delhi		Delhi	India	IN	28.65	11034555	Asia/Kolkata
-Wuhan		Hubei	China	CN	30.58	10392693	Asia/Shanghai
 Moscow		Moscow	Russia	RU	55.75	10381222	Europe/Moscow
 Dhaka		Dhaka Division	Bangladesh	BD	23.71	10356500	Asia/Dhaka
 Seoul		Seoul	South Korea	KR	37.57	10349312	Asia/Seoul
+Harbin		Heilongjiang	China	CN	45.75	10009854	Asia/Shanghai
 Tokyo		Tokyo	Japan	JP	35.69	9733276	Asia/Tokyo
 Dongguan		Guangdong	China	CN	23.02	9644871	Asia/Shanghai
 Cairo		Cairo	Egypt	EG	30.06	9606916	Africa/Cairo
-Xi’an	Xi'an	Shaanxi	China	CN	34.26	9600000	Asia/Shanghai
+Hefei		Anhui	China	CN	31.86	9465881	Asia/Shanghai
 Johannesburg		Gauteng	South Africa	ZA	-26.20	9418183	Africa/Johannesburg
+Weifang		Shandong	China	CN	36.71	9386705	Asia/Shanghai
 Nanjing		Jiangsu	China	CN	32.06	9314685	Asia/Shanghai
-Hangzhou		Zhejiang	China	CN	30.29	9236032	Asia/Shanghai
+Shenyang		Liaoning	China	CN	41.79	9070093	Asia/Shanghai
 Foshan		Guangdong	China	CN	23.03	9042509	Asia/Shanghai
 London		England	United Kingdom	GB	51.51	8961989	Europe/London
 New York City		New York	United States	US	40.71	8804190	America/New_York
 Jakarta		Jakarta	Indonesia	ID	-6.21	8540121	Asia/Jakarta
 Bengaluru		Karnataka	India	IN	12.97	8495492	Asia/Kolkata
+Jinan		Shandong	China	CN	36.67	8352574	Asia/Shanghai
 Hanoi		Hanoi	Vietnam	VN	21.02	8053663	Asia/Bangkok
 Taipei		Taiwan	Taiwan	TW	25.05	7871900	Asia/Taipei
 Lima		Lima Province	Peru	PE	-12.04	7737002	America/Lima
 Bogotá	Bogota	Bogota D.C.	Colombia	CO	4.61	7674366	America/Bogota
-Chongqing		Chongqing	China	CN	29.56	7457599	Asia/Shanghai
+Dalian		Liaoning	China	CN	38.91	7450785	Asia/Shanghai
 Hong Kong			Hong Kong	HK	22.28	7396076	Asia/Hong_Kong
 Baghdad		Baghdad	Iraq	IQ	33.34	7216000	Asia/Baghdad
 Wuzhong		Ningxia	China	CN	37.99	7202654	Asia/Shanghai
 Qingdao		Shandong	China	CN	36.06	7172451	Asia/Shanghai
 Tehran		Tehran	Iran	IR	35.69	7153309	Asia/Tehran
-Shenyang		Liaoning	China	CN	41.79	7050000	Asia/Shanghai
+Yantai		Shandong	China	CN	37.48	7102100	Asia/Shanghai
 Hyderabad		Telangana	India	IN	17.38	6993262	Asia/Kolkata
 Rio de Janeiro		Rio de Janeiro	Brazil	BR	-22.91	6747815	America/Sao_Paulo
 Suzhou		Jiangsu	China	CN	31.30	6715559	Asia/Shanghai
 Puxi		Shanghai	China	CN	31.24	6683712	Asia/Shanghai
+Zhengzhou		Henan	China	CN	34.76	6650532	Asia/Shanghai
 Ahmedabad		Gujarat	India	IN	23.03	6357693	Asia/Kolkata
 Abidjan		Abidjan Autonomous District	Ivory Coast	CI	5.35	6321017	Africa/Abidjan
+Nanning		Guangxi	China	CN	22.82	5977185	Asia/Shanghai
+Kunming		Yunnan	China	CN	25.04	5950578	Asia/Shanghai
+Shijiazhuang		Hebei	China	CN	38.04	5758403	Asia/Shanghai
+Changchun		Jilin	China	CN	43.88	5691024	Asia/Shanghai
 Pudong		Shanghai	China	CN	31.24	5681512	Asia/Shanghai
 Sydney		New South Wales	Australia	AU	-33.87	5638830	Australia/Sydney
 Singapore			Singapore	SG	1.29	5638700	Asia/Singapore
 Melbourne		Victoria	Australia	AU	-37.81	5435590	Australia/Melbourne
 Dar es Salaam		Dar es Salaam Region	Tanzania	TZ	-6.82	5383728	Africa/Dar_es_Salaam
 Saint Petersburg		St.-Petersburg	Russia	RU	59.94	5351935	Europe/Moscow
+Taiyuan		Shanxi	China	CN	37.87	5305061	Asia/Shanghai
 Alexandria		Alexandria	Egypt	EG	31.20	5263542	Africa/Cairo
-Harbin		Heilongjiang	China	CN	45.75	5242897	Asia/Shanghai
 Bangkok		Bangkok	Thailand	TH	13.75	5104476	Asia/Bangkok
-Hefei		Anhui	China	CN	31.86	5050000	Asia/Shanghai
-Dalian		Liaoning	China	CN	38.91	4913879	Asia/Shanghai
 Kano		Kano State	Nigeria	NG	12.00	4910000	Africa/Lagos
 Santiago		Santiago Metropolitan	Chile	CL	-33.46	4837295	America/Santiago
 Cape Town		Western Cape	South Africa	ZA	-33.93	4772846	Africa/Johannesburg
 Peshawar		Khyber Pakhtunkhwa	Pakistan	PK	34.01	4758762	Asia/Karachi
-Changchun		Jilin	China	CN	43.88	4714996	Asia/Shanghai
+Zibo		Shandong	China	CN	36.79	4704138	Asia/Shanghai
 Jeddah		Mecca Region	Saudi Arabia	SA	21.49	4697000	Asia/Riyadh
 Chennai		Tamil Nadu	India	IN	13.09	4681087	Asia/Kolkata
 Kolkata		West Bengal	India	IN	22.56	4631392	Asia/Kolkata
 Xiamen		Fujian	China	CN	24.48	4617251	Asia/Shanghai
 Surat		Gujarat	India	IN	21.20	4591246	Asia/Kolkata
+Yangzhou		Jiangsu	China	CN	32.40	4559797	Asia/Shanghai
+Huai'an		Jiangsu	China	CN	33.59	4556230	Asia/Shanghai
+Guiyang		Guizhou	China	CN	26.58	4506134	Asia/Shanghai
 Yangon		Yangon	Myanmar	MM	16.81	4477638	Asia/Yangon
 Bao'an		Guangdong	China	CN	22.55	4476554	Asia/Shanghai
 Kabul		Kabul	Afghanistan	AF	34.53	4434550	Asia/Kabul
 Nairobi		Nairobi County	Kenya	KE	-1.28	4397073	Africa/Nairobi
 Wuxi		Jiangsu	China	CN	31.57	4396835	Asia/Shanghai
 Giza		Giza	Egypt	EG	30.01	4367343	Africa/Cairo
-Jinan		Shandong	China	CN	36.67	4335989	Asia/Shanghai
-Taiyuan		Shanxi	China	CN	37.87	4303673	Asia/Shanghai
-Zhengzhou		Henan	China	CN	34.76	4253913	Asia/Shanghai
+Lanzhou		Gansu	China	CN	36.06	4359446	Asia/Shanghai
 Bamako		Bamako	Mali	ML	12.61	4227569	Africa/Bamako
 Riyadh		Riyadh Region	Saudi Arabia	SA	24.69	4205961	Asia/Riyadh
+Fuzhou		Fujian	China	CN	26.06	4094491	Asia/Shanghai
+Ürümqi	UEruemqi	Xinjiang	China	CN	43.80	4054000	Asia/Urumqi
 New Taipei City		Taipei	Taiwan	TW	25.06	4004367	Asia/Taipei
 New Territories			Hong Kong	HK	22.42	3984077	Asia/Hong_Kong
-Shijiazhuang		Hebei	China	CN	38.04	3938513	Asia/Shanghai
 Chattogram		Chittagong	Bangladesh	BD	22.34	3920222	Asia/Dhaka
 Addis Ababa		Addis Ababa	Ethiopia	ET	9.02	3860000	Africa/Addis_Ababa
-Kunming		Yunnan	China	CN	25.04	3855346	Asia/Shanghai
+Zaozhuang		Shandong	China	CN	34.86	3855601	Asia/Shanghai
 Zhongshan		Guangdong	China	CN	22.52	3841873	Asia/Shanghai
-Nanning		Guangxi	China	CN	22.82	3839800	Asia/Shanghai
 Shantou		Guangdong	China	CN	23.35	3838900	Asia/Shanghai
 Los Angeles		California	United States	US	34.05	3820914	America/Los_Angeles
 Faisalabad		Punjab	Pakistan	PK	31.42	3800193	Asia/Karachi
 Dubai		Dubai	United Arab Emirates	AE	25.08	3790000	Asia/Dubai
 Yokohama		Kanagawa	Japan	JP	35.43	3777491	Asia/Tokyo
-Fuzhou		Fujian	China	CN	26.06	3740000	Asia/Shanghai
 Ningbo		Zhejiang	China	CN	29.88	3731203	Asia/Shanghai
+Nanhai		Guangdong	China	CN	23.02	3667247	Asia/Shanghai
 Casablanca		Casablanca-Settat	Morocco	MA	33.59	3665954	Africa/Casablanca
 Ibadan		Oyo State	Nigeria	NG	7.38	3649000	Africa/Lagos
 Puyang		Zhejiang	China	CN	29.46	3590000	Asia/Shanghai
 Ankara		Ankara	Turkey	TR	39.92	3517182	Europe/Istanbul
 Shiyan		Hubei	China	CN	32.65	3460000	Asia/Shanghai
+Hohhot		Inner Mongolia	China	CN	40.81	3446100	Asia/Shanghai
 Berlin		State of Berlin	Germany	DE	52.52	3426354	Europe/Berlin
 Tangshan		Hebei	China	CN	39.64	3372102	Asia/Shanghai
 Rawalpindi		Punjab	Pakistan	PK	33.60	3357612	Asia/Karachi
 Lüliang	Lueliang	Shanxi	China	CN	37.52	3346500	Asia/Shanghai
 Durban		KwaZulu-Natal	South Africa	ZA	-29.86	3338026	Africa/Johannesburg
+Anshan		Liaoning	China	CN	41.12	3325372	Asia/Shanghai
 Changzhou		Jiangsu	China	CN	31.77	3290918	Asia/Shanghai
 Busan		Busan	South Korea	KR	35.10	3285147	Asia/Seoul
 Madrid		Madrid	Spain	ES	40.42	3255944	Europe/Madrid
 Pyongyang		Pyongyang	North Korea	KP	39.03	3222000	Asia/Pyongyang
-Zibo		Shandong	China	CN	36.79	3129228	Asia/Shanghai
 Pune		Maharashtra	India	IN	18.52	3124458	Asia/Kolkata
+Datong		Shanxi	China	CN	40.09	3105591	Asia/Shanghai
 Bursa		Bursa Province	Turkey	TR	40.20	3101833	Europe/Istanbul
 Changsha		Hunan	China	CN	28.20	3093980	Asia/Shanghai
 Quezon City		National Capital Region	Philippines	PH	14.65	3084270	Asia/Manila
 Jaipur		Rajasthan	India	IN	26.92	3046163	Asia/Kolkata
-Guiyang		Guizhou	China	CN	26.58	3037159	Asia/Shanghai
-Ürümqi	UEruemqi	Xinjiang	China	CN	43.80	3029372	Asia/Urumqi
+Huainan		Anhui	China	CN	32.63	3033528	Asia/Shanghai
 Surabaya		East Java	Indonesia	ID	-7.25	3018022	Asia/Jakarta
 Incheon		Incheon	South Korea	KR	37.46	3015482	Asia/Seoul
+Haikou		Hainan	China	CN	20.03	3001600	Asia/Shanghai
 Caracas		Distrito Federal	Venezuela	VE	10.49	3000000	America/Caracas
-Lanzhou		Gansu	China	CN	36.06	3000000	Asia/Shanghai
 Kyiv		Kyiv City	Ukraine	UA	50.45	2952301	Europe/Kyiv
 İzmir	Izmir	İzmir Province	Turkey	TR	38.41	2938292	Europe/Istanbul
 Huizhou		Guangdong	China	CN	23.11	2900113	Asia/Shanghai
 Buenos Aires		Buenos Aires F.D.	Argentina	AR	-34.61	2891082	America/Argentina/Buenos_Aires
-Haikou		Hainan	China	CN	20.03	2873358	Asia/Shanghai
+Yinchuan		Ningxia	China	CN	38.47	2859074	Asia/Shanghai
 Taichung		Taiwan	Taiwan	TW	24.15	2850285	Asia/Taipei
 Kanpur		Uttar Pradesh	India	IN	26.47	2823249	Asia/Kolkata
 Toronto		Ontario	Canada	CA	43.71	2794356	America/Toronto
 Quito		Pichincha	Ecuador	EC	-0.23	2781641	America/Guayaquil
 Brisbane		Queensland	Australia	AU	-27.47	2780063	Australia/Brisbane
 Luanda		Luanda	Angola	AO	-8.84	2776168	Africa/Luanda
+Baotou		Inner Mongolia	China	CN	40.65	2761700	Asia/Shanghai
 Osaka		Osaka	Japan	JP	34.69	2753862	Asia/Tokyo
 Linyi		Shandong	China	CN	35.06	2743843	Asia/Shanghai
 Baoding		Hebei	China	CN	38.87	2739887	Asia/Shanghai
@@ -157,9 +169,9 @@ Mogadishu		Banaadir	Somalia	SO	2.04	2587183	Africa/Mogadishu
 Kumasi		Ashanti	Ghana	GH	6.69	2544530	Africa/Accra
 Bandung		West Java	Indonesia	ID	-6.92	2528163	Asia/Jakarta
 Gujranwala		Punjab	Pakistan	PK	32.16	2511118	Asia/Karachi
-Huai'an		Jiangsu	China	CN	33.59	2494013	Asia/Shanghai
 Medan		North Sumatra	Indonesia	ID	3.58	2486283	Asia/Jakarta
 Lucknow		Uttar Pradesh	India	IN	26.84	2472011	Asia/Kolkata
+Xining		Qinghai	China	CN	36.63	2467965	Asia/Shanghai
 Ouagadougou		Centre	Burkina Faso	BF	12.37	2415266	Africa/Ouagadougou
 Nagpur		Maharashtra	India	IN	21.15	2405665	Asia/Kolkata
 Fortaleza		Ceará	Brazil	BR	-3.72	2400000	America/Fortaleza
@@ -169,7 +181,6 @@ Daegu		Daegu	South Korea	KR	35.87	2365523	Asia/Seoul
 Algiers		Algiers	Algeria	DZ	36.73	2364230	Africa/Algiers
 Nanchang		Jiangxi	China	CN	28.68	2357839	Asia/Shanghai
 Baku		Baki	Azerbaijan	AZ	40.38	2351300	Asia/Baku
-Hohhot		Inner Mongolia	China	CN	40.81	2350000	Asia/Shanghai
 Nagoya		Aichi	Japan	JP	35.18	2332176	Asia/Tokyo
 Rome		Lazio	Italy	IT	41.89	2318895	Europe/Rome
 Queens		New York	United States	US	40.68	2316841	America/New_York
@@ -179,7 +190,6 @@ Shaoxing		Zhejiang	China	CN	30.00	2300000	Asia/Shanghai
 Nantong		Jiangsu	China	CN	32.03	2273326	Asia/Shanghai
 Baoshan		Shanghai	China	CN	31.41	2265900	Asia/Shanghai
 Kowloon			Hong Kong	HK	22.32	2232339	Asia/Hong_Kong
-Yantai		Shandong	China	CN	37.48	2227733	Asia/Shanghai
 Gaziantep		Gaziantep	Turkey	TR	37.06	2222415	Europe/Istanbul
 Lubumbashi		Haut-Katanga	Democratic Republic of the Congo	CD	-11.66	2221925	Africa/Lubumbashi
 Manaus		Amazonas	Brazil	BR	-3.10	2219580	America/Manaus
@@ -191,7 +201,7 @@ Lomé	Lome	Maritime	Togo	TG	6.13	2188376	Africa/Lome
 Multan		Punjab	Pakistan	PK	30.20	2169915	Asia/Karachi
 Havana		Havana	Cuba	CU	23.13	2163824	America/Havana
 Depok		West Java	Indonesia	ID	-6.40	2163635	Asia/Jakarta
-Baotou		Inner Mongolia	China	CN	40.65	2150000	Asia/Shanghai
+Ordos		Inner Mongolia	China	CN	39.61	2153638	Asia/Shanghai
 Paris		Île-de-France	France	FR	48.85	2138551	Europe/Paris
 Coimbatore		Tamil Nadu	India	IN	11.01	2136916	Asia/Kolkata
 Qingyang		Gansu	China	CN	35.71	2125400	Asia/Shanghai
@@ -202,11 +212,11 @@ Mbuji-Mayi		East Kasai	Democratic Republic of the Congo	CD	-6.14	2101332	Africa/
 Aleppo		Aleppo	Syria	SY	36.20	2098210	Asia/Damascus
 Kunshan		Jiangsu	China	CN	31.38	2092496	Asia/Shanghai
 Al Mawşil al Jadīdah	Al Mawsil al Jadidah	Nineveh	Iraq	IQ	36.33	2065597	Asia/Baghdad
-Weifang		Shandong	China	CN	36.71	2044028	Asia/Shanghai
 Zunyi		Guizhou	China	CN	27.69	2037775	Asia/Shanghai
 La Paz		La Paz Department	Bolivia	BO	-16.50	2004652	America/La_Paz
 Lianyungang		Jiangsu	China	CN	34.60	2001009	Asia/Shanghai
 Medellín	Medellin	Antioquia	Colombia	CO	6.25	1999979	America/Bogota
+Puning		Guangdong	China	CN	23.31	1998619	Asia/Shanghai
 Indore		Madhya Pradesh	India	IN	22.72	1994397	Asia/Kolkata
 Brazzaville		Brazzaville	Republic of the Congo	CG	-4.27	1982000	Africa/Brazzaville
 Tashkent		Tashkent	Uzbekistan	UZ	41.26	1978028	Asia/Tashkent
@@ -218,7 +228,6 @@ Sapporo		Hokkaido	Japan	JP	43.07	1973832	Asia/Tokyo
 Songjiang		Shanghai	China	CN	31.03	1973500	Asia/Shanghai
 Accra		Greater Accra	Ghana	GH	5.56	1963264	Africa/Accra
 Curitiba		Paraná	Brazil	BR	-25.43	1948626	America/Sao_Paulo
-Ordos		Inner Mongolia	China	CN	39.61	1940653	Asia/Shanghai
 Sanaa		Amanat Alasimah	Yemen	YE	15.35	1937451	Asia/Aden
 Conakry		Conakry	Guinea	GN	9.54	1928389	Africa/Conakry
 Tangerang		Banten	Indonesia	ID	-6.18	1927815	Asia/Jakarta
@@ -234,7 +243,6 @@ Kakamega		Kakamega County	Kenya	KE	0.28	1867579	Africa/Nairobi
 Shangqiu		Henan	China	CN	34.41	1859723	Asia/Shanghai
 Nanchong		Sichuan	China	CN	30.80	1858875	Asia/Shanghai
 Tainan		Taiwan	Taiwan	TW	22.99	1856642	Asia/Taipei
-Datong		Shanxi	China	CN	40.09	1850000	Asia/Shanghai
 Kaduna		Kaduna State	Nigeria	NG	10.53	1850000	Africa/Lagos
 Omdurman		Khartoum	Sudan	SD	15.64	1849659	Africa/Khartoum
 Davao		Davao Region	Philippines	PH	7.07	1848947	Asia/Manila
@@ -255,6 +263,7 @@ Jiangyin		Jiangsu	China	CN	31.91	1779515	Asia/Shanghai
 Fuyang		Anhui	China	CN	32.90	1768947	Asia/Shanghai
 Montréal	Montreal	Quebec	Canada	CA	45.51	1762949	America/Toronto
 Bayan Nur		Inner Mongolia	China	CN	40.74	1760000	Asia/Shanghai
+Chengtangcun		Shandong	China	CN	35.08	1756300	Asia/Shanghai
 Maracaibo		Zulia	Venezuela	VE	10.64	1752602	America/Caracas
 Chaozhou		Guangdong	China	CN	23.65	1750945	Asia/Shanghai
 Minsk		Minsk City	Belarus	BY	53.90	1742124	Europe/Minsk
@@ -274,9 +283,7 @@ Patna		Bihar	India	IN	25.59	1684297	Asia/Kolkata
 Mosul		Nineveh	Iraq	IQ	36.34	1683000	Asia/Baghdad
 Kallakurichi		Tamil Nadu	India	IN	11.73	1682687	Asia/Kolkata
 Kampala		Central Region	Uganda	UG	0.32	1680600	Africa/Kampala
-Xining		Qinghai	China	CN	36.63	1677177	Asia/Shanghai
 Changshu		Jiangsu	China	CN	31.65	1677050	Asia/Shanghai
-Huainan		Anhui	China	CN	32.63	1666826	Asia/Shanghai
 Rabat		Rabat-Salé-Kénitra	Morocco	MA	34.01	1655753	Africa/Casablanca
 Recife		Pernambuco	Brazil	BR	-8.05	1653461	America/Recife
 Phoenix		Arizona	United States	US	33.45	1650070	America/Phoenix
@@ -295,7 +302,6 @@ Manila		National Capital Region	Philippines	PH	14.60	1600000	Asia/Manila
 Wuhu		Anhui	China	CN	31.35	1598165	Asia/Shanghai
 Santiago de Querétaro	Santiago de Queretaro	Querétaro	Mexico	MX	20.59	1594212	America/Mexico_City
 Dazhou		Sichuan	China	CN	31.21	1589435	Asia/Shanghai
-Yangzhou		Jiangsu	China	CN	32.40	1584237	Asia/Shanghai
 León de los Aldama	Leon de los Aldama	Guanajuato	Mexico	MX	21.12	1579803	America/Mexico_City
 Makkah		Mecca Region	Saudi Arabia	SA	21.43	1578722	Asia/Riyadh
 Philadelphia		Pennsylvania	United States	US	39.95	1573916	America/New_York
@@ -317,6 +323,7 @@ Kawasaki		Kanagawa	Japan	JP	35.52	1538262	Asia/Tokyo
 Goiânia	Goiania	Goiás	Brazil	BR	-16.68	1536097	America/Sao_Paulo
 San Antonio		Texas	United States	US	29.42	1526656	America/Chicago
 Kobe		Hyōgo	Japan	JP	34.69	1525152	Asia/Tokyo
+Jinzhou		Liaoning	China	CN	41.11	1524362	Asia/Shanghai
 Stockholm		Stockholm	Sweden	SE	59.33	1515017	Europe/Stockholm
 Ciudad Juárez	Ciudad Juarez	Chihuahua	Mexico	MX	31.72	1512450	America/Ciudad_Juarez
 Cần Thơ	Can Tho	Can Tho City	Vietnam	VN	10.04	1507187	Asia/Ho_Chi_Minh
@@ -325,7 +332,6 @@ Khulna		Khulna Division	Bangladesh	BD	22.81	1500689	Asia/Dhaka
 Belém	Belem	Pará	Brazil	BR	-1.46	1499641	America/Belem
 Yekaterinburg		Sverdlovsk Oblast	Russia	RU	56.86	1495066	Asia/Yekaterinburg
 Porto Alegre		Rio Grande do Sul	Brazil	BR	-30.03	1488252	America/Sao_Paulo
-Yinchuan		Ningxia	China	CN	38.47	1487579	Asia/Shanghai
 Manhattan		New York	United States	US	40.78	1487536	America/New_York
 Nashik		Maharashtra	India	IN	20.00	1486053	Asia/Kolkata
 Taizhou		Zhejiang	China	CN	28.66	1485502	Asia/Shanghai
@@ -343,7 +349,6 @@ Changde		Hunan	China	CN	29.03	1457419	Asia/Shanghai
 Kuala Lumpur		Kuala Lumpur	Malaysia	MY	3.14	1453975	Asia/Kuala_Lumpur
 Kayseri		Kayseri	Turkey	TR	38.73	1452458	Europe/Istanbul
 Kaifeng		Henan	China	CN	34.80	1451741	Asia/Shanghai
-Anshan		Liaoning	China	CN	41.12	1450000	Asia/Shanghai
 Karaj		Alborz Province	Iran	IR	35.83	1448075	Asia/Tehran
 Kathmandu		Bagmati Province	Nepal	NP	27.70	1442271	Asia/Kathmandu
 Daejeon		Daejeon	South Korea	KR	36.35	1441203	Asia/Seoul
@@ -357,6 +362,7 @@ Agra		Uttar Pradesh	India	IN	27.18	1430055	Asia/Kolkata
 South Tangerang		Banten	Indonesia	ID	-6.29	1429529	Asia/Jakarta
 Tabriz		East Azerbaijan	Iran	IR	38.08	1424641	Asia/Tehran
 Kharkiv		Kharkiv	Ukraine	UA	49.98	1421125	Europe/Kyiv
+Xinyang		Henan	China	CN	32.12	1416800	Asia/Shanghai
 Jinjiang		Fujian	China	CN	24.82	1416151	Asia/Shanghai
 Faridabad		Haryana	India	IN	28.41	1414050	Asia/Kolkata
 Bozhou		Anhui	China	CN	33.88	1409436	Asia/Shanghai
@@ -373,6 +379,7 @@ Guankou		Hunan	China	CN	28.16	1380000	Asia/Shanghai
 Huế	Hue	Thừa Thiên Huế Province	Vietnam	VN	16.46	1380000	Asia/Bangkok
 Milan		Lombardy	Italy	IT	45.46	1371498	Europe/Rome
 Najafgarh		Delhi	India	IN	28.61	1365000	Asia/Kolkata
+Lianjiang		Guangdong	China	CN	21.65	1363470	Asia/Shanghai
 N'Djamena		N’Djaména	Chad	TD	12.11	1359526	Africa/Ndjamena
 Handan		Hebei	China	CN	36.61	1358318	Asia/Shanghai
 Bannu		Khyber Pakhtunkhwa	Pakistan	PK	32.99	1357890	Asia/Karachi
@@ -430,7 +437,6 @@ Shubrā al Khaymah	Shubra al Khaymah	Qalyubia	Egypt	EG	30.13	1240289	Africa/Cair
 Putuo		Shanghai	China	CN	31.25	1239100	Asia/Shanghai
 Port-au-Prince		Ouest	Haiti	HT	18.54	1234742	America/Port-au-Prince
 Suwon		Gyeonggi-do	South Korea	KR	37.29	1234582	Asia/Seoul
-Xinyang		Henan	China	CN	32.12	1230042	Asia/Shanghai
 Liaocheng		Shandong	China	CN	36.45	1229768	Asia/Shanghai
 Jinzhong		Shanxi	China	CN	37.68	1226617	Asia/Shanghai
 Callao		Callao	Peru	PE	-12.05	1226200	America/Lima
@@ -488,10 +494,12 @@ Monterrey		Nuevo León	Mexico	MX	25.68	1135512	America/Monterrey
 Kigali		Kigali	Rwanda	RW	-1.95	1132686	Africa/Kigali
 Rostov-on-Don		Rostov	Russia	RU	47.22	1130305	Europe/Moscow
 Zhuzhou		Hunan	China	CN	27.83	1129687	Asia/Shanghai
+Rui’an	Rui'an	Zhejiang	China	CN	27.78	1125000	Asia/Shanghai
 Malingao		Soccsksargen	Philippines	PH	7.16	1121974	Asia/Manila
 Touba		Diourbel Region	Senegal	SN	14.86	1120824	Africa/Dakar
 Ufa		Bashkortostan Republic	Russia	RU	54.74	1120547	Asia/Yekaterinburg
 Ranchi		Jharkhand	India	IN	23.34	1120374	Asia/Kolkata
+Zoucheng		Shandong	China	CN	35.40	1116692	Asia/Shanghai
 Shangrao		Jiangxi	China	CN	28.45	1116486	Asia/Shanghai
 Lilongwe		Central Region	Malawi	MW	-13.97	1115815	Africa/Blantyre
 Huaibei		Anhui	China	CN	33.97	1113321	Asia/Shanghai
@@ -499,6 +507,7 @@ Maiduguri		Borno State	Nigeria	NG	11.85	1110000	Africa/Lagos
 Xuhui		Shanghai	China	CN	31.20	1109800	Asia/Shanghai
 Meishan		Sichuan	China	CN	30.04	1107742	Asia/Shanghai
 Mwanza		Mwanza	Tanzania	TZ	-2.52	1104521	Africa/Dar_es_Salaam
+Wuchang		Hubei	China	CN	30.54	1102188	Asia/Shanghai
 Ulsan		Ulsan	South Korea	KR	35.54	1098421	Asia/Seoul
 Sendai		Miyagi	Japan	JP	38.27	1096704	Asia/Tokyo
 Krasnoyarsk		Krasnoyarsk Krai	Russia	RU	56.04	1090811	Asia/Krasnoyarsk
@@ -550,6 +559,7 @@ Brussels		Brussels Capital	Belgium	BE	50.85	1019022	Europe/Brussels
 Zamboanga		Zamboanga Peninsula	Philippines	PH	6.91	1018849	Asia/Manila
 Ottawa		Ontario	Canada	CA	45.41	1017449	America/Toronto
 Huzhou		Zhejiang	China	CN	30.87	1015937	Asia/Shanghai
+Xinyi		Guangdong	China	CN	22.37	1014577	Asia/Shanghai
 Volgograd		Volgograd Oblast	Russia	RU	48.71	1013533	Europe/Volgograd
 Khartoum North		Khartoum	Sudan	SD	15.65	1012211	Africa/Khartoum
 Edmonton		Alberta	Canada	CA	53.55	1010899	America/Edmonton
@@ -557,6 +567,7 @@ Odesa		Odesa	Ukraine	UA	46.49	1010537	Europe/Kyiv
 Wuwei		Gansu	China	CN	37.93	1010295	Asia/Shanghai
 Jacksonville		Florida	United States	US	30.33	1009833	America/New_York
 Fort Worth		Texas	United States	US	32.73	1008106	America/Chicago
+Yishui		Shandong	China	CN	35.78	1007100	Asia/Shanghai
 Hanzhong		Shaanxi	China	CN	33.08	1006557	Asia/Shanghai
 Hezhou		Guangxi	China	CN	24.40	1005490	Asia/Shanghai
 Pest		Budapest	Hungary	HU	47.50	1001748	Europe/Budapest
@@ -572,7 +583,6 @@ Guatemala City		Guatemala	Guatemala	GT	14.64	994938	America/Guatemala
 Meizhou		Guangdong	China	CN	24.29	992351	Asia/Shanghai
 Yueyang		Hunan	China	CN	29.37	991465	Asia/Shanghai
 Laiwu		Shandong	China	CN	36.19	989535	Asia/Shanghai
-Benxi		Liaoning	China	CN	41.29	987717	Asia/Shanghai
 Esenyurt		Istanbul	Turkey	TR	41.03	983571	Europe/Istanbul
 Perm		Perm Krai	Russia	RU	58.01	982419	Asia/Yekaterinburg
 Zaria		Kaduna State	Nigeria	NG	11.11	980000	Africa/Lagos
@@ -588,8 +598,10 @@ Salé	Sale	Rabat-Salé-Kénitra	Morocco	MA	34.05	972299	Africa/Casablanca
 Jerusalem		Jerusalem	Israel	IL	31.77	971800	Asia/Jerusalem
 Chandigarh		Chandigarh	India	IN	30.74	970602	Asia/Kolkata
 Dnipro		Dnipropetrovsk	Ukraine	UA	48.47	968502	Europe/Kyiv
+Feicheng		Shandong	China	CN	36.25	968100	Asia/Shanghai
 Cebu City		Central Visayas	Philippines	PH	10.32	965332	Asia/Manila
 Sanhe		Hebei	China	CN	39.98	965075	Asia/Shanghai
+Guli		Zhejiang	China	CN	28.88	964203	Asia/Shanghai
 Tiruppur		Tamil Nadu	India	IN	11.12	963173	Asia/Kolkata
 Guwahati		Assam	India	IN	26.18	962334	Asia/Kolkata
 Xiangtan		Hunan	China	CN	27.85	959303	Asia/Shanghai
@@ -608,11 +620,11 @@ Setagaya		Tokyo	Japan	JP	35.64	940071	Asia/Tokyo
 Kingston		Kingston	Jamaica	JM	18.00	937700	America/Jamaica
 Jing’an	Jing'an	Shanghai	China	CN	31.22	936500	Asia/Shanghai
 Baoshan		Yunnan	China	CN	25.12	935618	Asia/Shanghai
-Rui’an	Rui'an	Zhejiang	China	CN	27.78	927383	Asia/Shanghai
 Chihuahua		Chihuahua	Mexico	MX	28.64	925762	America/Chihuahua
 Nay Pyi Taw		Nay Pyi Taw	Myanmar	MM	19.75	925000	Asia/Yangon
 Eskişehir	Eskisehir	Eskişehir	Turkey	TR	39.78	921630	Europe/Istanbul
 Mysuru		Karnataka	India	IN	12.30	920550	Asia/Kolkata
+Chengde		Hebei	China	CN	40.95	920395	Asia/Shanghai
 Salem		Tamil Nadu	India	IN	11.65	917414	Asia/Kolkata
 São Luís	Sao Luis	Maranhão	Brazil	BR	-2.53	917237	America/Fortaleza
 Seongnam-si		Gyeonggi-do	South Korea	KR	37.44	914832	Asia/Seoul
@@ -625,6 +637,7 @@ Laibin		Guangxi	China	CN	23.75	910282	Asia/Shanghai
 Warri		Delta	Nigeria	NG	5.52	910000	Africa/Lagos
 Naples		Campania	Italy	IT	40.85	909048	Europe/Rome
 Xiaogan		Hubei	China	CN	30.93	908266	Asia/Shanghai
+Wuchuan		Guangdong	China	CN	21.46	907354	Asia/Shanghai
 Campo Grande		Mato Grosso do Sul	Brazil	BR	-20.44	906092	America/Campo_Grande
 Ziyang		Sichuan	China	CN	30.12	905729	Asia/Shanghai
 Bobo-Dioulasso		Hauts-Bassins	Burkina Faso	BF	11.18	904920	Africa/Ouagadougou
@@ -635,7 +648,6 @@ Donetsk		Donetsk	Ukraine	UA	48.02	901645	Europe/Kyiv
 Abū Ghurayb	Abu Ghurayb	Baghdad	Iraq	IQ	33.31	900000	Asia/Baghdad
 Bishkek		Bishkek	Kyrgyzstan	KG	42.87	900000	Asia/Bishkek
 Qom		Qom Province	Iran	IR	34.64	900000	Asia/Tehran
-Zaozhuang		Shandong	China	CN	34.86	899753	Asia/Shanghai
 Krasnodar		Krasnodar Krai	Russia	RU	45.05	899541	Europe/Moscow
 Natal		Rio Grande do Norte	Brazil	BR	-5.79	896708	America/Fortaleza
 Pingxiang		Jiangxi	China	CN	27.62	893550	Asia/Shanghai
@@ -649,18 +661,21 @@ Qiqihar		Heilongjiang	China	CN	47.34	882364	Asia/Shanghai
 Mulenvos		Luanda	Angola	AO	-8.87	882014	Africa/Luanda
 Sulaymaniyah		Sulaymaniyah	Iraq	IQ	35.56	878146	Asia/Baghdad
 Marseille		Provence-Alpes-Côte d'Azur	France	FR	43.30	877215	Europe/Paris
-Puning		Guangdong	China	CN	23.31	874954	Asia/Shanghai
 Bhiwandi		Maharashtra	India	IN	19.30	874032	Asia/Kolkata
 Soshanguve		Gauteng	South Africa	ZA	-25.47	872309	Africa/Johannesburg
+Laiyang		Shandong	China	CN	36.98	872000	Asia/Shanghai
+Daye		Hubei	China	CN	30.08	871214	Asia/Shanghai
 Teresina		Piauí	Brazil	BR	-5.09	871126	America/Fortaleza
 Ankang		Shaanxi	China	CN	32.68	870126	Asia/Shanghai
 Jalandhar		Punjab	India	IN	31.33	868929	Asia/Kolkata
 Rotterdam		South Holland	The Netherlands	NL	51.92	868135	Europe/Amsterdam
 Langfang		Hebei	China	CN	39.52	868066	Asia/Shanghai
+Lhasa		Tibet	China	CN	29.65	867900	Asia/Shanghai
 Duque de Caxias		Rio de Janeiro	Brazil	BR	-22.79	866347	America/Sao_Paulo
 Viana		Luanda	Angola	AO	-8.91	865863	Africa/Luanda
 Jiaozuo		Henan	China	CN	35.24	865413	Asia/Shanghai
 Samarinda		East Kalimantan	Indonesia	ID	-0.49	865306	Asia/Makassar
+Benxi		Liaoning	China	CN	41.29	865215	Asia/Shanghai
 Rohini		Delhi	India	IN	28.74	860000	Asia/Kolkata
 Wanxian		Chongqing	China	CN	30.82	859662	Asia/Shanghai
 Guang’an	Guang'an	Sichuan	China	CN	30.47	858159	Asia/Shanghai
@@ -685,6 +700,7 @@ Ahvaz		Khuzestan	Iran	IR	31.32	841145	Asia/Tehran
 Vientiane		Vientiane Prefecture	Laos	LA	17.97	840940	Asia/Vientiane
 São Bernardo do Campo	Sao Bernardo do Campo	São Paulo	Brazil	BR	-23.69	840499	America/Sao_Paulo
 Zhabei		Shanghai	China	CN	31.26	840000	Asia/Shanghai
+Shangyu		Zhejiang	China	CN	30.02	839747	Asia/Shanghai
 Xinyu		Jiangxi	China	CN	27.80	839488	Asia/Shanghai
 Pietermaritzburg		KwaZulu-Natal	South Africa	ZA	-29.62	839327	Africa/Johannesburg
 Yibin		Sichuan	China	CN	28.76	836340	Asia/Shanghai
@@ -694,12 +710,14 @@ Bouaké	Bouake	Vallée du Bandama District	Ivory Coast	CI	7.69	832371	Africa/Abi
 Taicang		Jiangsu	China	CN	31.45	831113	Asia/Shanghai
 San Francisco		California	United States	US	37.77	827526	America/Los_Angeles
 Sakai		Osaka	Japan	JP	34.58	826161	Asia/Tokyo
+Jiaojiang		Zhejiang	China	CN	28.70	826100	Asia/Shanghai
 Valencia		Valencia	Spain	ES	39.47	824340	Europe/Madrid
 Jinshan		Shanghai	China	CN	30.84	822776	Asia/Shanghai
 Chenzhou		Hunan	China	CN	25.80	822534	Asia/Shanghai
 João Pessoa	Joao Pessoa	Paraíba	Brazil	BR	-7.12	817511	America/Fortaleza
 Bukavu		South Kivu	Democratic Republic of the Congo	CD	-2.49	816811	Africa/Lubumbashi
 Kraków	Krakow	Lesser Poland	Poland	PL	50.06	816614	Europe/Warsaw
+Dandong		Liaoning	China	CN	40.13	815858	Asia/Shanghai
 Barcelona		Anzoátegui	Venezuela	VE	10.14	815141	America/Caracas
 Bangui		Bangui	Central African Republic	CF	4.36	812407	Africa/Bangui
 Hermosillo		Sonora	Mexico	MX	29.09	812229	America/Hermosillo
@@ -722,6 +740,7 @@ Kolwezi		Lualaba	Democratic Republic of the Congo	CD	-10.71	790248	Africa/Lubumb
 Vinh		Nghệ An Province	Vietnam	VN	18.67	790000	Asia/Bangkok
 Thiruvananthapuram		Kerala	India	IN	8.49	788271	Asia/Kolkata
 Zhaotong		Yunnan	China	CN	27.32	787845	Asia/Shanghai
+Hondlon		Inner Mongolia	China	CN	40.65	787681	Asia/Shanghai
 Panzhihua		Sichuan	China	CN	26.59	787177	Asia/Shanghai
 Chuzhou		Anhui	China	CN	32.32	782671	Asia/Shanghai
 Seattle		Washington	United States	US	47.61	780995	America/Los_Angeles
@@ -732,7 +751,6 @@ Xuancheng		Anhui	China	CN	30.95	774332	Asia/Shanghai
 Ibb		Ibb Governorate	Yemen	YE	13.97	771514	Asia/Aden
 Tasikmalaya		West Java	Indonesia	ID	-7.33	770839	Asia/Jakarta
 Nampula		Nampula	Mozambique	MZ	-15.12	770379	Africa/Maputo
-Shangyu		Zhejiang	China	CN	30.02	770000	Asia/Shanghai
 Bujumbura		Bujumbura Mairie	Burundi	BI	-3.38	769317	Africa/Bujumbura
 Tyumen		Tyumen Oblast	Russia	RU	57.15	768358	Asia/Yekaterinburg
 Erzurum		Erzurum	Turkey	TR	39.91	767848	Europe/Istanbul
@@ -757,6 +775,7 @@ Buraydah		Al-Qassim Region	Saudi Arabia	SA	26.33	745353	Asia/Riyadh
 Hegang		Heilongjiang	China	CN	47.35	743307	Asia/Shanghai
 Morelia		Michoacán	Mexico	MX	19.70	743275	America/Mexico_City
 Riga		Riga	Latvia	LV	56.95	742572	Europe/Riga
+Zhuanghe		Liaoning	China	CN	39.70	742496	Asia/Shanghai
 Amsterdam		North Holland	The Netherlands	NL	52.37	741636	Europe/Amsterdam
 Cagayan de Oro		Northern Mindanao	Philippines	PH	8.48	741617	Asia/Manila
 Ma’anshan	Ma'anshan	Anhui	China	CN	31.69	741531	Asia/Shanghai
@@ -789,6 +808,7 @@ General Santos		Soccsksargen	Philippines	PH	6.11	722059	Asia/Manila
 Zhumadian		Henan	China	CN	32.98	721670	Asia/Shanghai
 Morādābād	Moradabad	Uttar Pradesh	India	IN	28.84	721139	Asia/Kolkata
 Sagamihara		Kanagawa	Japan	JP	35.57	720780	Asia/Tokyo
+Qingshan		Inner Mongolia	China	CN	40.66	719255	Asia/Shanghai
 Mississauga		Ontario	Canada	CA	43.58	717961	America/Toronto
 Lviv		Lviv	Ukraine	UA	49.84	717273	Europe/Kyiv
 Namangan		Namangan	Uzbekistan	UZ	41.00	713220	Asia/Tashkent
@@ -865,10 +885,12 @@ Rizhao		Shandong	China	CN	35.41	661943	Asia/Shanghai
 Helsinki		Uusimaa	Finland	FI	60.17	658864	Europe/Helsinki
 Cheonan		Chungcheongnam-do	South Korea	KR	36.81	658831	Asia/Seoul
 Acapulco de Juárez	Acapulco de Juarez	Guerrero	Mexico	MX	16.85	658609	America/Mexico_City
+Dongcun		Shandong	China	CN	36.78	658000	Asia/Shanghai
 Banjarmasin		South Kalimantan	Indonesia	ID	-3.32	657663	Asia/Makassar
 Puducherry		Puducherry	India	IN	11.93	657209	Asia/Kolkata
 Suining		Sichuan	China	CN	30.51	656760	Asia/Shanghai
 Brampton		Ontario	Canada	CA	43.68	656480	America/Toronto
+Huangpu		Shanghai	China	CN	31.24	656200	Asia/Shanghai
 Golfe		Luanda	Angola	AO	-8.87	655796	Africa/Luanda
 Puyang		Henan	China	CN	35.76	655674	Asia/Shanghai
 Soacha		Cundinamarca	Colombia	CO	4.58	655025	America/Bogota
@@ -885,7 +907,9 @@ Izhevsk		Udmurtiya Republic	Russia	RU	56.85	648213	Europe/Samara
 Colombo		Western Province	Sri Lanka	LK	6.94	648034	Asia/Colombo
 Maturín	Maturin	Monagas	Venezuela	VE	9.75	647459	America/Caracas
 Amravati		Maharashtra	India	IN	20.93	647057	Asia/Kolkata
+Lingyuan		Liaoning	China	CN	41.24	646000	Asia/Shanghai
 Detroit		Michigan	United States	US	42.33	645705	America/Detroit
+Mingguang		Anhui	China	CN	32.78	645000	Asia/Shanghai
 Osogbo		Osun State	Nigeria	NG	7.77	645000	Africa/Lagos
 Honchō	Honcho	Chiba	Japan	JP	35.70	644668	Asia/Tokyo
 Bikaner		Rajasthan	India	IN	28.02	644406	Asia/Kolkata
@@ -911,8 +935,8 @@ Kochi		Kerala	India	IN	9.94	633553	Asia/Kolkata
 Memphis		Tennessee	United States	US	35.15	633104	America/Chicago
 Jingmen		Hubei	China	CN	31.03	632954	Asia/Shanghai
 Barnaul		Altai Krai	Russia	RU	53.36	632372	Asia/Barnaul
-Dandong		Liaoning	China	CN	40.13	631973	Asia/Shanghai
 Piura		Piura	Peru	PE	-5.18	630000	America/Lima
+Siping		Jilin	China	CN	43.16	627957	Asia/Shanghai
 Bhilai		Chhattisgarh	India	IN	21.21	627734	Asia/Kolkata
 Ndola		Copperbelt	Zambia	ZM	-12.96	627503	Africa/Lusaka
 Contagem		Minas Gerais	Brazil	BR	-19.93	627123	America/Sao_Paulo
@@ -950,7 +974,6 @@ Ha'il		Ha'il Region	Saudi Arabia	SA	27.52	605930	Asia/Riyadh
 Bhavnagar		Gujarat	India	IN	21.76	605882	Asia/Kolkata
 Benoni		Gauteng	South Africa	ZA	-26.19	605344	Africa/Johannesburg
 Vladivostok		Primorye	Russia	RU	43.11	604901	Asia/Vladivostok
-Jinzhou		Liaoning	China	CN	41.11	604269	Asia/Shanghai
 Tuxtla		Chiapas	Mexico	MX	16.75	604147	America/Merida
 Kryvyy Rih		Dnipropetrovsk	Ukraine	UA	47.91	603904	Europe/Kyiv
 Sanming		Fujian	China	CN	26.25	602166	Asia/Shanghai
@@ -1002,6 +1025,7 @@ Iskandar Puteri		Johor	Malaysia	MY	1.39	575977	Asia/Kuala_Lumpur
 Calamba		Calabarzon	Philippines	PH	14.21	575046	Asia/Manila
 Tlalpan		Mexico City	Mexico	MX	19.30	574577	America/Mexico_City
 Herāt	Herat	Herat	Afghanistan	AF	34.35	574300	Asia/Kabul
+Dongsheng		Inner Mongolia	China	CN	39.82	574242	Asia/Shanghai
 Gujrat		Punjab	Pakistan	PK	32.57	574240	Asia/Karachi
 Tomsk		Tomsk Oblast	Russia	RU	56.50	574002	Asia/Tomsk
 Umraniye		Istanbul	Turkey	TR	41.02	573265	Europe/Istanbul
@@ -1016,6 +1040,7 @@ Surrey		British Columbia	Canada	CA	49.11	568322	America/Vancouver
 Meknes		Fes-Meknes	Morocco	MA	33.89	568295	Africa/Casablanca
 Puente Alto		Santiago Metropolitan	Chile	CL	-33.61	568106	America/Santiago
 Nyala		Southern Darfur	Sudan	SD	12.05	565734	Africa/Khartoum
+Xinmin		Liaoning	China	CN	41.99	565634	Asia/Shanghai
 Dresden		Saxony	Germany	DE	51.05	564904	Europe/Berlin
 Orenburg		Orenburg Oblast	Russia	RU	51.77	564773	Asia/Yekaterinburg
 Albuquerque		New Mexico	United States	US	35.08	564559	America/Denver
@@ -1033,12 +1058,12 @@ Nasiriyah		Dhi Qar	Iraq	IQ	31.06	558400	Asia/Baghdad
 Bloemfontein		Free State	South Africa	ZA	-29.12	556637	Africa/Johannesburg
 Sheffield		England	United Kingdom	GB	53.38	556500	Europe/London
 Santiago de Cuba		Santiago de Cuba Province	Cuba	CU	20.02	555865	America/Havana
-Siping		Jilin	China	CN	43.16	555609	Asia/Shanghai
 Cuautitlán Izcalli	Cuautitlan Izcalli	México	Mexico	MX	19.64	555163	America/Mexico_City
 Benguela		Benguela	Angola	AO	-12.58	555124	Africa/Luanda
 Chuxiong		Yunnan	China	CN	25.04	555081	Asia/Shanghai
 Balbala		Djibouti	Djibouti	DJ	11.56	554350	Africa/Djibouti
 Huaihua		Hunan	China	CN	27.56	552622	Asia/Shanghai
+Sishui		Shandong	China	CN	35.65	552300	Asia/Shanghai
 Muntinlupa		Calabarzon	Philippines	PH	14.39	552225	Asia/Manila
 Bình Thạnh	Binh Thanh	Ho Chi Minh City (HCMC)	Vietnam	VN	10.81	552164	Asia/Ho_Chi_Minh
 Zahedan		Sistan and Baluchestan	Iran	IR	29.50	551980	Asia/Tehran
@@ -1085,7 +1110,6 @@ Mersin		Mersin	Turkey	TR	36.81	537842	Europe/Istanbul
 Nilüfer	Niluefer	Bursa Province	Turkey	TR	40.21	536365	Europe/Istanbul
 Leeds		England	United Kingdom	GB	53.80	536280	Europe/London
 Poznań	Poznan	Greater Poland	Poland	PL	52.41	536151	Europe/Warsaw
-Guli		Zhejiang	China	CN	28.88	536000	Asia/Shanghai
 Aqsu		Xinjiang	China	CN	41.18	535657	Asia/Urumqi
 Ebute Ikorodu		Lagos	Nigeria	NG	6.60	535619	Africa/Lagos
 Ananindeua		Pará	Brazil	BR	-1.37	535547	America/Belem
@@ -1109,6 +1133,7 @@ Aparecida de Goiânia	Aparecida de Goiania	Goiás	Brazil	BR	-16.82	527796	Americ
 Cangzhou		Hebei	China	CN	38.31	527681	Asia/Shanghai
 Mohammadpur		Rajshahi Division	Bangladesh	BD	24.90	527571	Asia/Dhaka
 Surakarta		Central Java	Indonesia	ID	-7.56	526870	Asia/Jakarta
+Yuanping		Shanxi	China	CN	38.72	526000	Asia/Shanghai
 San Salvador		San Salvador Department	El Salvador	SV	13.69	525990	America/El_Salvador
 Beihai		Guangxi	China	CN	21.48	525329	Asia/Shanghai
 Van		Van	Turkey	TR	38.49	525016	Europe/Istanbul
@@ -1173,7 +1198,6 @@ Karol Bāgh	Karol Bagh	Delhi	India	IN	28.65	505241	Asia/Kolkata
 Zhoukou		Henan	China	CN	33.63	505171	Asia/Shanghai
 Leipzig		Saxony	Germany	DE	51.34	504971	Europe/Berlin
 Pingliang		Gansu	China	CN	35.54	504848	Asia/Shanghai
-Huangpu		Shanghai	China	CN	31.24	504700	Asia/Shanghai
 Kalininskiy		St.-Petersburg	Russia	RU	60.00	504641	Europe/Moscow
 Duisburg		North Rhine-Westphalia	Germany	DE	51.43	504358	Europe/Berlin
 Āsansol	Asansol	West Bengal	India	IN	23.68	504271	Asia/Kolkata
@@ -1185,6 +1209,7 @@ Kota Kinabalu		Sabah	Malaysia	MY	5.97	500421	Asia/Kuching
 Jalalpur Pirwala		Punjab	Pakistan	PK	29.51	500000	Asia/Karachi
 Kampung Larkin Lama		Johor	Malaysia	MY	1.50	500000	Asia/Kuala_Lumpur
 Kota Damansara		Selangor	Malaysia	MY	3.15	500000	Asia/Kuala_Lumpur
+Saminaka		Kaduna State	Nigeria	NG	10.41	500000	Africa/Lagos
 Talatona		Luanda	Angola	AO	-8.92	500000	Africa/Luanda
 Mangaluru		Karnataka	India	IN	12.92	499487	Asia/Kolkata
 Zhucheng		Shandong	China	CN	35.99	499285	Asia/Shanghai
@@ -1196,9 +1221,9 @@ Karagandy		Karaganda	Kazakhstan	KZ	49.80	497777	Asia/Almaty
 Loudi		Hunan	China	CN	27.73	497171	Asia/Shanghai
 Liverpool		England	United Kingdom	GB	53.41	496770	Europe/London
 Ichikawa		Chiba	Japan	JP	35.73	496676	Asia/Tokyo
-Bāndarban	Bandarban	Chittagong	Bangladesh	BD	22.20	495272	Asia/Dhaka
 Sha Tin		Sha Tin	Hong Kong	HK	22.38	495200	Asia/Hong_Kong
 Dera Ghazi Khan		Punjab	Pakistan	PK	30.05	494464	Asia/Karachi
+Hecun		Hebei	China	CN	36.53	494412	Asia/Shanghai
 Higashiosaka		Osaka	Japan	JP	34.67	493940	Asia/Tokyo
 Pindi Bhattian		Punjab	Pakistan	PK	31.90	493222	Asia/Karachi
 Cheboksary		Chuvash Republic	Russia	RU	56.13	492331	Europe/Moscow
@@ -1223,6 +1248,7 @@ Nishinomiya		Hyōgo	Japan	JP	34.72	485587	Asia/Tokyo
 Masina		Kinshasa	Democratic Republic of the Congo	CD	-4.38	485167	Africa/Kinshasa
 Sahāranpur	Saharanpur	Uttar Pradesh	India	IN	29.97	484873	Asia/Kolkata
 Vellore		Tamil Nadu	India	IN	12.92	484690	Asia/Kolkata
+Donghe		Inner Mongolia	China	CN	40.57	484218	Asia/Shanghai
 Kurashiki		Okayama	Japan	JP	34.58	483576	Asia/Tokyo
 Campos dos Goytacazes		Rio de Janeiro	Brazil	BR	-21.75	483540	America/Sao_Paulo
 Angeles City		Central Luzon	Philippines	PH	15.15	483452	Asia/Manila
@@ -1234,6 +1260,7 @@ Raleigh		North Carolina	United States	US	35.77	482295	America/New_York
 Imus		Calabarzon	Philippines	PH	14.43	481949	Asia/Manila
 Xichang		Sichuan	China	CN	27.90	481796	Asia/Shanghai
 Malegaon		Maharashtra	India	IN	20.55	481228	Asia/Kolkata
+Zaoyang		Hubei	China	CN	32.13	481004	Asia/Shanghai
 São José do Rio Preto	Sao Jose do Rio Preto	São Paulo	Brazil	BR	-20.82	480393	America/Sao_Paulo
 Caxias do Sul		Rio Grande do Sul	Brazil	BR	-29.17	479599	America/Sao_Paulo
 Karabağlar	Karabaglar	İzmir Province	Turkey	TR	38.38	479338	Europe/Istanbul
@@ -1246,6 +1273,7 @@ Yazd		Yazd Province	Iran	IR	31.90	477905	Asia/Tehran
 Hargeysa		Woqooyi Galbeed	Somalia	SO	9.56	477876	Africa/Mogadishu
 Ōita	Oita	Oita	Japan	JP	33.23	477715	Asia/Tokyo
 Jincheng		Shanxi	China	CN	35.50	476945	Asia/Shanghai
+Hongjiang		Hunan	China	CN	27.11	476000	Asia/Shanghai
 Modīnagar	Modinagar	Uttar Pradesh	India	IN	28.83	475843	Asia/Kolkata
 Taoyuan		Taiwan	Taiwan	TW	24.99	475798	Asia/Taipei
 Eldoret		Uasin Gishu County	Kenya	KE	0.52	475716	Africa/Nairobi
@@ -1268,7 +1296,6 @@ Morogoro		Morogoro	Tanzania	TZ	-6.82	471409	Africa/Dar_es_Salaam
 Marikina City		National Capital Region	Philippines	PH	14.65	471323	Asia/Manila
 Kenitra		Rabat-Salé-Kénitra	Morocco	MA	34.26	470949	Africa/Casablanca
 Seeb		Muscat	Oman	OM	23.67	470878	Asia/Muscat
-Jiaojiang		Zhejiang	China	CN	28.70	470804	Asia/Shanghai
 Cilegon		Banten	Indonesia	ID	-6.01	470378	Asia/Jakarta
 Mykolayiv		Mykolaiv	Ukraine	UA	46.98	470011	Europe/Kyiv
 Fukuyama		Hiroshima	Japan	JP	34.48	468812	Asia/Tokyo
@@ -1297,6 +1324,7 @@ Huangshan		Anhui	China	CN	29.71	460786	Asia/Shanghai
 Jalgaon		Maharashtra	India	IN	21.00	460228	Asia/Kolkata
 Kurnool		Andhra Pradesh	India	IN	15.83	460184	Asia/Kolkata
 Yola		Adamawa	Nigeria	NG	9.21	460000	Africa/Lagos
+Tieling		Liaoning	China	CN	42.29	459985	Asia/Shanghai
 Rạch Giá	Rach Gia	An Giang	Vietnam	VN	10.01	459860	Asia/Ho_Chi_Minh
 Amagasaki		Hyōgo	Japan	JP	34.72	459593	Asia/Tokyo
 Manado		North Sulawesi	Indonesia	ID	1.48	458582	Asia/Makassar
@@ -1318,6 +1346,7 @@ Mansilingan		Western Visayas	Philippines	PH	10.63	454150	Asia/Manila
 Kahama		Shinyanga	Tanzania	TZ	-3.83	453654	Africa/Dar_es_Salaam
 Hsinchu		Taiwan	Taiwan	TW	24.80	453536	Asia/Taipei
 Katsushika		Tokyo	Japan	JP	35.73	453093	Asia/Tokyo
+Bornova		İzmir Province	Turkey	TR	38.48	452479	Europe/Istanbul
 Rāmgundam	Ramgundam	Telangana	India	IN	18.80	452261	Asia/Kolkata
 Batman		Batman	Turkey	TR	37.89	452157	Europe/Istanbul
 Yongji		Shanxi	China	CN	34.87	452000	Asia/Shanghai
@@ -1330,7 +1359,6 @@ Juba		Central Equatoria	South Sudan	SS	4.85	450000	Africa/Juba
 Muratpaşa	Muratpasa	Antalya	Turkey	TR	36.89	450000	Europe/Istanbul
 Wenshan City		Yunnan	China	CN	23.36	450000	Asia/Shanghai
 Şanlıurfa	Sanliurfa	Şanlıurfa	Turkey	TR	37.17	449549	Europe/Istanbul
-Chengde		Hebei	China	CN	40.95	449325	Asia/Shanghai
 Kursk		Kursk Oblast	Russia	RU	51.73	448733	Europe/Moscow
 Maheshtala		West Bengal	India	IN	22.51	448317	Asia/Kolkata
 Nam Định	Nam GJinh	Ninh Binh	Vietnam	VN	20.43	448225	Asia/Bangkok
@@ -1351,6 +1379,7 @@ Korhogo		Savanes District	Ivory Coast	CI	9.46	440926	Africa/Abidjan
 Piracicaba		São Paulo	Brazil	BR	-22.73	440835	America/Sao_Paulo
 Fujisawa		Kanagawa	Japan	JP	35.35	439728	Asia/Tokyo
 Bissau		Bissau	Guinea-Bissau	GW	11.86	439704	Africa/Bissau
+Zhongxiang		Hubei	China	CN	31.17	439394	Asia/Shanghai
 Sandakan		Sabah	Malaysia	MY	5.84	439050	Asia/Kuching
 Mawlamyine		Mon	Myanmar	MM	16.49	438861	Asia/Yangon
 Laval		Quebec	Canada	CA	45.57	438366	America/Toronto
@@ -1361,6 +1390,7 @@ Sultangazi		Istanbul	Turkey	TR	41.11	436935	Europe/Istanbul
 Uyo		Akwa Ibom State	Nigeria	NG	5.05	436606	Africa/Lagos
 Bei’an	Bei'an	Heilongjiang	China	CN	48.27	436444	Asia/Shanghai
 Davangere		Karnataka	India	IN	14.47	435128	Asia/Kolkata
+Macheng		Hubei	China	CN	31.18	435076	Asia/Shanghai
 Ado-Ekiti		Ekiti State	Nigeria	NG	7.62	435000	Africa/Lagos
 Manizales		Caldas Department	Colombia	CO	5.07	434403	America/Bogota
 Masan		Gwangju	South Korea	KR	35.13	434371	Asia/Seoul
@@ -1462,6 +1492,7 @@ Saltivka		Kharkiv	Ukraine	UA	50.02	409300	Europe/Kyiv
 Nagasaki		Nagasaki	Japan	JP	32.75	409118	Asia/Tokyo
 Gujangbagh		Xinjiang	China	CN	37.11	408894	Asia/Urumqi
 Tonalá	Tonala	Jalisco	Mexico	MX	20.62	408759	America/Mexico_City
+Zhijiang		Hubei	China	CN	30.42	408487	Asia/Shanghai
 Panama City		Panamá	Panama	PA	8.99	408168	America/Panama
 Uvira		South Kivu	Democratic Republic of the Congo	CD	-3.40	407092	Africa/Lubumbashi
 Hirakata		Osaka	Japan	JP	34.81	406331	Asia/Tokyo
@@ -1495,11 +1526,13 @@ Kisumu		Kisumu County	Kenya	KE	-0.10	397957	Africa/Nairobi
 Luhansk		Luhansk	Ukraine	UA	48.57	397677	Europe/Kyiv
 Bengkulu		Bengkulu	Indonesia	ID	-3.80	397321	Asia/Jakarta
 Barinas		Barinas	Venezuela	VE	8.62	397279	America/Caracas
+Hancheng		Shaanxi	China	CN	35.46	397020	Asia/Shanghai
 Vitória da Conquista	Vitoria da Conquista	Bahia	Brazil	BR	-14.87	396613	America/Bahia
 Wichita		Kansas	United States	US	37.69	396119	America/Chicago
 Al Hoceïma	Al Hoceima	Tanger-Tetouan-Al Hoceima	Morocco	MA	35.25	395644	Africa/Casablanca
 Szczecin		West Pomerania	Poland	PL	53.43	395513	Europe/Warsaw
 Delmas		Ouest	Haiti	HT	18.54	395260	America/Port-au-Prince
+Liaozhong		Liaoning	China	CN	41.51	395017	Asia/Shanghai
 Vila Velha		Espírito Santo	Brazil	BR	-20.33	394930	America/Sao_Paulo
 Bologna		Emilia-Romagna	Italy	IT	44.49	394843	Europe/Rome
 Sejong		Sejong-si	South Korea	KR	36.59	394630	Asia/Seoul
@@ -1566,9 +1599,11 @@ Rajamahendravaram		Andhra Pradesh	India	IN	17.01	376333	Asia/Kolkata
 Cariacica		Espírito Santo	Brazil	BR	-20.26	376200	America/Sao_Paulo
 Yogyakarta		Yogyakarta	Indonesia	ID	-7.80	375699	Asia/Jakarta
 Dhule		Maharashtra	India	IN	20.90	375559	Asia/Kolkata
+Yanzhou		Shandong	China	CN	35.55	375500	Asia/Shanghai
 Minato		Wakayama	Japan	JP	34.22	375339	Asia/Tokyo
 Puchong		Selangor	Malaysia	MY	3.00	375181	Asia/Kuala_Lumpur
 Ondo		Ondo State	Nigeria	NG	7.09	375000	Africa/Lagos
+Pingyin		Shandong	China	CN	36.28	374900	Asia/Shanghai
 Rohtak		Haryana	India	IN	28.89	374292	Asia/Kolkata
 Bhawana		Punjab	Pakistan	PK	31.57	373841	Asia/Karachi
 Rustenburg		North West	South Africa	ZA	-25.67	373695	Africa/Johannesburg
@@ -1711,7 +1746,6 @@ Kalemyo		Sagaing Region	Myanmar	MM	23.19	348573	Asia/Yangon
 Belfast		Northern Ireland	United Kingdom	GB	54.60	348005	Europe/London
 Long Bien		Hanoi	Vietnam	VN	21.03	347829	Asia/Bangkok
 Camagüey	Camagueey	Camagüey	Cuba	CU	21.38	347562	America/Havana
-Daye		Hubei	China	CN	30.08	347406	Asia/Shanghai
 Bilbao		Basque Country	Spain	ES	43.26	347342	Europe/Madrid
 Ambon		Maluku	Indonesia	ID	-3.70	347288	Asia/Jayapura
 Brest		Brest	Belarus	BY	52.11	347138	Europe/Minsk
@@ -1745,7 +1779,6 @@ Nice		Provence-Alpes-Côte d'Azur	France	FR	43.70	342669	Europe/Paris
 Iligan		Northern Mindanao	Philippines	PH	8.23	342618	Asia/Manila
 Soledad		Atlántico	Colombia	CO	10.92	342556	America/Bogota
 Temara		Rabat-Salé-Kénitra	Morocco	MA	33.93	342345	Africa/Casablanca
-Shiqi		Guangdong	China	CN	22.52	342306	Asia/Shanghai
 Paulista		Pernambuco	Brazil	BR	-7.94	342167	America/Recife
 Obalende		Lagos	Nigeria	NG	6.45	342000	Africa/Lagos
 Kukatpally		Telangana	India	IN	17.48	341709	Asia/Kolkata
@@ -1774,7 +1807,6 @@ Pelotas		Rio Grande do Sul	Brazil	BR	-31.77	336150	America/Sao_Paulo
 San José	San Jose	San José	Costa Rica	CR	9.93	335007	America/Costa_Rica
 Orlando		Florida	United States	US	28.54	334854	America/New_York
 Viña del Mar	Vina del Mar	Valparaiso	Chile	CL	-33.02	334248	America/Santiago
-Tieling		Liaoning	China	CN	42.29	333907	Asia/Shanghai
 Qazvin		Qazvin Province	Iran	IR	36.27	333635	Asia/Tehran
 Asahikawa		Hokkaido	Japan	JP	43.77	333530	Asia/Tokyo
 Kāmārhāti	Kamarhati	West Bengal	India	IN	22.67	332965	Asia/Kolkata
@@ -2089,6 +2121,7 @@ Bathinda		Punjab	India	IN	30.21	285788	Asia/Kolkata
 Henderson		Nevada	United States	US	36.04	285667	America/Los_Angeles
 Jālna	Jalna	Maharashtra	India	IN	19.84	285577	Asia/Kolkata
 Sekondi		Western	Ghana	GH	4.93	285506	Africa/Accra
+São Gonçalo	Sao Goncalo	Rio de Janeiro	Brazil	BR	-22.83	285439	America/Sao_Paulo
 Kyengera		Central Region	Uganda	UG	0.30	285400	Africa/Kampala
 Greensboro		North Carolina	United States	US	36.07	285342	America/New_York
 Haifa		Haifa	Israel	IL	32.81	285316	Asia/Jerusalem
@@ -2147,7 +2180,6 @@ Qarshi		Qashqadaryo	Uzbekistan	UZ	38.86	278300	Asia/Samarkand
 Tanghe		Henan	China	CN	32.69	278055	Asia/Shanghai
 Coacalco		México	Mexico	MX	19.63	277959	America/Mexico_City
 Sincelejo		Sucre Department	Colombia	CO	9.30	277773	America/Bogota
-Zoucheng		Shandong	China	CN	35.40	277400	Asia/Shanghai
 Khomeynī Shahr	Khomeyni Shahr	Isfahan	Iran	IR	32.69	277334	Asia/Tehran
 Kostroma		Kostroma Oblast	Russia	RU	57.77	277280	Europe/Moscow
 Imphal		Manipur	India	IN	24.81	277196	Asia/Kolkata
@@ -2246,6 +2278,7 @@ Djelfa		Djelfa	Algeria	DZ	34.67	265833	Africa/Algiers
 Chula Vista		California	United States	US	32.64	265757	America/Los_Angeles
 Shimonoseki		Yamaguchi	Japan	JP	33.96	265684	Asia/Tokyo
 Toledo		Ohio	United States	US	41.66	265638	America/New_York
+Ulanhot		Inner Mongolia	China	CN	46.08	265600	Asia/Shanghai
 Kibaha		Pwani	Tanzania	TZ	-6.77	265360	Africa/Dar_es_Salaam
 Hulan Ergi		Heilongjiang	China	CN	47.20	265344	Asia/Shanghai
 Tampines Estate			Singapore	SG	1.36	265340	Asia/Singapore
@@ -2276,6 +2309,7 @@ Sivas		Sivas	Turkey	TR	39.75	264022	Europe/Istanbul
 Dourados		Mato Grosso do Sul	Brazil	BR	-22.22	264017	America/Campo_Grande
 Rondonópolis	Rondonopolis	Mato Grosso	Brazil	BR	-16.47	263708	America/Cuiaba
 Wolverhampton		England	United Kingdom	GB	52.59	263700	Europe/London
+Huayin		Shaanxi	China	CN	34.57	263352	Asia/Shanghai
 Pasarkemis		West Java	Indonesia	ID	-6.17	263289	Asia/Jakarta
 Fanling		North District	Hong Kong	HK	22.49	263200	Asia/Hong_Kong
 Chiayi City		Taiwan	Taiwan	TW	23.48	263188	Asia/Taipei
@@ -2326,6 +2360,7 @@ Verona		Veneto	Italy	IT	45.44	258031	Europe/Rome
 Ðà Lạt	Da Lat	Lam Dong	Vietnam	VN	11.95	258014	Asia/Ho_Chi_Minh
 San Salvador de Jujuy		Jujuy	Argentina	AR	-24.19	257970	America/Argentina/Jujuy
 Durham		North Carolina	United States	US	35.99	257636	America/New_York
+Shiqi		Guangdong	China	CN	22.52	257472	Asia/Shanghai
 Etāwah	Etawah	Uttar Pradesh	India	IN	26.78	257448	Asia/Kolkata
 Gasteiz / Vitoria		Basque Country	Spain	ES	42.85	257407	Europe/Madrid
 Rugao		Jiangsu	China	CN	32.37	257400	Asia/Shanghai
@@ -2361,7 +2396,6 @@ Al Madīnah	Al Madinah	Basra	Iraq	IQ	30.96	255000	Asia/Baghdad
 Mossamedes		Namibe	Angola	AO	-15.20	255000	Africa/Luanda
 Hobart		Tasmania	Australia	AU	-42.88	254930	Australia/Hobart
 Ikot Ekpene		Akwa Ibom State	Nigeria	NG	5.18	254806	Africa/Lagos
-Yanzhou		Shandong	China	CN	35.55	254788	Asia/Shanghai
 Woodlands			Singapore	SG	1.44	254440	Asia/Singapore
 Hanam		Gyeonggi-do	South Korea	KR	37.54	254415	Asia/Seoul
 Mueang Nonthaburi		Nonthaburi	Thailand	TH	13.86	254375	Asia/Bangkok
@@ -2381,7 +2415,6 @@ Godomè	Godome	Atlantique	Benin	BJ	6.39	253262	Africa/Porto-Novo
 Naihāti	Naihati	West Bengal	India	IN	22.89	253221	Asia/Kolkata
 Braşov	Brasov	Brașov County	Romania	RO	45.65	253200	Europe/Bucharest
 Xuân Lộc	Xuan Loc	Dong Nai	Vietnam	VN	10.93	253140	Asia/Ho_Chi_Minh
-Laohekou		Hubei	China	CN	32.39	253112	Asia/Shanghai
 Richards Bay		KwaZulu-Natal	South Africa	ZA	-28.78	252968	Africa/Johannesburg
 Qina		Qena	Egypt	EG	26.16	252883	Africa/Cairo
 Bharatpur		Rajasthan	India	IN	27.22	252838	Asia/Kolkata
@@ -2427,6 +2460,7 @@ Tiruvottiyūr	Tiruvottiyur	Tamil Nadu	India	IN	13.16	249446	Asia/Kolkata
 Cidade Ademar		São Paulo	Brazil	BR	-23.67	249218	America/Sao_Paulo
 Burnaby		British Columbia	Canada	CA	49.27	249125	America/Vancouver
 Lubbock		Texas	United States	US	33.58	249042	America/Chicago
+Palermo		Buenos Aires F.D.	Argentina	AR	-34.59	249016	America/Argentina/Buenos_Aires
 Thị Trấn Đông Triều	Thi Tran GJong Trieu	Quảng Ninh	Vietnam	VN	21.08	248896	Asia/Bangkok
 Thuqbah		Eastern Province	Saudi Arabia	SA	26.26	248888	Asia/Riyadh
 Yamagata		Yamagata	Japan	JP	38.23	248772	Asia/Tokyo
@@ -2494,7 +2528,6 @@ Hāpur	Hapur	Uttar Pradesh	India	IN	28.73	242920	Asia/Kolkata
 Chigasaki		Kanagawa	Japan	JP	35.34	242798	Asia/Tokyo
 Toli-Toli		Central Sulawesi	Indonesia	ID	1.04	242783	Asia/Makassar
 Chōfu	Chofu	Tokyo	Japan	JP	35.66	242614	Asia/Tokyo
-Huayin		Shaanxi	China	CN	34.57	242488	Asia/Shanghai
 Berbera		Woqooyi Galbeed	Somalia	SO	10.44	242344	Africa/Mogadishu
 Jiyuan		Henan	China	CN	35.09	242143	Asia/Shanghai
 Yamato		Kanagawa	Japan	JP	35.47	242065	Asia/Tokyo
@@ -2506,6 +2539,7 @@ Tsukuba		Ibaraki	Japan	JP	36.08	241656	Asia/Tokyo
 Arica		Arica y Parinacota Region	Chile	CL	-18.48	241653	America/Santiago
 Peñalolén	Penalolen	Santiago Metropolitan	Chile	CL	-33.47	241599	America/Santiago
 Rio Verde		Goiás	Brazil	BR	-17.80	241494	America/Sao_Paulo
+Laohekou		Hubei	China	CN	32.39	241431	Asia/Shanghai
 Hải Dương	Hai Duong	Hai Phong	Vietnam	VN	20.94	241373	Asia/Bangkok
 Winston-Salem		North Carolina	United States	US	36.10	241218	America/New_York
 Farrukhābād	Farrukhabad	Uttar Pradesh	India	IN	27.39	241152	Asia/Kolkata
@@ -2517,6 +2551,7 @@ Buenaventura		Valle del Cauca Department	Colombia	CO	3.88	240387	America/Bogota
 Ciudad Ojeda		Zulia	Venezuela	VE	10.20	240283	America/Caracas
 Gucun		Shanghai	China	CN	31.35	240185	Asia/Shanghai
 Glendale		Arizona	United States	US	33.54	240126	America/Phoenix
+Xiulin		Hubei	China	CN	29.72	240082	Asia/Shanghai
 Navegantes		Benguela	Angola	AO	-12.59	240075	Africa/Luanda
 Bunkyo		Kanagawa	Japan	JP	35.53	240069	Asia/Tokyo
 Itaboraí	Itaborai	Rio de Janeiro	Brazil	BR	-22.74	240040	America/Sao_Paulo
@@ -2589,6 +2624,7 @@ Dali		Yunnan	China	CN	25.58	235305	Asia/Shanghai
 Najafābād	Najafabad	Isfahan	Iran	IR	32.63	235281	Asia/Tehran
 Thành Phố Bà Rịa	Thanh Pho Ba Ria	Ho Chi Minh City (HCMC)	Vietnam	VN	10.50	235192	Asia/Ho_Chi_Minh
 Georgetown		Demerara-Mahaica	Guyana	GY	6.80	235017	America/Guyana
+Xiangxiang		Hunan	China	CN	27.73	235000	Asia/Shanghai
 Kismayo		Lower Juba	Somalia	SO	-0.36	234852	Africa/Mogadishu
 North Las Vegas		Nevada	United States	US	36.20	234807	America/Los_Angeles
 Elche		Valencia	Spain	ES	38.26	234765	Europe/Madrid
@@ -2637,6 +2673,7 @@ Pāli	Pali	Rajasthan	India	IN	25.77	230075	Asia/Kolkata
 Atani		Anambra	Nigeria	NG	6.01	230000	Africa/Lagos
 Mariupol		Donetsk	Ukraine	UA	47.10	230000	Europe/Kyiv
 Ḩalwān	Halwan	Cairo	Egypt	EG	29.84	230000	Africa/Cairo
+Huanren		Liaoning	China	CN	41.26	229953	Asia/Shanghai
 Changzheng		Shanghai	China	CN	31.24	229925	Asia/Shanghai
 Kasukabe		Saitama	Japan	JP	35.98	229792	Asia/Tokyo
 Paris 15 Vaugirard		Île-de-France	France	FR	48.84	229713	Europe/Paris
@@ -2740,6 +2777,7 @@ El Tigre		Anzoátegui	Venezuela	VE	8.89	222450	America/Caracas
 Haeju		South Hwanghae	North Korea	KP	38.04	222396	Asia/Pyongyang
 Formosa		Formosa	Argentina	AR	-26.18	222226	America/Argentina/Cordoba
 Ikire		Osun State	Nigeria	NG	7.37	222160	Africa/Lagos
+Jiexiu		Shanxi	China	CN	37.02	222100	Asia/Shanghai
 La Ceiba		Atlántida Department	Honduras	HN	15.76	222055	America/Tegucigalpa
 Tilburg		North Brabant	The Netherlands	NL	51.56	221947	Europe/Amsterdam
 Ba Dinh		Hanoi	Vietnam	VN	21.04	221893	Asia/Bangkok
@@ -2857,6 +2895,7 @@ Oakville		Ontario	Canada	CA	43.45	213759	America/Toronto
 Pasuruan		East Java	Indonesia	ID	-7.65	213469	Asia/Jakarta
 Naz̧arābād	Nazarabad	Alborz Province	Iran	IR	35.95	213388	Asia/Tehran
 Munger		Bihar	India	IN	25.37	213303	Asia/Kolkata
+Xilin Hot		Inner Mongolia	China	CN	43.97	213000	Asia/Shanghai
 Jerez de la Frontera		Andalusia	Spain	ES	36.69	212879	Europe/Madrid
 El Jadida		Casablanca-Settat	Morocco	MA	33.26	212863	Africa/Casablanca
 Zitong		Chongqing	China	CN	30.18	212819	Asia/Shanghai
@@ -3097,6 +3136,7 @@ Naivasha		Nakuru County	Kenya	KE	-0.71	198444	Africa/Nairobi
 Kaiyuan		Yunnan	China	CN	23.70	198423	Asia/Shanghai
 Cachoeiro de Itapemirim		Espírito Santo	Brazil	BR	-20.85	198342	America/Sao_Paulo
 Rzeszów	Rzeszow	Subcarpathia	Poland	PL	50.04	198317	Europe/Warsaw
+Lengshuijiang		Hunan	China	CN	27.69	198299	Asia/Shanghai
 Rostock		Mecklenburg-Vorpommern	Germany	DE	54.09	198293	Europe/Berlin
 Parma		Emilia-Romagna	Italy	IT	44.80	198292	Europe/Rome
 Sibu		Sarawak	Malaysia	MY	2.30	198239	Asia/Kuching
@@ -3140,6 +3180,7 @@ Ciudad Lázaro Cárdenas	Ciudad Lazaro Cardenas	Michoacán	Mexico	MX	17.96	19600
 Mocuba		Zambezia Province	Mozambique	MZ	-16.84	196001	Africa/Maputo
 Hetauda		Bagmati Province	Nepal	NP	27.43	195951	Asia/Kathmandu
 Durrës	Durres	Durrës County	Albania	AL	41.32	195920	Europe/Tirane
+Fengcheng		Liaoning	China	CN	40.45	195700	Asia/Shanghai
 Suzuka		Mie	Japan	JP	34.88	195670	Asia/Tokyo
 Hub		Balochistan	Pakistan	PK	25.03	195661	Asia/Karachi
 La Plata		Buenos Aires	Argentina	AR	-34.92	195443	America/Argentina/Buenos_Aires
@@ -3316,7 +3357,6 @@ Toyokawa		Aichi	Japan	JP	34.82	184661	Asia/Tokyo
 Adoni		Andhra Pradesh	India	IN	15.63	184625	Asia/Kolkata
 Izumi		Osaka	Japan	JP	34.48	184615	Asia/Tokyo
 Santa Anita - Los Ficus		Lima region	Peru	PE	-12.05	184614	America/Lima
-Zaoyang		Hubei	China	CN	32.13	184509	Asia/Shanghai
 Paltan		Dhaka Division	Bangladesh	BD	23.74	184492	Asia/Dhaka
 Ivory Park		Gauteng	South Africa	ZA	-26.00	184383	Africa/Johannesburg
 Al Qāmishlī	Al Qamishli	Al-Hasakah	Syria	SY	37.05	184231	Asia/Damascus
@@ -3379,6 +3419,7 @@ Guna		Madhya Pradesh	India	IN	24.65	180935	Asia/Kolkata
 Odense		South Denmark	Denmark	DK	55.40	180863	Europe/Copenhagen
 Sacaba		Cochabamba	Bolivia	BO	-17.40	180726	America/La_Paz
 Quetzaltenango		Quetzaltenango	Guatemala	GT	14.84	180706	America/Guatemala
+Gongzhuling		Jilin	China	CN	43.50	180700	Asia/Shanghai
 Chandannagar		West Bengal	India	IN	22.86	180623	Asia/Kolkata
 Baharampur		West Bengal	India	IN	24.10	180547	Asia/Kolkata
 Ploieşti	Ploiesti	Prahova	Romania	RO	44.95	180540	Europe/Bucharest
@@ -3587,7 +3628,6 @@ Ouargla		Ouargla	Algeria	DZ	31.95	169928	Africa/Algiers
 Olsztyn		Warmia-Masuria	Poland	PL	53.78	169793	Europe/Warsaw
 Kipushi		Haut-Katanga	Democratic Republic of the Congo	CD	-11.76	169635	Africa/Lubumbashi
 Yuen Long Kau Hui		Yuen Long	Hong Kong	HK	22.45	169600	Asia/Hong_Kong
-Laiyang		Shandong	China	CN	36.98	169594	Asia/Shanghai
 Jaunpur		Uttar Pradesh	India	IN	25.75	169572	Asia/Kolkata
 Khlong Sam Wa		Bangkok	Thailand	TH	13.87	169489	Asia/Bangkok
 Harburg		Hamburg	Germany	DE	53.46	169221	Europe/Berlin
@@ -3663,7 +3703,6 @@ Comitán	Comitan	Chiapas	Mexico	MX	16.24	166178	America/Merida
 Ocumare del Tuy		Miranda	Venezuela	VE	10.12	166072	America/Caracas
 Niiza		Saitama	Japan	JP	35.82	166017	Asia/Tokyo
 Greater Sudbury		Ontario	Canada	CA	46.49	166004	America/Toronto
-Ulanhot		Inner Mongolia	China	CN	46.08	165846	Asia/Shanghai
 Khobar		Eastern Province	Saudi Arabia	SA	26.28	165799	Asia/Riyadh
 Songcheng		Fujian	China	CN	26.88	165730	Asia/Shanghai
 Deer Valley		Arizona	United States	US	33.68	165656	America/Phoenix
@@ -4117,6 +4156,7 @@ Clermont-Ferrand		Rhône-Alpes	France	FR	45.78	147865	Europe/Paris
 Joliet		Illinois	United States	US	41.53	147861	America/Chicago
 Barrie		Ontario	Canada	CA	44.40	147829	America/Toronto
 Bang Kapi		Bangkok	Thailand	TH	13.77	147800	Asia/Bangkok
+Yima		Henan	China	CN	34.74	147800	Asia/Shanghai
 Savannah		Georgia	United States	US	32.08	147780	America/New_York
 Paterson		New Jersey	United States	US	40.92	147754	America/New_York
 Salamanca		Madrid	Spain	ES	40.43	147707	Europe/Madrid
@@ -4330,7 +4370,6 @@ Orange		California	United States	US	33.79	140992	America/Los_Angeles
 Wola		Mazovia	Poland	PL	52.23	140958	Europe/Warsaw
 Sanhe		Chongqing	China	CN	29.87	140954	Asia/Shanghai
 Īlām	Ilam	Ilam Province	Iran	IR	33.64	140940	Asia/Tehran
-Gongzhuling		Jilin	China	CN	43.50	140909	Asia/Shanghai
 Shimotoda		Saitama	Japan	JP	35.81	140899	Asia/Tokyo
 Comodoro Rivadavia		Chubut	Argentina	AR	-45.86	140850	America/Argentina/Catamarca
 Kampung Sungai Ara		Penang	Malaysia	MY	5.33	140849	Asia/Kuala_Lumpur
@@ -4466,6 +4505,7 @@ Hampton		Virginia	United States	US	37.03	137148	America/New_York
 Wuyishan		Fujian	China	CN	27.76	137133	Asia/Shanghai
 Miramar		Florida	United States	US	25.99	137132	America/New_York
 Jiashan		Zhejiang	China	CN	30.85	137112	Asia/Shanghai
+Jiagedaqi		Inner Mongolia	China	CN	50.42	137105	Asia/Shanghai
 Bilqās	Bilqas	Dakahlia	Egypt	EG	31.21	137080	Africa/Cairo
 Odintsovo		Moscow Oblast	Russia	RU	55.67	137041	Europe/Moscow
 Rangkasbitung		Banten	Indonesia	ID	-6.36	137041	Asia/Jakarta
@@ -4507,7 +4547,6 @@ Cheras		Selangor	Malaysia	MY	3.11	135823	Asia/Kuala_Lumpur
 Tasek Glugor		Penang	Malaysia	MY	5.48	135786	Asia/Kuala_Lumpur
 Osorno		Los Lagos Region	Chile	CL	-40.57	135773	America/Santiago
 Amsterdam-Oost		North Holland	The Netherlands	NL	52.35	135767	Europe/Amsterdam
-Jiagedaqi		Inner Mongolia	China	CN	50.42	135760	Asia/Shanghai
 Araras		São Paulo	Brazil	BR	-22.36	135744	America/Sao_Paulo
 Tumxuk		Xinjiang	China	CN	39.87	135727	Asia/Urumqi
 Kushtia		Khulna Division	Bangladesh	BD	23.90	135724	Asia/Dhaka
@@ -4718,13 +4757,13 @@ Visalia		California	United States	US	36.33	130104	America/Los_Angeles
 Nankana Sahib		Punjab	Pakistan	PK	31.45	130041	Asia/Karachi
 Aley		Mount Lebanon	Lebanon	LB	33.81	130000	Asia/Beirut
 Caála	Caala	Huambo	Angola	AO	-12.85	130000	Africa/Luanda
+Dongxing		Guangxi	China	CN	21.55	130000	Asia/Shanghai
 Ramenki		Moscow	Russia	RU	55.70	130000	Europe/Moscow
 San Martin		Piura	Peru	PE	-5.19	130000	America/Lima
 Sonārgaon	Sonargaon	Dhaka Division	Bangladesh	BD	23.65	130000	Asia/Dhaka
 Tottenham		England	United Kingdom	GB	51.60	130000	Europe/London
 Tychy		Silesia	Poland	PL	50.14	130000	Europe/Warsaw
 Zugló	Zuglo	Budapest	Hungary	HU	47.52	130000	Europe/Budapest
-Wuda		Inner Mongolia	China	CN	39.50	129922	Asia/Shanghai
 Cambridge		Ontario	Canada	CA	43.36	129920	America/Toronto
 Mardin		Mardin	Turkey	TR	37.31	129864	Europe/Istanbul
 Pingxiang		Guangxi	China	CN	22.10	129843	Asia/Shanghai
@@ -4881,7 +4920,6 @@ Nakhon Ratchasima		Nakhon Ratchasima	Thailand	TH	14.97	126391	Asia/Bangkok
 Chinandega		Chinandega Department	Nicaragua	NI	12.63	126387	America/Managua
 Al Jadīd	Al Jadid	Sabha District	Libya	LY	27.05	126386	Africa/Tripoli
 Lambaré	Lambare	Central Department	Paraguay	PY	-25.35	126377	America/Asuncion
-Macheng		Hubei	China	CN	31.18	126366	Asia/Shanghai
 Iizuka		Fukuoka	Japan	JP	33.64	126364	Asia/Tokyo
 Hua Hin		Prachuap Khiri Khan	Thailand	TH	12.57	126355	Asia/Bangkok
 San Carlos del Zulia		Zulia	Venezuela	VE	9.00	126353	America/Caracas
@@ -5016,6 +5054,7 @@ Tabuk		Cordillera	Philippines	PH	17.47	122771	Asia/Manila
 Tabuk		Cordillera	Philippines	PH	17.41	122771	Asia/Manila
 Dam Dam		West Bengal	India	IN	22.63	122719	Asia/Kolkata
 Hoima		Western Region	Uganda	UG	1.43	122700	Africa/Kampala
+Wuda		Inner Mongolia	China	CN	39.50	122696	Asia/Shanghai
 Az Zubayr		Basra	Iraq	IQ	30.39	122676	Asia/Baghdad
 Schöneberg	Schoeneberg	State of Berlin	Germany	DE	52.50	122658	Europe/Berlin
 Beppu		Oita	Japan	JP	33.28	122643	Asia/Tokyo
@@ -5029,7 +5068,6 @@ Ubon Ratchathani		Ubon Ratchathani	Thailand	TH	15.24	122533	Asia/Bangkok
 Virginia		Free State	South Africa	ZA	-28.10	122502	Africa/Johannesburg
 Brits		North West	South Africa	ZA	-25.63	122497	Africa/Johannesburg
 Recklinghausen		North Rhine-Westphalia	Germany	DE	51.61	122438	Europe/Berlin
-Xiulin		Hubei	China	CN	29.72	122411	Asia/Shanghai
 Zhoucun		Shandong	China	CN	36.82	122402	Asia/Shanghai
 Cherkessk		Karachayevo-Cherkesiya Republic	Russia	RU	44.22	122395	Europe/Moscow
 Haveli Lakha		Punjab	Pakistan	PK	30.45	122389	Asia/Karachi
@@ -5092,7 +5130,6 @@ Dolisie		Niari	Republic of the Congo	CG	-4.20	121000	Africa/Brazzaville
 Zyuzino		Moscow	Russia	RU	55.66	121000	Europe/Moscow
 Ejido		Mérida	Venezuela	VE	8.55	120978	America/Caracas
 Berkeley		California	United States	US	37.87	120972	America/Los_Angeles
-Xilin Hot		Inner Mongolia	China	CN	43.97	120965	Asia/Shanghai
 Nova Lima		Minas Gerais	Brazil	BR	-19.99	120959	America/Sao_Paulo
 Plaridel		Central Luzon	Philippines	PH	14.89	120939	Asia/Manila
 West Palm Beach		Florida	United States	US	26.72	120932	America/New_York
@@ -5109,7 +5146,6 @@ Ingolstadt		Bavaria	Germany	DE	48.77	120658	Europe/Berlin
 Toa Payoh New Town			Singapore	SG	1.34	120650	Asia/Singapore
 Lichuan		Hubei	China	CN	30.30	120587	Asia/Shanghai
 Bukit Bintang		Kuala Lumpur	Malaysia	MY	3.15	120529	Asia/Kuala_Lumpur
-Fengcheng		Liaoning	China	CN	40.45	120514	Asia/Shanghai
 La Concepción	La Concepcion	Zulia	Venezuela	VE	10.62	120478	America/Caracas
 Ulm		Baden-Wurttemberg	Germany	DE	48.40	120451	Europe/Berlin
 Mandoli		Delhi	India	IN	28.70	120417	Asia/Kolkata
@@ -5191,7 +5227,6 @@ Santana		Amapá	Brazil	BR	-0.04	118803	America/Belem
 Araxá	Araxa	Minas Gerais	Brazil	BR	-19.59	118786	America/Sao_Paulo
 Piraquara		Paraná	Brazil	BR	-25.44	118730	America/Sao_Paulo
 Barshi		Maharashtra	India	IN	18.23	118722	Asia/Kolkata
-Lhasa		Tibet	China	CN	29.65	118721	Asia/Shanghai
 Bắc Quang	Bac Quang	Tuyen Quang	Vietnam	VN	22.48	118690	Asia/Ho_Chi_Minh
 Xunchang		Sichuan	China	CN	28.45	118664	Asia/Shanghai
 Hưng Yên	Hung Yen	Hưng Yên Province	Vietnam	VN	20.65	118646	Asia/Bangkok
@@ -5377,13 +5412,13 @@ Anliu		Guangdong	China	CN	23.70	115560	Asia/Shanghai
 Ribeirão Pires	Ribeirao Pires	São Paulo	Brazil	BR	-23.71	115559	America/Sao_Paulo
 Recanto das Emas		Federal District	Brazil	BR	-15.91	115550	America/Sao_Paulo
 Chunga		Lusaka Province	Zambia	ZM	-15.32	115539	Africa/Lusaka
+Bīshah	Bishah	'Asir Region	Saudi Arabia	SA	20.00	115537	Asia/Riyadh
 Novo-Peredelkino		Moscow	Russia	RU	55.65	115536	Europe/Moscow
 Baidyabāti	Baidyabati	West Bengal	India	IN	22.78	115504	Asia/Kolkata
 Okigwe		Imo State	Nigeria	NG	5.83	115499	Africa/Lagos
 Ar Rifā‘	Ar Rifa'	Southern Governorate	Bahrain	BH	26.13	115495	Asia/Bahrain
 Uzhhorod		Zakarpattia	Ukraine	UA	48.62	115449	Europe/Kyiv
 Kasese		Western Region	Uganda	UG	0.18	115400	Africa/Kampala
-Lengshuijiang		Hunan	China	CN	27.69	115399	Asia/Shanghai
 Tianfu		Shandong	China	CN	37.26	115370	Asia/Shanghai
 Arvada		Colorado	United States	US	39.80	115368	America/Denver
 Otaru		Hokkaido	Japan	JP	43.19	115333	Asia/Tokyo
@@ -5491,6 +5526,7 @@ Khwisero		Kakamega County	Kenya	KE	0.17	113294	Africa/Nairobi
 Costa Mesa		California	United States	US	33.64	113204	America/Los_Angeles
 Jauharabad		Punjab	Pakistan	PK	32.29	113188	Asia/Karachi
 Miami Gardens		Florida	United States	US	25.94	113187	America/New_York
+Bagrām	Bagram	Parwan	Afghanistan	AF	34.97	113173	Asia/Kabul
 Chesterfield		England	United Kingdom	GB	53.25	113057	Europe/London
 North Peoria		Illinois	United States	US	40.72	113004	America/Chicago
 Shchyolkovo		Moscow Oblast	Russia	RU	55.92	113000	Europe/Moscow
@@ -5700,7 +5736,6 @@ Leninsk-Kuznetsky		Kuzbass	Russia	RU	54.66	109023	Asia/Novokuznetsk
 Kiryū	Kiryu	Gunma	Japan	JP	36.40	108991	Asia/Tokyo
 Handeni		Tanga	Tanzania	TZ	-5.43	108968	Africa/Dar_es_Salaam
 Balombo		Benguela	Angola	AO	-12.35	108965	Africa/Luanda
-Zhongxiang		Hubei	China	CN	31.17	108883	Asia/Shanghai
 Thunder Bay		Ontario	Canada	CA	48.38	108843	America/Toronto
 Iwatsuki		Saitama	Japan	JP	35.96	108833	Asia/Tokyo
 Pearland		Texas	United States	US	29.56	108821	America/Chicago
@@ -5738,6 +5773,7 @@ Xuyong		Sichuan	China	CN	28.17	108352	Asia/Shanghai
 North Charleston		South Carolina	United States	US	32.85	108304	America/New_York
 Sohar		Al Batinah North	Oman	OM	24.35	108274	Asia/Muscat
 Nehe		Heilongjiang	China	CN	48.48	108253	Asia/Shanghai
+Abu Gharaq		Babil	Iraq	IQ	32.53	108212	Asia/Baghdad
 Oktyabrsky		Bashkortostan Republic	Russia	RU	54.48	108200	Asia/Yekaterinburg
 Tadpatri		Andhra Pradesh	India	IN	14.91	108171	Asia/Kolkata
 Birnin Kebbi		Kebbi	Nigeria	NG	12.45	108164	Africa/Lagos
@@ -5859,7 +5895,6 @@ Ponnāni	Ponnani	Kerala	India	IN	10.77	105512	Asia/Kolkata
 Tanza		National Capital Region	Philippines	PH	14.68	105510	Asia/Manila
 Inzai		Chiba	Japan	JP	35.83	105463	Asia/Tokyo
 Bhairab Bāzār	Bhairab Bazar	Dhaka Division	Bangladesh	BD	24.05	105457	Asia/Dhaka
-Chengtangcun		Shandong	China	CN	35.08	105456	Asia/Shanghai
 Hindaun		Rajasthan	India	IN	26.73	105452	Asia/Kolkata
 Jamālpur	Jamalpur	Bihar	India	IN	25.31	105434	Asia/Kolkata
 Abū Tīj	Abu Tij	Asyut	Egypt	EG	27.05	105418	Africa/Cairo
@@ -5936,7 +5971,6 @@ Bouaflé	Bouafle	Sassandra-Marahoue	Ivory Coast	CI	6.99	104209	Africa/Abidjan
 Kara		Kara	Togo	TG	9.55	104207	Africa/Lome
 Clovis		California	United States	US	36.83	104180	America/Los_Angeles
 Kafue		Lusaka Province	Zambia	ZM	-15.77	104174	Africa/Lusaka
-Wuchuan		Guangdong	China	CN	21.46	104168	Asia/Shanghai
 Campo Mourão	Campo Mourao	Paraná	Brazil	BR	-24.04	104122	America/Sao_Paulo
 Salaqi		Inner Mongolia	China	CN	40.54	104090	Asia/Shanghai
 Kalulushi		Copperbelt	Zambia	ZM	-12.84	104046	Africa/Lusaka
@@ -6193,7 +6227,6 @@ Los Rastrojos		Lara	Venezuela	VE	10.03	100497	America/Caracas
 Masjed Soleymān	Masjed Soleyman	Khuzestan	Iran	IR	31.94	100497	Asia/Tehran
 Vasco da Gama		Goa	India	IN	15.40	100485	Asia/Kolkata
 Barakaldo		Basque Country	Spain	ES	43.30	100435	Europe/Madrid
-Lianjiang		Guangdong	China	CN	21.65	100341	Asia/Shanghai
 Oleksandrivskyi		Donetsk	Ukraine	UA	47.97	100330	Europe/Kyiv
 Ermelo		Mpumalanga	South Africa	ZA	-26.53	100324	Africa/Johannesburg
 Klagenfurt am Wörthersee	Klagenfurt am Woerthersee	Carinthia	Austria	AT	46.62	100316	Europe/Vienna
@@ -6238,10 +6271,13 @@ Sakiet ez Zit		Sfax Governorate	Tunisia	TN	34.80	100000	Africa/Tunis
 Sentul		Kuala Lumpur	Malaysia	MY	3.18	100000	Asia/Kuala_Lumpur
 Seri Manjung		Perak	Malaysia	MY	4.20	100000	Asia/Kuala_Lumpur
 Shahrak-e Pardīsān	Shahrak-e Pardisan	Qom Province	Iran	IR	34.56	100000	Asia/Tehran
+Sino-Singapore Tianjin Eco-city		Tianjin	China	CN	39.15	100000	Asia/Shanghai
 Subotica		Vojvodina	Serbia	RS	46.10	100000	Europe/Belgrade
+Suifenhe		Heilongjiang	China	CN	44.40	100000	Asia/Shanghai
 Sumedang Utara		West Java	Indonesia	ID	-6.85	100000	Asia/Jakarta
 Tekstil’shchiki	Tekstil'shchiki	Moscow	Russia	RU	55.70	100000	Europe/Moscow
 Tājūrā’	Tajura'	Tripoli	Libya	LY	32.88	100000	Africa/Tripoli
+Yanjia		Chongqing	China	CN	29.83	100000	Asia/Shanghai
 Jaramānā	Jaramana	Rif-dimashq	Syria	SY	33.49	99999	Asia/Damascus
 al-Yarmūk	al-Yarmuk	Damascus Governorate	Syria	SY	33.47	99999	Asia/Damascus
 Qincheng		Jiangxi	China	CN	27.21	99987	Asia/Shanghai
@@ -6258,7 +6294,6 @@ Kenosha		Wisconsin	United States	US	42.58	99858	America/Chicago
 Nabire		Central Papua	Indonesia	ID	-3.36	99848	Asia/Jayapura
 Chanthaburi		Chanthaburi	Thailand	TH	12.61	99819	Asia/Bangkok
 Niagara Falls		Ontario	Canada	CA	43.10	99818	America/Toronto
-Dongsheng		Inner Mongolia	China	CN	39.82	99809	Asia/Shanghai
 Andria		Apulia	Italy	IT	41.23	99784	Europe/Rome
 Tucupita		Delta Amacuro	Venezuela	VE	9.06	99778	America/Caracas
 Clinton Township		Michigan	United States	US	42.59	99753	America/Detroit
@@ -6338,7 +6373,6 @@ Słupsk	Slupsk	Pomerania	Poland	PL	54.46	98608	Europe/Warsaw
 Tatuapé	Tatuape	São Paulo	Brazil	BR	-23.54	98601	America/Sao_Paulo
 Ponta Porã	Ponta Pora	Mato Grosso do Sul	Brazil	BR	-22.54	98598	America/Campo_Grande
 Renqiu		Hebei	China	CN	38.71	98569	Asia/Shanghai
-Suifenhe		Heilongjiang	China	CN	44.40	98561	Asia/Shanghai
 Mahuva		Gujarat	India	IN	21.09	98519	Asia/Kolkata
 Cárdenas	Cardenas	Matanzas Province	Cuba	CU	23.04	98515	America/Havana
 Bridgetown		Saint Michael	Barbados	BB	13.11	98511	America/Barbados
@@ -6354,7 +6388,6 @@ League City		Texas	United States	US	29.51	98312	America/Chicago
 Flint		Michigan	United States	US	43.01	98310	America/Detroit
 Silvassa		Dadra and Nagar Haveli and Daman and Diu	India	IN	20.27	98265	Asia/Kolkata
 Al Qaţīf	Al Qatif	Eastern Province	Saudi Arabia	SA	26.57	98259	Asia/Riyadh
-Xinyi		Guangdong	China	CN	22.37	98259	Asia/Shanghai
 Kōnan	Konan	Aichi	Japan	JP	35.33	98255	Asia/Tokyo
 Guaíba	Guaiba	Rio Grande do Sul	Brazil	BR	-30.11	98239	America/Sao_Paulo
 Balāngīr	Balangir	Odisha	India	IN	20.70	98238	Asia/Kolkata
@@ -6611,7 +6644,6 @@ Boryeong		Chungcheongnam-do	South Korea	KR	36.35	94191	Asia/Seoul
 Yilan		Taiwan	Taiwan	TW	24.76	94188	Asia/Taipei
 Awsīm	Awsim	Giza	Egypt	EG	30.12	94174	Africa/Cairo
 Gjakovë	Gjakove	Gjakova	Kosovo	XK	42.38	94158	Europe/Belgrade
-Yishui		Shandong	China	CN	35.78	94115	Asia/Shanghai
 Ruwa		Mashonaland East Province	Zimbabwe	ZW	-17.89	94083	Africa/Harare
 Sông Cầu	Song Cau	Dak Lak	Vietnam	VN	13.46	94066	Asia/Ho_Chi_Minh
 Pendang		Kedah	Malaysia	MY	6.00	94033	Asia/Kuala_Lumpur
@@ -6639,7 +6671,6 @@ Bohicon		Zou	Benin	BJ	7.18	93744	Africa/Porto-Novo
 Daotian		Shandong	China	CN	36.83	93728	Asia/Shanghai
 Yakima		Washington	United States	US	46.60	93701	America/Los_Angeles
 Kharkivskyi Masyv		Kyiv City	Ukraine	UA	50.41	93700	Europe/Kyiv
-Baijiantan		Xinjiang	China	CN	45.69	93697	Asia/Urumqi
 Yunnanyi		Yunnan	China	CN	25.42	93671	Asia/Shanghai
 Shuangliao		Jilin	China	CN	43.51	93666	Asia/Shanghai
 Mogi Mirim		São Paulo	Brazil	BR	-22.43	93650	America/Sao_Paulo
@@ -6753,7 +6784,6 @@ Tübingen	Tuebingen	Baden-Wurttemberg	Germany	DE	48.52	92322	Europe/Berlin
 Pandeglang		Banten	Indonesia	ID	-6.31	92316	Asia/Jakarta
 Miami Beach		Florida	United States	US	25.79	92312	America/New_York
 Rajpura		Punjab	India	IN	30.48	92301	Asia/Kolkata
-Dongcun		Shandong	China	CN	36.78	92282	Asia/Shanghai
 Lucas do Rio Verde		Mato Grosso	Brazil	BR	-13.07	92256	America/Cuiaba
 Sibolga		North Sumatra	Indonesia	ID	1.74	92244	Asia/Jakarta
 Serra Talhada		Pernambuco	Brazil	BR	-7.99	92228	America/Recife
@@ -6816,7 +6846,6 @@ Yatou		Shandong	China	CN	37.16	91517	Asia/Shanghai
 Tanfang		Shandong	China	CN	36.70	91460	Asia/Shanghai
 Kars		Kars Province	Turkey	TR	40.60	91450	Europe/Istanbul
 Patrocínio	Patrocinio	Minas Gerais	Brazil	BR	-18.94	91449	America/Sao_Paulo
-Lingyuan		Liaoning	China	CN	41.24	91418	Asia/Shanghai
 Surallah		Soccsksargen	Philippines	PH	6.38	91412	Asia/Manila
 Lodja		Sankuru	Democratic Republic of the Congo	CD	-3.52	91409	Africa/Lubumbashi
 Tartu		Tartu	Estonia	EE	58.38	91407	Europe/Tallinn
@@ -6901,7 +6930,6 @@ Reconquista		Santa Fe	Argentina	AR	-29.15	90184	America/Argentina/Cordoba
 Huddinge		Stockholm	Sweden	SE	59.24	90182	Europe/Stockholm
 Pollachi		Tamil Nadu	India	IN	10.66	90180	Asia/Kolkata
 Daharki		Sindh	Pakistan	PK	28.05	90177	Asia/Karachi
-Sishui		Shandong	China	CN	35.65	90175	Asia/Shanghai
 Prosperidad		Caraga	Philippines	PH	8.58	90162	Asia/Manila
 El Khroub		Constantine	Algeria	DZ	36.26	90122	Africa/Algiers
 Alabel		Soccsksargen	Philippines	PH	6.10	90120	Asia/Manila
@@ -6919,7 +6947,6 @@ Cafunfo		Luanda Norte	Angola	AO	-8.77	90000	Africa/Luanda
 Cela		Kwanza Sul	Angola	AO	-11.42	90000	Africa/Luanda
 Chinatown		New York	United States	US	40.72	90000	America/New_York
 Dubai Silicon Oasis		Dubai	United Arab Emirates	AE	25.12	90000	Asia/Dubai
-Gantang		Hunan	China	CN	27.44	90000	Asia/Shanghai
 Kanata		Ontario	Canada	CA	45.30	90000	America/Toronto
 Quissecula		Kwanza Sul	Angola	AO	-11.39	90000	Africa/Luanda
 Roha		Maharashtra	India	IN	18.44	90000	Asia/Kolkata
@@ -6962,6 +6989,7 @@ Tuggeranong		Australian Capital Territory	Australia	AU	-35.42	89461	Australia/Sy
 Ankleshwar		Gujarat	India	IN	21.63	89457	Asia/Kolkata
 Circoiscrizione VII		Piedmont	Italy	IT	45.08	89448	Europe/Rome
 Fujin		Heilongjiang	China	CN	47.25	89442	Asia/Shanghai
+Yoff		Dakar	Senegal	SN	14.75	89442	Africa/Dakar
 Kadiri		Andhra Pradesh	India	IN	14.11	89429	Asia/Kolkata
 Granada		Granada Department	Nicaragua	NI	11.93	89409	America/Managua
 Níkaia	Nikaia	Attica	Greece	GR	37.97	89380	Europe/Athens
@@ -6997,6 +7025,7 @@ Banjar		Bali	Indonesia	ID	-8.19	89040	Asia/Makassar
 Bibir Hat		Chittagong	Bangladesh	BD	22.68	89030	Asia/Dhaka
 Sambava		Sava	Madagascar	MG	-14.27	89003	Indian/Antananarivo
 Biryulëvo Zapadnoye	Biryulevo Zapadnoye	Moscow	Russia	RU	55.59	89000	Europe/Moscow
+Gantang		Hunan	China	CN	27.44	89000	Asia/Shanghai
 Kholodna Hora		Kharkiv	Ukraine	UA	50.00	89000	Europe/Kyiv
 Nusaybin		Mardin	Turkey	TR	37.07	88977	Europe/Istanbul
 Cicurug		West Java	Indonesia	ID	-6.78	88965	Asia/Jakarta
@@ -7027,7 +7056,6 @@ Khan Na Yao		Bangkok	Thailand	TH	13.83	88678	Asia/Bangkok
 Hanau am Main		Hesse	Germany	DE	50.13	88648	Europe/Berlin
 Montero		Santa Cruz Department	Bolivia	BO	-17.34	88616	America/La_Paz
 Sangrūr	Sangrur	Punjab	India	IN	30.25	88615	Asia/Kolkata
-Dongxing		Guangxi	China	CN	21.55	88607	Asia/Shanghai
 Chosica		Lima region	Peru	PE	-11.94	88606	America/Lima
 Val Dor		Penang	Malaysia	MY	5.25	88600	Asia/Kuala_Lumpur
 Campo di Marte		Tuscany	Italy	IT	43.78	88588	Europe/Rome
@@ -7119,7 +7147,6 @@ Qiongshan		Hainan	China	CN	20.01	87657	Asia/Shanghai
 Madgaon		Goa	India	IN	15.28	87650	Asia/Kolkata
 Gitarama		Southern Province	Rwanda	RW	-2.07	87613	Africa/Kigali
 Ludwigsburg		Baden-Wurttemberg	Germany	DE	48.90	87603	Europe/Berlin
-Xiangxiang		Hunan	China	CN	27.73	87592	Asia/Shanghai
 Deqing		Zhejiang	China	CN	30.54	87576	Asia/Shanghai
 Gurupi		Tocantins	Brazil	BR	-11.73	87545	America/Araguaina
 Indio		California	United States	US	33.72	87533	America/Los_Angeles
@@ -7511,7 +7538,6 @@ Kimitsu		Chiba	Japan	JP	35.35	83058	Asia/Tokyo
 Galesong		South Sulawesi	Indonesia	ID	-5.32	83050	Asia/Makassar
 Bambari		Ouaka	Central African Republic	CF	5.77	83029	Africa/Bangui
 Mar del Tuyú	Mar del Tuyu	Buenos Aires	Argentina	AR	-36.57	83016	America/Argentina/Buenos_Aires
-Hecun		Hebei	China	CN	36.53	83009	Asia/Shanghai
 San Fernando		Ilocos	Philippines	PH	16.62	83003	Asia/Manila
 Kamigyō-ku	Kamigyo-ku	Kyoto	Japan	JP	35.03	83000	Asia/Tokyo
 Mid-City		California	United States	US	34.04	83000	America/Los_Angeles
@@ -7527,7 +7553,6 @@ David		Chiriquí Province	Panama	PA	8.43	82907	America/Panama
 Jinshi		Hunan	China	CN	29.60	82906	Asia/Shanghai
 Weston-super-Mare		England	United Kingdom	GB	51.35	82903	Europe/London
 Palm Coast		Florida	United States	US	29.58	82893	America/New_York
-Yuanping		Shanxi	China	CN	38.72	82883	Asia/Shanghai
 Minden		North Rhine-Westphalia	Germany	DE	52.29	82879	Europe/Berlin
 Charlesbourg		Quebec	Canada	CA	46.90	82870	America/Toronto
 Montego Bay		Saint James Parish	Jamaica	JM	18.47	82867	America/Jamaica
@@ -7571,7 +7596,6 @@ Ecunna		Huambo	Angola	AO	-12.68	82541	Africa/Luanda
 Muş	Mus	Muş	Turkey	TR	38.73	82536	Europe/Istanbul
 Douar Hicher		Manouba	Tunisia	TN	36.83	82532	Africa/Tunis
 Anzhero-Sudzhensk		Kuzbass	Russia	RU	56.08	82526	Asia/Novokuznetsk
-Yima		Henan	China	CN	34.74	82509	Asia/Shanghai
 Sahand		East Azerbaijan	Iran	IR	37.95	82494	Asia/Tehran
 Lake Forest		California	United States	US	33.65	82492	America/Los_Angeles
 Arcoverde		Pernambuco	Brazil	BR	-8.42	82487	America/Recife
@@ -7638,7 +7662,6 @@ Maraimalainagar		Tamil Nadu	India	IN	12.80	81872	Asia/Kolkata
 Huaiyang		Hebei	China	CN	37.76	81861	Asia/Shanghai
 Coslada		Madrid	Spain	ES	40.42	81860	Europe/Madrid
 Ashoknagar		Madhya Pradesh	India	IN	24.58	81828	Asia/Kolkata
-Qal‘at Bīshah	Qal`at Bishah	'Asir Region	Saudi Arabia	SA	20.00	81828	Asia/Riyadh
 Sesto San Giovanni		Lombardy	Italy	IT	45.53	81822	Europe/Rome
 Macaíba	Macaiba	Rio Grande do Norte	Brazil	BR	-5.86	81821	America/Fortaleza
 Gwangju		Gyeonggi-do	South Korea	KR	37.41	81780	Asia/Seoul
@@ -7774,7 +7797,6 @@ Serrinha		Bahia	Brazil	BR	-11.66	80435	America/Bahia
 Napa		California	United States	US	38.30	80434	America/Los_Angeles
 Kairāna	Kairana	Uttar Pradesh	India	IN	29.40	80432	Asia/Kolkata
 Brajarajnagar		Odisha	India	IN	21.82	80403	Asia/Kolkata
-Zhuanghe		Liaoning	China	CN	39.70	80384	Asia/Shanghai
 Hannō	Hanno	Saitama	Japan	JP	35.85	80361	Asia/Tokyo
 Bonāb	Bonab	East Azerbaijan	Iran	IR	37.34	80359	Asia/Tehran
 Loushanguan		Guizhou	China	CN	28.14	80344	Asia/Shanghai
@@ -8028,7 +8050,6 @@ Huangmei		Hubei	China	CN	30.19	77633	Asia/Shanghai
 Campo Limpo Paulista		São Paulo	Brazil	BR	-23.21	77632	America/Sao_Paulo
 Numan		Adamawa	Nigeria	NG	9.46	77617	Africa/Lagos
 Hammond		Indiana	United States	US	41.58	77614	America/Chicago
-Feicheng		Shandong	China	CN	36.25	77606	Asia/Shanghai
 Ītāy al Bārūd	Itay al Barud	Beheira	Egypt	EG	30.89	77606	Africa/Cairo
 Milpitas		California	United States	US	37.43	77604	America/Los_Angeles
 Ouarzazate		Drâa-Tafilalet	Morocco	MA	30.92	77603	Africa/Casablanca
@@ -8077,7 +8098,6 @@ Akihabara		Tokyo	Japan	JP	35.70	77200	Asia/Tokyo
 Aş Şuwayrah	As Suwayrah	Wasit	Iraq	IQ	32.93	77200	Asia/Baghdad
 Siedlce		Mazovia	Poland	PL	52.17	77185	Europe/Warsaw
 Damiao		Jiangsu	China	CN	34.26	77179	Asia/Shanghai
-Jiexiu		Shanxi	China	CN	37.02	77178	Asia/Shanghai
 South Surrey		British Columbia	Canada	CA	49.05	77170	America/Vancouver
 Santa Cruz de Barahona		Barahona Province	Dominican Republic	DO	18.21	77160	America/Santo_Domingo
 Gary		Indiana	United States	US	41.59	77156	America/Chicago
@@ -8417,7 +8437,6 @@ Eusébio	Eusebio	Ceará	Brazil	BR	-3.89	74170	America/Fortaleza
 Layton		Utah	United States	US	41.06	74143	America/Denver
 Appleton		Wisconsin	United States	US	44.26	74139	America/Chicago
 Missouri City		Texas	United States	US	29.62	74139	America/Chicago
-Xinmin		Liaoning	China	CN	41.99	74139	Asia/Shanghai
 Igbara-Odo		Ekiti State	Nigeria	NG	7.50	74121	Africa/Lagos
 Ambājogāi	Ambajogai	Maharashtra	India	IN	18.73	74114	Asia/Kolkata
 Zhangzhuang		Jiangsu	China	CN	34.52	74114	Asia/Shanghai
@@ -8560,7 +8579,6 @@ Saint George		Utah	United States	US	37.10	72897	America/Denver
 Padre Las Casas		Araucania	Chile	CL	-38.76	72892	America/Santiago
 Rosh Ha‘Ayin	Rosh Ha'Ayin	Central District	Israel	IL	32.10	72881	Asia/Jerusalem
 Caserta		Campania	Italy	IT	41.07	72844	Europe/Rome
-Yanjia		Chongqing	China	CN	29.83	72825	Asia/Shanghai
 Dachnoye		St.-Petersburg	Russia	RU	59.84	72822	Europe/Moscow
 Bethal		Mpumalanga	South Africa	ZA	-26.46	72821	Africa/Johannesburg
 Krathum Baen		Samut Sakhon	Thailand	TH	13.65	72819	Asia/Bangkok
@@ -8942,12 +8960,12 @@ Satpayev		Ulytau Region	Kazakhstan	KZ	47.90	69782	Asia/Almaty
 Santa Cruz de Mara		Zulia	Venezuela	VE	10.79	69781	America/Caracas
 Māngrol	Mangrol	Gujarat	India	IN	21.12	69779	Asia/Kolkata
 Kahror Pakka		Punjab	Pakistan	PK	29.62	69743	Asia/Karachi
+Kladno		Central Bohemia	Czechia	CZ	50.15	69728	Europe/Prague
 Kaura Namoda		Zamfara State	Nigeria	NG	12.59	69725	Africa/Lagos
 Basavakalyan		Karnataka	India	IN	17.87	69717	Asia/Kolkata
 Planeta Rica		Córdoba	Colombia	CO	8.41	69708	America/Bogota
 Āsosa	Asosa	Bīnshangul Gumuz	Ethiopia	ET	10.07	69700	Africa/Addis_Ababa
 Las Piedras		Canelones	Uruguay	UY	-34.73	69682	America/Montevideo
-Kladno		Central Bohemia	Czechia	CZ	50.15	69664	Europe/Prague
 Pul Pehlad		Delhi	India	IN	28.50	69657	Asia/Kolkata
 Tacarigua		Carabobo	Venezuela	VE	10.09	69636	America/Caracas
 Abū ‘Arīsh	Abu 'Arish	Jazan Region	Saudi Arabia	SA	16.97	69632	Asia/Riyadh
@@ -9093,7 +9111,6 @@ Shima		Fujian	China	CN	24.45	68375	Asia/Shanghai
 Aparri		Cagayan Valley	Philippines	PH	18.36	68368	Asia/Manila
 Bīsalpur	Bisalpur	Uttar Pradesh	India	IN	28.29	68355	Asia/Kolkata
 Peruíbe	Peruibe	São Paulo	Brazil	BR	-24.32	68352	America/Sao_Paulo
-Mingguang		Anhui	China	CN	32.78	68351	Asia/Shanghai
 Ninghai		Zhejiang	China	CN	29.29	68330	Asia/Shanghai
 Framingham		Massachusetts	United States	US	42.28	68318	America/New_York
 San Isidro		Lima region	Peru	PE	-12.10	68309	America/Lima
@@ -9403,7 +9420,6 @@ Viladecans		Catalonia	Spain	ES	41.31	66168	Europe/Madrid
 Castellammare di Stabia		Campania	Italy	IT	40.70	66164	Europe/Rome
 Cheria		Tébessa	Algeria	DZ	35.27	66160	Africa/Algiers
 Kasungu		Central Region	Malawi	MW	-13.03	66152	Africa/Blantyre
-Huanren		Liaoning	China	CN	41.26	66147	Asia/Shanghai
 Qionghu		Hunan	China	CN	28.84	66145	Asia/Shanghai
 I‘zāz	I`zaz	Aleppo	Syria	SY	36.59	66138	Asia/Damascus
 Thái Hòa	Thai Hoa	Nghệ An Province	Vietnam	VN	18.92	66127	Asia/Ho_Chi_Minh
@@ -9916,6 +9932,7 @@ Butare		Southern Province	Rwanda	RW	-2.60	62823	Africa/Kigali
 Trnava		Trnava Region	Slovakia	SK	48.38	62806	Europe/Bratislava
 Moknine		Monastir Governorate	Tunisia	TN	35.63	62802	Africa/Tunis
 Randers		Central Jutland	Denmark	DK	56.46	62802	Europe/Copenhagen
+Qingshuping		Hunan	China	CN	27.38	62800	Asia/Shanghai
 Caltanissetta		Sicily	Italy	IT	37.49	62797	Europe/Rome
 Ashford		England	United Kingdom	GB	51.15	62787	Europe/London
 Haverhill		Massachusetts	United States	US	42.78	62765	America/New_York
@@ -10016,7 +10033,6 @@ Auburn		Alabama	United States	US	32.61	62059	America/Chicago
 Minglanilla		Central Visayas	Philippines	PH	10.24	62058	Asia/Manila
 Okha		Gujarat	India	IN	22.47	62052	Asia/Kolkata
 Kiffa		Assaba	Mauritania	MR	16.62	62051	Africa/Nouakchott
-Pingyin		Shandong	China	CN	36.28	62050	Asia/Shanghai
 Lār	Lar	Fars	Iran	IR	27.68	62045	Asia/Tehran
 Floriano		Piauí	Brazil	BR	-6.77	62036	America/Fortaleza
 Sanghar		Sindh	Pakistan	PK	26.05	62033	Asia/Karachi
@@ -10031,7 +10047,6 @@ Meshkīn Dasht	Meshkin Dasht	Tehran	Iran	IR	35.75	62005	Asia/Tehran
 Erzsébetváros	Erzsebetvaros	Budapest	Hungary	HU	47.50	62000	Europe/Budapest
 Mīzan Teferī	Mizan Teferi	South West Ethiopia Peoples' Region	Ethiopia	ET	7.00	62000	Africa/Addis_Ababa
 Nani Daman		Dadra and Nagar Haveli and Daman and Diu	India	IN	20.41	62000	Asia/Kolkata
-Qingshuping		Hunan	China	CN	27.38	62000	Asia/Shanghai
 Rossosh’	Rossosh'	Voronezh Oblast	Russia	RU	50.20	62000	Europe/Moscow
 Seremban 2		Negeri Sembilan	Malaysia	MY	2.69	62000	Asia/Kuala_Lumpur
 Smederevo		Central Serbia	Serbia	RS	44.66	62000	Europe/Belgrade
@@ -10337,7 +10352,6 @@ Monze		Southern Province	Zambia	ZM	-16.27	60281	Africa/Lusaka
 Setia Tropika		Johor	Malaysia	MY	1.55	60279	Asia/Kuala_Lumpur
 Shimotsuke		Tochigi	Japan	JP	36.41	60274	Asia/Tokyo
 Wujing		Shandong	China	CN	36.45	60260	Asia/Shanghai
-Opava		Moravian-Silesian Region	Czechia	CZ	49.94	60252	Europe/Prague
 Ilkal		Karnataka	India	IN	15.96	60242	Asia/Kolkata
 Rowlett		Texas	United States	US	32.90	60236	America/Chicago
 Chełm	Chelm	Lublin	Poland	PL	51.14	60231	Europe/Warsaw
@@ -10358,7 +10372,6 @@ Penedo		Alagoas	Brazil	BR	-10.29	60189	America/Maceio
 Bandar-e Kangān	Bandar-e Kangan	Bushehr	Iran	IR	27.83	60187	Asia/Tehran
 Vavuniya		Northern Province	Sri Lanka	LK	8.75	60176	Asia/Colombo
 Ech Chettia		Chlef	Algeria	DZ	36.20	60170	Africa/Algiers
-Zhijiang		Hubei	China	CN	30.42	60169	Asia/Shanghai
 Rosenheim		Bavaria	Germany	DE	47.86	60167	Europe/Berlin
 Nagakute		Aichi	Japan	JP	35.17	60162	Asia/Tokyo
 Nedumangād	Nedumangad	Kerala	India	IN	8.60	60161	Asia/Kolkata
@@ -10520,7 +10533,6 @@ Lamongan		East Java	Indonesia	ID	-7.12	59224	Asia/Jakarta
 Pánlóngchéng Jīngjì Kāifāqū	Panlongcheng Jingji Kaifaqu	Hubei	China	CN	30.69	59207	Asia/Shanghai
 Leander		Texas	United States	US	30.58	59202	America/Chicago
 Nabarūh	Nabaruh	Dakahlia	Egypt	EG	31.10	59202	Africa/Cairo
-Hongjiang		Hunan	China	CN	27.11	59199	Asia/Shanghai
 Mikhaylovsk		Stavropol Kray	Russia	RU	45.13	59198	Europe/Moscow
 Rājgarh	Rajgarh	Rajasthan	India	IN	28.64	59193	Asia/Kolkata
 Sahagún	Sahagun	Córdoba	Colombia	CO	8.95	59188	America/Bogota
@@ -10730,7 +10742,6 @@ Dapaong		Savanes	Togo	TG	10.86	58071	Africa/Lome
 Felgueiras		Porto	Portugal	PT	41.37	58065	Europe/Lisbon
 Serian		Sarawak	Malaysia	MY	1.17	58059	Asia/Kuching
 Streatham		England	United Kingdom	GB	51.43	58055	Europe/London
-Hancheng		Shaanxi	China	CN	35.46	58049	Asia/Shanghai
 Göppingen	Goeppingen	Baden-Wurttemberg	Germany	DE	48.70	58040	Europe/Berlin
 Zgierz		Łódź Voivodeship	Poland	PL	51.86	58036	Europe/Warsaw
 Caucasia		Antioquia	Colombia	CO	7.99	58034	America/Bogota
@@ -10738,7 +10749,6 @@ Bowie		Maryland	United States	US	38.94	58025	America/New_York
 Simpang Empat		Perak	Malaysia	MY	4.95	58004	Asia/Kuala_Lumpur
 Invercargill		Southland	New Zealand	NZ	-46.40	58000	Pacific/Auckland
 Port Coquitlam		British Columbia	Canada	CA	49.27	58000	America/Vancouver
-Santangpu		Hunan	China	CN	27.41	58000	Asia/Shanghai
 Volzhsk		Mariy-El Republic	Russia	RU	55.87	58000	Europe/Moscow
 Kokomo		Indiana	United States	US	40.49	57995	America/Indiana/Indianapolis
 Chornomors’k	Chornomors'k	Odesa	Ukraine	UA	46.30	57983	Europe/Kyiv
@@ -11305,6 +11315,7 @@ Cuenca		Castille-La Mancha	Spain	ES	40.07	54898	Europe/Madrid
 Derbendîxan	Derbendixan	Sulaymaniyah	Iraq	IQ	35.11	54896	Asia/Baghdad
 Euskirchen		North Rhine-Westphalia	Germany	DE	50.66	54889	Europe/Berlin
 Estancia		Western Visayas	Philippines	PH	11.46	54882	Asia/Manila
+Opava		Moravian-Silesian Region	Czechia	CZ	49.94	54881	Europe/Prague
 Edgewater		Illinois	United States	US	41.98	54873	America/Chicago
 Yecheon		Gyeongsangbuk-do	South Korea	KR	36.66	54873	Asia/Seoul
 Pithāpuram	Pithapuram	Andhra Pradesh	India	IN	17.12	54859	Asia/Kolkata
@@ -11335,7 +11346,6 @@ Huyton		England	United Kingdom	GB	53.41	54738	Europe/London
 Bhamo		Kachin State	Myanmar	MM	24.25	54721	Asia/Yangon
 Leytonstone		England	United Kingdom	GB	51.57	54696	Europe/London
 Rio de Mouro		Lisbon	Portugal	PT	38.77	54695	Europe/Lisbon
-Liaozhong		Liaoning	China	CN	41.51	54691	Asia/Shanghai
 Hürth	Huerth	North Rhine-Westphalia	Germany	DE	50.87	54678	Europe/Berlin
 Luputa		Lomami	Democratic Republic of the Congo	CD	-7.16	54676	Africa/Lubumbashi
 Barry		Wales	United Kingdom	GB	51.40	54673	Europe/London
@@ -11376,6 +11386,7 @@ Hamilton		Scotland	United Kingdom	GB	55.77	54480	Europe/London
 Meikle Earnock		Scotland	United Kingdom	GB	55.75	54480	Europe/London
 Madhepura		Bihar	India	IN	25.92	54472	Asia/Kolkata
 Modica		Sicily	Italy	IT	36.86	54456	Europe/Rome
+Bāndarban	Bandarban	Chittagong	Bangladesh	BD	22.20	54450	Asia/Dhaka
 Nanzhou		Hunan	China	CN	29.36	54449	Asia/Shanghai
 Pocatello		Idaho	United States	US	42.87	54441	America/Boise
 Bradenton		Florida	United States	US	27.50	54437	America/New_York
@@ -12130,7 +12141,6 @@ Birkat as Sab‘	Birkat as Sab'	Monufia	Egypt	EG	30.63	50924	Africa/Cairo
 Royal Leamington Spa		England	United Kingdom	GB	52.29	50923	Europe/London
 Mannārakkāt	Mannarakkat	Kerala	India	IN	10.99	50921	Asia/Kolkata
 Shuijiang		Chongqing	China	CN	29.25	50918	Asia/Shanghai
-Teplice		Ústí nad Labem Region	Czechia	CZ	50.64	50912	Europe/Prague
 Tobias Barreto		Sergipe	Brazil	BR	-11.18	50905	America/Maceio
 Metpalle		Telangana	India	IN	18.85	50902	Asia/Kolkata
 Gurlan		Xorazm Region	Uzbekistan	UZ	41.84	50900	Asia/Samarkand
@@ -12144,6 +12154,7 @@ Naya Gaon		Punjab	India	IN	30.78	50869	Asia/Kolkata
 Repalle		Andhra Pradesh	India	IN	16.02	50866	Asia/Kolkata
 Hunsūr	Hunsur	Karnataka	India	IN	12.30	50865	Asia/Kolkata
 Kyōtango	Kyotango	Kyoto	Japan	JP	35.61	50860	Asia/Tokyo
+Teplice		Ústí nad Labem Region	Czechia	CZ	50.64	50856	Europe/Prague
 Vittoria		Sicily	Italy	IT	36.95	50852	Europe/Rome
 Donetsk		Rostov	Russia	RU	48.34	50850	Europe/Moscow
 Tocumen		Panamá	Panama	PA	9.09	50844	America/Panama
@@ -12151,6 +12162,7 @@ Flagami		Florida	United States	US	25.76	50834	America/New_York
 Vigia		Pará	Brazil	BR	-0.86	50832	America/Belem
 Phra Nakhon Si Ayutthaya		Phra Nakhon Si Ayutthaya	Thailand	TH	14.35	50830	Asia/Bangkok
 Guanzhuang		Shandong	China	CN	36.26	50826	Asia/Shanghai
+Baijiantan		Xinjiang	China	CN	45.69	50825	Asia/Urumqi
 Barranqueras		Chaco	Argentina	AR	-27.48	50823	America/Argentina/Cordoba
 Catalina Foothills		Arizona	United States	US	32.30	50796	America/Phoenix
 Boende		Tshuapa	Democratic Republic of the Congo	CD	-0.28	50794	Africa/Kinshasa
@@ -12808,6 +12820,7 @@ Iwakura		Aichi	Japan	JP	35.28	48007	Asia/Tokyo
 Takua Pa		Phang Nga	Thailand	TH	8.87	48004	Asia/Bangkok
 Hennef (Sieg)		North Rhine-Westphalia	Germany	DE	50.78	48002	Europe/Berlin
 Hadero		Central Ethiopia Regional State	Ethiopia	ET	7.20	48000	Africa/Addis_Ababa
+Santangpu		Hunan	China	CN	27.41	48000	Asia/Shanghai
 Tunduru		Ruvuma	Tanzania	TZ	-11.07	48000	Africa/Dar_es_Salaam
 Quimistán	Quimistan	Santa Bárbara Department	Honduras	HN	15.35	47993	America/Tegucigalpa
 Conceição do Araguaia	Conceicao do Araguaia	Pará	Brazil	BR	-8.26	47991	America/Belem
@@ -12837,6 +12850,7 @@ Long Eaton		England	United Kingdom	GB	52.90	47898	Europe/London
 Bakhtiarpur		Bihar	India	IN	25.46	47897	Asia/Kolkata
 Alexandria		Louisiana	United States	US	31.31	47889	America/Chicago
 Baizi		Chongqing	China	CN	30.09	47879	Asia/Shanghai
+Mladá Boleslav	Mlada Boleslav	Central Bohemia	Czechia	CZ	50.41	47874	Europe/Prague
 Chesterfield		Missouri	United States	US	38.66	47864	America/Chicago
 Moyale		Marsabit County	Kenya	KE	3.53	47850	Africa/Nairobi
 Jalandhar Cantonment		Punjab	India	IN	31.29	47845	Asia/Kolkata
@@ -13126,7 +13140,6 @@ Nanpeng		Chongqing	China	CN	29.33	46786	Asia/Shanghai
 Livny		Oryol oblast	Russia	RU	52.42	46779	Europe/Moscow
 Chhatarpur		Delhi	India	IN	28.50	46776	Asia/Kolkata
 Draper		Utah	United States	US	40.52	46774	America/Denver
-Chomutov		Ústí nad Labem Region	Czechia	CZ	50.46	46771	Europe/Prague
 Dondaicha		Maharashtra	India	IN	21.32	46767	Asia/Kolkata
 Jāmner	Jamner	Maharashtra	India	IN	20.81	46762	Asia/Kolkata
 Yuqunweng		Xinjiang	China	CN	43.87	46759	Asia/Urumqi
@@ -13173,6 +13186,7 @@ Medianeira		Paraná	Brazil	BR	-25.30	46574	America/Sao_Paulo
 Tômbua	Tombua	Namibe	Angola	AO	-15.80	46573	Africa/Luanda
 Erdemli		Mersin	Turkey	TR	36.60	46570	Europe/Istanbul
 Bassila		Donga	Benin	BJ	9.01	46569	Africa/Porto-Novo
+Chomutov		Ústí nad Labem Region	Czechia	CZ	50.46	46560	Europe/Prague
 Guajará Mirim	Guajara Mirim	Rondônia	Brazil	BR	-10.78	46556	America/Porto_Velho
 Seohāra	Seohara	Uttar Pradesh	India	IN	29.21	46546	Asia/Kolkata
 Lukula		Sankuru	Democratic Republic of the Congo	CD	-3.87	46534	Africa/Lubumbashi
@@ -13497,6 +13511,7 @@ Jaraguá	Jaragua	Goiás	Brazil	BR	-15.76	45223	America/Sao_Paulo
 Mangaratiba		Rio de Janeiro	Brazil	BR	-22.96	45220	America/Sao_Paulo
 Moatize		Tete	Mozambique	MZ	-16.12	45213	Africa/Maputo
 Enfield		Connecticut	United States	US	41.98	45212	America/New_York
+Cordovil		Rio de Janeiro	Brazil	BR	-22.83	45202	America/Sao_Paulo
 Shebekino		Belgorod Oblast	Russia	RU	50.41	45194	Europe/Moscow
 San Isidro		Buenos Aires	Argentina	AR	-34.47	45190	America/Argentina/Buenos_Aires
 Ridderkerk		South Holland	The Netherlands	NL	51.87	45189	Europe/Amsterdam
@@ -13941,7 +13956,6 @@ Bodupāl	Bodupal	Telangana	India	IN	17.42	43692	Asia/Kolkata
 Pattani		Pattani	Thailand	TH	6.87	43690	Asia/Bangkok
 Santo Antônio de Pádua	Santo Antonio de Padua	Rio de Janeiro	Brazil	BR	-21.54	43686	America/Sao_Paulo
 Campina Grande do Sul		Paraná	Brazil	BR	-25.31	43685	America/Sao_Paulo
-Mladá Boleslav	Mlada Boleslav	Central Bohemia	Czechia	CZ	50.41	43684	Europe/Prague
 Cheshunt		England	United Kingdom	GB	51.70	43680	Europe/London
 Shihao		Chongqing	China	CN	28.54	43680	Asia/Shanghai
 Yeongdong		North Chungcheong	South Korea	KR	36.17	43680	Asia/Seoul
@@ -14015,7 +14029,6 @@ Caripito		Monagas	Venezuela	VE	10.11	43448	America/Caracas
 Las Tejerías	Las Tejerias	Aragua	Venezuela	VE	10.25	43445	America/Caracas
 Barajas de Madrid		Madrid	Spain	ES	40.47	43423	Europe/Madrid
 Gaozuo		Jiangsu	China	CN	33.90	43419	Asia/Shanghai
-Prostějov	Prostejov	Olomouc Region	Czechia	CZ	49.47	43408	Europe/Prague
 Bozeman		Montana	United States	US	45.68	43405	America/Denver
 Villa de Mayo		Buenos Aires	Argentina	AR	-34.51	43405	America/Argentina/Buenos_Aires
 Fāraskūr	Faraskur	Damietta	Egypt	EG	31.33	43400	Africa/Cairo
@@ -14064,6 +14077,7 @@ Kopali		Jharkhand	India	IN	22.84	43256	Asia/Kolkata
 Tizayuca		Hidalgo	Mexico	MX	19.84	43250	America/Mexico_City
 Maḩallāt	Mahallat	Markazi	Iran	IR	33.91	43245	Asia/Tehran
 Lugoj		Timiș County	Romania	RO	45.69	43243	Europe/Bucharest
+Prostějov	Prostejov	Olomouc Region	Czechia	CZ	49.47	43236	Europe/Prague
 Al Bukayrīyah	Al Bukayriyah	Al-Qassim Region	Saudi Arabia	SA	26.14	43229	Asia/Riyadh
 Sainthia		West Bengal	India	IN	23.95	43221	Asia/Kolkata
 Bellinzona		Ticino	Switzerland	CH	46.19	43220	Europe/Zurich
@@ -14771,7 +14785,6 @@ Hadong		Gyeongsangnam-do	South Korea	KR	35.07	40909	Asia/Seoul
 Muaná	Muana	Pará	Brazil	BR	-1.53	40906	America/Belem
 Niendorf		Hamburg	Germany	DE	53.62	40906	Europe/Berlin
 Poble Sec		Catalonia	Spain	ES	41.37	40906	Europe/Madrid
-Přerov	Prerov	Olomouc Region	Czechia	CZ	49.46	40906	Europe/Prague
 Várzea Alegre	Varzea Alegre	Ceará	Brazil	BR	-6.79	40903	America/Fortaleza
 Lugulu		Busia County	Kenya	KE	0.39	40894	Africa/Nairobi
 Ka'ersai		Xinjiang	China	CN	37.48	40892	Asia/Urumqi
@@ -14898,7 +14911,6 @@ Nannambra		Kerala	India	IN	10.99	40543	Asia/Kolkata
 Lordegān	Lordegan	Chaharmahal and Bakhtiari	Iran	IR	31.51	40528	Asia/Tehran
 Corbeil-Essonnes		Île-de-France	France	FR	48.61	40527	Europe/Paris
 Mai Dịch	Mai Dich	Hanoi	Vietnam	VN	21.03	40527	Asia/Bangkok
-Arkadag		Ahal	Turkmenistan	TM	38.07	40524	Asia/Ashgabat
 Gaurnadi		Barisal Division	Bangladesh	BD	22.97	40519	Asia/Dhaka
 Harderwijk		Gelderland	The Netherlands	NL	52.34	40516	Europe/Amsterdam
 Antsohihy		Sofia	Madagascar	MG	-14.88	40512	Indian/Antananarivo
@@ -14909,6 +14921,7 @@ Boyampālaiyam	Boyampalaiyam	Tamil Nadu	India	IN	11.15	40503	Asia/Kolkata
 Yabrūd	Yabrud	Rif-dimashq	Syria	SY	33.97	40502	Asia/Damascus
 Bedelē	Bedele	Oromiya	Ethiopia	ET	8.46	40500	Africa/Addis_Ababa
 Kālia	Kalia	Khulna Division	Bangladesh	BD	23.04	40492	Asia/Dhaka
+Přerov	Prerov	Olomouc Region	Czechia	CZ	49.46	40492	Europe/Prague
 Djenné	Djenne	Mopti	Mali	ML	13.91	40489	Africa/Bamako
 Mukdahan		Mukdahan	Thailand	TH	16.55	40480	Asia/Bangkok
 Palomeras Bajas		Madrid	Spain	ES	40.38	40477	Europe/Madrid
@@ -15620,7 +15633,6 @@ Vilafranca del Penedès	Vilafranca del Penedes	Catalonia	Spain	ES	41.35	38425	Eu
 Dalnegorsk		Primorye	Russia	RU	44.56	38424	Asia/Vladivostok
 Jiachuan		Sichuan	China	CN	32.21	38421	Asia/Shanghai
 Hobbs		New Mexico	United States	US	32.70	38416	America/Denver
-Třinec	Trinec	Moravian-Silesian Region	Czechia	CZ	49.68	38415	Europe/Prague
 Kalmar		Kalmar	Sweden	SE	56.66	38408	Europe/Stockholm
 Choi Wan		Wong Tai Sin District	Hong Kong	HK	22.33	38405	Asia/Hong_Kong
 Muskegon		Michigan	United States	US	43.23	38401	America/Detroit
@@ -16145,6 +16157,7 @@ Santa Rita		Maranhão	Brazil	BR	-3.14	37035	America/Fortaleza
 Kabare		South Kivu	Democratic Republic of the Congo	CD	-2.50	37034	Africa/Lubumbashi
 Kampene		Maniema	Democratic Republic of the Congo	CD	-3.60	37034	Africa/Lubumbashi
 Calumet City		Illinois	United States	US	41.62	37031	America/Chicago
+Kassambya		Kagera	Tanzania	TZ	-1.20	37028	Africa/Dar_es_Salaam
 Mińsk Mazowiecki	Minsk Mazowiecki	Mazovia	Poland	PL	52.18	37027	Europe/Warsaw
 Giyani		Limpopo	South Africa	ZA	-23.30	37024	Africa/Johannesburg
 Saint-Benoît	Saint-Benoit	Reunion	Reunion	RE	-21.04	37023	Indian/Reunion
@@ -16219,7 +16232,6 @@ Los Palacios y Villafranca		Andalusia	Spain	ES	37.16	36824	Europe/Madrid
 Qina		Yunnan	China	CN	26.31	36823	Asia/Shanghai
 Missão Velha	Missao Velha	Ceará	Brazil	BR	-7.25	36822	America/Fortaleza
 Wermelskirchen		North Rhine-Westphalia	Germany	DE	51.14	36816	Europe/Berlin
-Česká Lípa	Ceska Lipa	Liberec Region	Czechia	CZ	50.69	36815	Europe/Prague
 Or Yehuda		Tel Aviv	Israel	IL	32.03	36813	Asia/Jerusalem
 Pīpār	Pipar	Rajasthan	India	IN	26.38	36810	Asia/Kolkata
 Lanka		Assam	India	IN	25.93	36805	Asia/Kolkata
@@ -16389,6 +16401,7 @@ Tamamura		Gunma	Japan	JP	36.30	36367	Asia/Tokyo
 Temple City		California	United States	US	34.11	36365	America/Los_Angeles
 Betafo		Vakinankaratra	Madagascar	MG	-19.83	36364	Indian/Antananarivo
 Porta Westfalica		North Rhine-Westphalia	Germany	DE	52.23	36364	Europe/Berlin
+Česká Lípa	Ceska Lipa	Liberec Region	Czechia	CZ	50.69	36364	Europe/Prague
 Marion		Ohio	United States	US	40.59	36363	America/New_York
 Mellunkylä	Mellunkylae	Uusimaa	Finland	FI	60.23	36360	Europe/Helsinki
 Conflans-Sainte-Honorine		Île-de-France	France	FR	49.00	36358	Europe/Paris
@@ -16429,7 +16442,6 @@ Piaseczno		Mazovia	Poland	PL	52.08	36278	Europe/Warsaw
 Włochy	Wlochy	Mazovia	Poland	PL	52.18	36276	Europe/Warsaw
 Yaita		Tochigi	Japan	JP	36.80	36275	Asia/Tokyo
 Parappur		Kerala	India	IN	11.01	36270	Asia/Kolkata
-Tábor	Tabor	South Bohemian Region	Czechia	CZ	49.41	36264	Europe/Prague
 Srono		East Java	Indonesia	ID	-8.40	36260	Asia/Jakarta
 Arucas		Canary Islands	Spain	ES	28.12	36259	Atlantic/Canary
 Jalilabad		Jalilabad	Azerbaijan	AZ	39.21	36259	Asia/Baku
@@ -16585,6 +16597,7 @@ Wildwood		Missouri	United States	US	38.58	35899	America/Chicago
 Waregem		Flanders	Belgium	BE	50.89	35896	Europe/Brussels
 Hyde		England	United Kingdom	GB	53.45	35895	Europe/London
 Labranza		Araucania	Chile	CL	-38.77	35893	America/Santiago
+Sepetiba		Rio de Janeiro	Brazil	BR	-22.98	35892	America/Sao_Paulo
 Yalutorovsk		Tyumen Oblast	Russia	RU	56.65	35892	Asia/Yekaterinburg
 Mādāyi	Madayi	Puducherry	India	IN	12.03	35888	Asia/Kolkata
 Valuyki		Belgorod Oblast	Russia	RU	50.20	35887	Europe/Moscow
@@ -16668,6 +16681,7 @@ Coyotepec		México	Mexico	MX	19.78	35677	America/Mexico_City
 Mirasierra		Madrid	Spain	ES	40.50	35676	Europe/Madrid
 Lahār	Lahar	Madhya Pradesh	India	IN	26.19	35674	Asia/Kolkata
 Sōsa	Sosa	Chiba	Japan	JP	35.72	35674	Asia/Tokyo
+Af’abet	Af'abet	Debub	Eritrea	ER	16.19	35673	Africa/Asmara
 Tibati		Adamaoua	Cameroon	CM	6.47	35673	Africa/Douala
 Det Udom		Ubon Ratchathani	Thailand	TH	14.91	35669	Asia/Bangkok
 Puerto del Rosario		Canary Islands	Spain	ES	28.50	35667	Atlantic/Canary
@@ -17272,6 +17286,7 @@ Sainte-Marie		Reunion	Reunion	RE	-20.90	34344	Indian/Reunion
 Cottonwood Heights		Utah	United States	US	40.62	34343	America/Denver
 Gojō	Gojo	Nara	Japan	JP	34.35	34342	Asia/Tokyo
 Soyāgaon	Soyagaon	Maharashtra	India	IN	20.55	34341	Asia/Kolkata
+Tábor	Tabor	South Bohemian Region	Czechia	CZ	49.41	34339	Europe/Prague
 Chiswick		England	United Kingdom	GB	51.49	34337	Europe/London
 Ranipur		Sindh	Pakistan	PK	27.29	34337	Asia/Karachi
 Kinel’	Kinel'	Samara Oblast	Russia	RU	53.23	34336	Europe/Samara
@@ -17663,6 +17678,7 @@ Acornhoek		Limpopo	South Africa	ZA	-24.59	33529	Africa/Johannesburg
 As Sūkī	As Suki	Sennar	Sudan	SD	13.32	33524	Africa/Khartoum
 Olot		Catalonia	Spain	ES	42.18	33524	Europe/Madrid
 Ostróda	Ostroda	Warmia-Masuria	Poland	PL	53.70	33524	Europe/Warsaw
+Třinec	Trinec	Moravian-Silesian Region	Czechia	CZ	49.68	33523	Europe/Prague
 Prachuap Khiri Khan		Prachuap Khiri Khan	Thailand	TH	11.82	33521	Asia/Bangkok
 Bom Retiro		São Paulo	Brazil	BR	-23.53	33520	America/Sao_Paulo
 Surrey City Centre		British Columbia	Canada	CA	49.19	33520	America/Vancouver
@@ -17704,7 +17720,6 @@ Fairborn		Ohio	United States	US	39.82	33452	America/New_York
 Shetan		Chongqing	China	CN	29.99	33452	Asia/Shanghai
 Menlo Park		California	United States	US	37.45	33449	America/Los_Angeles
 Chimbarongo		O'Higgins Region	Chile	CL	-34.71	33446	America/Santiago
-Kolín	Kolin	Central Bohemia	Czechia	CZ	50.03	33444	Europe/Prague
 Birmitrapur		Odisha	India	IN	22.40	33442	Asia/Kolkata
 Chicago Loop		Illinois	United States	US	41.88	33442	America/Chicago
 Voznesensk		Mykolaiv	Ukraine	UA	47.56	33442	Europe/Kyiv
@@ -17731,6 +17746,7 @@ Korschenbroich		North Rhine-Westphalia	Germany	DE	51.19	33406	Europe/Berlin
 Ciudad Vieja		Sacatepéquez	Guatemala	GT	14.52	33405	America/Guatemala
 Hinesville		Georgia	United States	US	31.85	33398	America/New_York
 Zaidpur		Uttar Pradesh	India	IN	26.83	33397	Asia/Kolkata
+Kolín	Kolin	Central Bohemia	Czechia	CZ	50.03	33392	Europe/Prague
 Harrismith		Free State	South Africa	ZA	-28.27	33390	Africa/Johannesburg
 Istra		Moscow Oblast	Russia	RU	55.92	33390	Europe/Moscow
 Nartkala		Kabardino-Balkariya Republic	Russia	RU	43.55	33390	Europe/Moscow
@@ -17954,6 +17970,7 @@ Patrātu	Patratu	Jharkhand	India	IN	23.67	32899	Asia/Kolkata
 Salisbury		Maryland	United States	US	38.36	32899	America/New_York
 Douglasville		Georgia	United States	US	33.75	32897	America/New_York
 Warrnambool		Victoria	Australia	AU	-38.38	32894	Australia/Melbourne
+Cheb		Carlsbad Region	Czechia	CZ	50.08	32892	Europe/Prague
 Silver Lake		California	United States	US	34.09	32890	America/Los_Angeles
 Aguaí	Aguai	São Paulo	Brazil	BR	-22.06	32888	America/Sao_Paulo
 Nanping		Chongqing	China	CN	29.09	32888	Asia/Shanghai
@@ -17994,7 +18011,6 @@ Eunos			Singapore	SG	1.32	32820	Asia/Singapore
 Pullman		Washington	United States	US	46.73	32816	America/Los_Angeles
 Sneek		Friesland	The Netherlands	NL	53.03	32811	Europe/Amsterdam
 Pilar		Ñeembucú Department	Paraguay	PY	-26.86	32810	America/Asuncion
-Cheb		Carlsbad Region	Czechia	CZ	50.08	32808	Europe/Prague
 Igrejinha		Rio Grande do Sul	Brazil	BR	-29.57	32808	America/Sao_Paulo
 Bihārīganj	Bihariganj	Bihar	India	IN	25.73	32805	Asia/Kolkata
 Pombal		Paraíba	Brazil	BR	-6.77	32802	America/Fortaleza
@@ -18243,6 +18259,7 @@ De Aar		Northern Cape	South Africa	ZA	-30.65	32318	Africa/Johannesburg
 Comalapa		Chimaltenango	Guatemala	GT	14.74	32312	America/Guatemala
 Guimba		Central Luzon	Philippines	PH	15.66	32306	Asia/Manila
 College Park		Maryland	United States	US	38.98	32301	America/New_York
+Wenquan		Inner Mongolia	China	CN	47.18	32301	Asia/Shanghai
 Nurota		Navoiy Region	Uzbekistan	UZ	40.56	32300	Asia/Samarkand
 Chittūr	Chittur	Kerala	India	IN	10.70	32298	Asia/Kolkata
 Madhapar		Gujarat	India	IN	23.24	32293	Asia/Kolkata
@@ -18695,7 +18712,6 @@ Osterholz-Scharmbeck		Lower Saxony	Germany	DE	53.23	31405	Europe/Berlin
 Bale Robe		Oromiya	Ethiopia	ET	7.12	31400	Africa/Addis_Ababa
 Bektemir		Tashkent	Uzbekistan	UZ	41.21	31400	Asia/Tashkent
 Lukyanivka		Kyiv City	Ukraine	UA	50.47	31400	Europe/Kyiv
-Trutnov		Hradec Králové Region	Czechia	CZ	50.56	31398	Europe/Prague
 Arroyomolinos		Madrid	Spain	ES	40.27	31396	Europe/Madrid
 Mehdia daira de meghila		Tiaret	Algeria	DZ	35.43	31396	Africa/Algiers
 Côte-Saint-Luc	Cote-Saint-Luc	Quebec	Canada	CA	45.47	31395	America/Toronto
@@ -18901,6 +18917,7 @@ Malakanagiri		Odisha	India	IN	18.36	31007	Asia/Kolkata
 Yurigaoka		Fukuoka	Japan	JP	33.85	31007	Asia/Tokyo
 São José do Egito	Sao Jose do Egito	Pernambuco	Brazil	BR	-7.48	31004	America/Recife
 Mimarsinan		Istanbul	Turkey	TR	41.01	31002	Europe/Istanbul
+Písek	Pisek	South Bohemian Region	Czechia	CZ	49.31	31002	Europe/Prague
 Caluquembe		Huíla	Angola	AO	-13.87	31000	Africa/Luanda
 Dayē	Daye	Oromiya	Ethiopia	ET	9.88	31000	Africa/Addis_Ababa
 Justiniškės	Justiniskes	Vilnius	Lithuania	LT	54.72	31000	Europe/Vilnius
@@ -19255,6 +19272,7 @@ San Pablo		California	United States	US	37.96	30407	America/Los_Angeles
 Karjan		Gujarat	India	IN	22.05	30405	Asia/Kolkata
 Śrem	Srem	Greater Poland	Poland	PL	52.09	30404	Europe/Warsaw
 Abomsa		Amhara	Ethiopia	ET	9.98	30400	Africa/Addis_Ababa
+Mambali		Tabora	Tanzania	TZ	-4.55	30398	Africa/Dar_es_Salaam
 Arrecifes		Buenos Aires	Argentina	AR	-34.06	30397	America/Argentina/Buenos_Aires
 Muvattupuzha		Kerala	India	IN	9.98	30397	Asia/Kolkata
 la Marina de Port		Catalonia	Spain	ES	41.36	30397	Europe/Madrid
@@ -19460,6 +19478,7 @@ Cát Bà	Cat Ba	Hai Phong	Vietnam	VN	20.73	30000	Asia/Ho_Chi_Minh
 Davydkovo		Moscow	Russia	RU	55.72	30000	Europe/Moscow
 Dibba Al-Fujairah		Fujairah	United Arab Emirates	AE	25.59	30000	Asia/Dubai
 Dlhé diely	Dlhe diely	Bratislava Region	Slovakia	SK	48.15	30000	Europe/Bratislava
+Eagle Foothills		Idaho	United States	US	43.74	30000	America/Boise
 Fuyuan		Heilongjiang	China	CN	48.36	30000	Asia/Shanghai
 Ghormach		Badghis	Afghanistan	AF	35.73	30000	Asia/Kabul
 Kabaty		Mazovia	Poland	PL	52.13	30000	Europe/Warsaw
@@ -19620,7 +19639,6 @@ San Miguel Ajusco		Mexico City	Mexico	MX	19.22	29781	America/Mexico_City
 Mookgophong		Limpopo	South Africa	ZA	-24.52	29778	Africa/Johannesburg
 Waterloo		Wallonia	Belgium	BE	50.71	29778	Europe/Brussels
 Gemas		Negeri Sembilan	Malaysia	MY	2.58	29777	Asia/Kuala_Lumpur
-Písek	Pisek	South Bohemian Region	Czechia	CZ	49.31	29774	Europe/Prague
 Shahrak-e Qods		Tehran	Iran	IR	35.76	29774	Asia/Tehran
 Lobatse		Lobatse	Botswana	BW	-25.22	29772	Africa/Gaborone
 Ghauspur		Sindh	Pakistan	PK	28.14	29767	Asia/Karachi
@@ -19887,6 +19905,7 @@ Alaquàs	Alaquas	Valencia	Spain	ES	39.46	29341	Europe/Madrid
 Amballūr	Amballur	Kerala	India	IN	10.43	29341	Asia/Kolkata
 Didcot		England	United Kingdom	GB	51.61	29341	Europe/London
 Koovappady		Kerala	India	IN	10.16	29339	Asia/Kolkata
+Trutnov		Hradec Králové Region	Czechia	CZ	50.56	29337	Europe/Prague
 Rosario de la Frontera		Salta	Argentina	AR	-25.80	29336	America/Argentina/Salta
 Thal		Khyber Pakhtunkhwa	Pakistan	PK	35.48	29331	Asia/Karachi
 Port Huron		Michigan	United States	US	42.97	29330	America/Detroit
@@ -20983,7 +21002,6 @@ Port Richmond		Pennsylvania	United States	US	39.99	27554	America/New_York
 Pombos		Pernambuco	Brazil	BR	-8.14	27552	America/Recife
 Bad Zwischenahn		Lower Saxony	Germany	DE	53.18	27550	Europe/Berlin
 Novo Oriente		Ceará	Brazil	BR	-5.53	27545	America/Fortaleza
-Orlová	Orlova	Moravian-Silesian Region	Czechia	CZ	49.85	27540	Europe/Prague
 Selm		North Rhine-Westphalia	Germany	DE	51.70	27540	Europe/Berlin
 Kirkby in Ashfield		England	United Kingdom	GB	53.10	27539	Europe/London
 Mechernich		North Rhine-Westphalia	Germany	DE	50.59	27537	Europe/Berlin
@@ -21025,7 +21043,6 @@ Friedberg		Hesse	Germany	DE	50.34	27484	Europe/Berlin
 Oiapoque		Amapá	Brazil	BR	3.84	27482	America/Belem
 Arai		Niigata	Japan	JP	37.00	27481	Asia/Tokyo
 Burngreave		England	United Kingdom	GB	53.39	27481	Europe/London
-Valašské Meziříčí	Valasske Mezirici	Zlín	Czechia	CZ	49.47	27481	Europe/Prague
 Kętrzyn	Ketrzyn	Warmia-Masuria	Poland	PL	54.08	27478	Europe/Warsaw
 San Pedro		San José	Costa Rica	CR	9.93	27477	America/Costa_Rica
 Dashi		Gansu	China	CN	34.90	27474	Asia/Shanghai
@@ -21092,6 +21109,7 @@ Abasolo		Guanajuato	Mexico	MX	20.45	27389	America/Mexico_City
 Maryland Heights		Missouri	United States	US	38.71	27389	America/Chicago
 Aïn Attig	Ain Attig	Rabat-Salé-Kénitra	Morocco	MA	33.89	27384	Africa/Casablanca
 Emmendingen		Baden-Wurttemberg	Germany	DE	48.12	27383	Europe/Berlin
+Orlová	Orlova	Moravian-Silesian Region	Czechia	CZ	49.85	27383	Europe/Prague
 Tamansourt		Marrakesh-Safi	Morocco	MA	31.75	27383	Africa/Casablanca
 Ashford		England	United Kingdom	GB	51.43	27382	Europe/London
 Nā’īn	Na'in	Isfahan	Iran	IR	32.86	27379	Asia/Tehran
@@ -21113,6 +21131,7 @@ Ibo Town		Banjul	Gambia	GM	13.44	27353	Africa/Banjul
 Akesalayi		Xinjiang	China	CN	37.17	27352	Asia/Urumqi
 Carlow		Leinster	Ireland	IE	52.84	27351	Europe/Dublin
 Crofton		Maryland	United States	US	39.00	27348	America/New_York
+Acari		Rio de Janeiro	Brazil	BR	-22.82	27347	America/Sao_Paulo
 Shakaskraal		KwaZulu-Natal	South Africa	ZA	-29.45	27345	Africa/Johannesburg
 Huimanguillo		Tabasco	Mexico	MX	17.83	27344	America/Merida
 Krč	Krc	Prague	Czechia	CZ	50.04	27344	Europe/Prague
@@ -21640,6 +21659,7 @@ Barogo		Plateau-Central	Burkina Faso	BF	12.55	26539	Africa/Ouagadougou
 Echemmaia Est		Marrakesh-Safi	Morocco	MA	32.08	26538	Africa/Casablanca
 Sankarapatti		Tamil Nadu	India	IN	10.05	26536	Asia/Kolkata
 Veranópolis	Veranopolis	Rio Grande do Sul	Brazil	BR	-28.94	26533	America/Sao_Paulo
+Mutukula		Kagera	Tanzania	TZ	-1.00	26532	Africa/Dar_es_Salaam
 Maramba		Tanga	Tanzania	TZ	-5.05	26531	Africa/Dar_es_Salaam
 Cueto		Holguín Province	Cuba	CU	20.65	26527	America/Havana
 Shofirkon Shahri		Bukhara	Uzbekistan	UZ	40.12	26527	Asia/Samarkand
@@ -21750,6 +21770,7 @@ Namapa-erati		Nampula	Mozambique	MZ	-13.71	26383	Africa/Maputo
 Zaltbommel		Gelderland	The Netherlands	NL	51.81	26383	Europe/Amsterdam
 Izegem		Flanders	Belgium	BE	50.91	26382	Europe/Brussels
 Ashton in Makerfield		England	United Kingdom	GB	53.48	26380	Europe/London
+Kakunyu		Kagera	Tanzania	TZ	-1.01	26379	Africa/Dar_es_Salaam
 Espelkamp		North Rhine-Westphalia	Germany	DE	52.38	26378	Europe/Berlin
 Kahone		Kaolack	Senegal	SN	14.16	26376	Africa/Dakar
 Liwá	Liwa	Al Batinah North	Oman	OM	24.53	26372	Asia/Muscat
@@ -22112,6 +22133,7 @@ Beltline		Alberta	Canada	CA	51.04	25880	America/Edmonton
 Inner Huai Khwang		Bangkok	Thailand	TH	13.78	25879	Asia/Bangkok
 Dole		Bourgogne	France	FR	47.09	25878	Europe/Paris
 Jāmul	Jamul	Chhattisgarh	India	IN	21.25	25878	Asia/Kolkata
+Linxi		Inner Mongolia	China	CN	43.52	25878	Asia/Shanghai
 Nalhāti	Nalhati	West Bengal	India	IN	24.30	25878	Asia/Kolkata
 Opportunity		Washington	United States	US	47.65	25877	America/Los_Angeles
 Aserrí	Aserri	San José	Costa Rica	CR	9.86	25874	America/Costa_Rica
@@ -22625,7 +22647,6 @@ Middle River		Maryland	United States	US	39.33	25191	America/New_York
 Woodstock		Illinois	United States	US	42.31	25189	America/Chicago
 Mostovskoy		Krasnodar Krai	Russia	RU	44.41	25188	Europe/Moscow
 Murree		Punjab	Pakistan	PK	33.91	25186	Asia/Karachi
-Vsetín	Vsetin	Zlín	Czechia	CZ	49.34	25185	Europe/Prague
 Erlun		Taiwan	Taiwan	TW	23.77	25183	Asia/Taipei
 Piranhas		Alagoas	Brazil	BR	-9.62	25183	America/Maceio
 Pāonta Sāhib	Paonta Sahib	Himachal Pradesh	India	IN	30.44	25183	Asia/Kolkata
@@ -22845,6 +22866,7 @@ Sadulshahar		Rajasthan	India	IN	29.91	24980	Asia/Kolkata
 Zverevo		Rostov	Russia	RU	48.03	24978	Europe/Moscow
 Chalk Farm		England	United Kingdom	GB	51.54	24977	Europe/London
 Borāwar	Borawar	Rajasthan	India	IN	27.02	24975	Asia/Kolkata
+Vsetín	Vsetin	Zlín	Czechia	CZ	49.34	24974	Europe/Prague
 Riverside		Ohio	United States	US	39.78	24972	America/New_York
 Rákoskeresztúr	Rakoskeresztur	Pest County	Hungary	HU	47.47	24971	Europe/Budapest
 Talisay		Calabarzon	Philippines	PH	14.09	24969	Asia/Manila
@@ -22915,7 +22937,6 @@ Daphne		Alabama	United States	US	30.60	24896	America/Chicago
 Whitehall Township		Pennsylvania	United States	US	40.67	24896	America/New_York
 Jucás	Jucas	Ceará	Brazil	BR	-6.53	24892	America/Fortaleza
 Ahmadpur Sial		Punjab	Pakistan	PK	30.68	24889	Asia/Karachi
-Uherské Hradiště	Uherske Hradiste	Zlín	Czechia	CZ	49.07	24887	Europe/Prague
 Apiaí	Apiai	São Paulo	Brazil	BR	-24.51	24886	America/Sao_Paulo
 Newport		England	United Kingdom	GB	50.70	24884	Europe/London
 Kānth	Kanth	Uttar Pradesh	India	IN	29.06	24883	Asia/Kolkata
@@ -22950,6 +22971,7 @@ Jenjarum		Selangor	Malaysia	MY	2.87	24857	Asia/Kuala_Lumpur
 Gagarin Shahri		Jizzakh Region	Uzbekistan	UZ	40.66	24856	Asia/Samarkand
 João Dourado	Joao Dourado	Bahia	Brazil	BR	-11.34	24854	America/Bahia
 Rudolstadt		Thuringia	Germany	DE	50.72	24852	Europe/Berlin
+Uherské Hradiště	Uherske Hradiste	Zlín	Czechia	CZ	49.07	24852	Europe/Prague
 Onda		Valencia	Spain	ES	39.96	24850	Europe/Madrid
 Iturrama		Navarre	Spain	ES	42.81	24846	Europe/Madrid
 Mahwa		Rajasthan	India	IN	27.05	24846	Asia/Kolkata
@@ -23109,6 +23131,7 @@ Arauco		Biobio	Chile	CL	-37.25	24659	America/Santiago
 Bixby		Oklahoma	United States	US	35.94	24657	America/Chicago
 Ezhudesam		Tamil Nadu	India	IN	8.27	24657	Asia/Kolkata
 Siraha		Madhesh	Nepal	NP	26.65	24657	Asia/Kathmandu
+Bystrc		South Moravian	Czechia	CZ	49.23	24655	Europe/Prague
 Martos		Andalusia	Spain	ES	37.72	24655	Europe/Madrid
 Al Quşayr	Al Qusayr	Red Sea	Egypt	EG	26.11	24653	Africa/Cairo
 Uvinza		Kigoma	Tanzania	TZ	-5.10	24650	Africa/Dar_es_Salaam
@@ -23347,7 +23370,6 @@ St Austell		England	United Kingdom	GB	50.34	24360	Europe/London
 Bélabo	Belabo	East	Cameroon	CM	4.93	24359	Africa/Douala
 Skopin		Ryazan Oblast	Russia	RU	53.82	24357	Europe/Moscow
 Birkirkara		Birkirkara	Malta	MT	35.90	24356	Europe/Malta
-Havlíčkův Brod	Havlickuv Brod	Vysocina	Czechia	CZ	49.61	24356	Europe/Prague
 Barrancas		Barinas	Venezuela	VE	8.77	24354	America/Caracas
 Midland		Ontario	Canada	CA	44.75	24353	America/Toronto
 Lanester		Brittany	France	FR	47.76	24352	Europe/Paris
@@ -24152,7 +24174,6 @@ Nikaho		Akita	Japan	JP	39.27	23435	Asia/Tokyo
 Kilindoni		Pwani	Tanzania	TZ	-7.91	23426	Africa/Dar_es_Salaam
 Yugawara		Kanagawa	Japan	JP	35.15	23426	Asia/Tokyo
 Chhātāpur	Chhatapur	Bihar	India	IN	26.22	23425	Asia/Kolkata
-Kopřivnice	Koprivnice	Moravian-Silesian Region	Czechia	CZ	49.60	23424	Europe/Prague
 Raul Soares		Minas Gerais	Brazil	BR	-20.10	23423	America/Sao_Paulo
 Itapaci		Goiás	Brazil	BR	-14.95	23421	America/Sao_Paulo
 Tūnēri	Tuneri	Kerala	India	IN	11.70	23421	Asia/Kolkata
@@ -24205,6 +24226,7 @@ Mernda		Victoria	Australia	AU	-37.60	23369	Australia/Melbourne
 Misburg-Nord		Lower Saxony	Germany	DE	52.40	23369	Europe/Berlin
 Caniço	Canico	Madeira	Portugal	PT	32.65	23368	Atlantic/Madeira
 Cesano Boscone		Lombardy	Italy	IT	45.44	23368	Europe/Rome
+Havlíčkův Brod	Havlickuv Brod	Vysocina	Czechia	CZ	49.61	23368	Europe/Prague
 Takahata		Yamagata	Japan	JP	38.00	23367	Asia/Tokyo
 Eloise		Florida	United States	US	27.99	23366	America/New_York
 Laguna Beach		California	United States	US	33.54	23365	America/Los_Angeles
@@ -24213,6 +24235,7 @@ Geretsried		Bavaria	Germany	DE	47.86	23364	Europe/Berlin
 Springfield		Pennsylvania	United States	US	39.93	23363	America/New_York
 Monoharpur		West Bengal	India	IN	22.11	23362	Asia/Kolkata
 Ciudad Bolívar	Ciudad Bolivar	Antioquia	Colombia	CO	5.85	23361	America/Bogota
+El Palmar		Murcia	Spain	ES	37.94	23361	Europe/Madrid
 Koster		North West	South Africa	ZA	-25.86	23361	Africa/Johannesburg
 Ikeno		Gifu	Japan	JP	35.43	23360	Asia/Tokyo
 Baza		Andalusia	Spain	ES	37.49	23359	Europe/Madrid
@@ -24619,6 +24642,7 @@ Vattalkundu		Tamil Nadu	India	IN	10.16	22928	Asia/Kolkata
 Ardahan		Ardahan	Turkey	TR	41.11	22927	Europe/Istanbul
 Machesney Park		Illinois	United States	US	42.35	22927	America/Chicago
 Morgan Park		Illinois	United States	US	41.69	22924	America/Chicago
+Klatovy		Plzeň Region	Czechia	CZ	49.40	22921	Europe/Prague
 Vertou		Pays de la Loire	France	FR	47.17	22921	Europe/Paris
 Dhamanagar		Odisha	India	IN	20.92	22920	Asia/Kolkata
 Nafada		Gombe State	Nigeria	NG	11.10	22920	Africa/Lagos
@@ -24717,7 +24741,6 @@ Illapel		Coquimbo Region	Chile	CL	-31.63	22816	America/Santiago
 Vellūr	Vellur	Kerala	India	IN	8.63	22816	Asia/Kolkata
 Wellington		England	United Kingdom	GB	52.70	22816	Europe/London
 Fatehnagar		Rajasthan	India	IN	24.81	22812	Asia/Kolkata
-Jindřichův Hradec	Jindrichuv Hradec	South Bohemian Region	Czechia	CZ	49.14	22812	Europe/Prague
 Valmiera		Valmiera	Latvia	LV	57.54	22812	Europe/Riga
 Campo de la Cruz		Atlántico	Colombia	CO	10.38	22810	America/Bogota
 Igugunu		Singida	Tanzania	TZ	-4.57	22810	Africa/Dar_es_Salaam
@@ -24755,7 +24778,6 @@ Ogre		Ogre	Latvia	LV	56.82	22767	Europe/Riga
 Pariyāpuram	Pariyapuram	Kerala	India	IN	11.02	22766	Asia/Kolkata
 Öhringen	Ohringen	Baden-Wurttemberg	Germany	DE	49.20	22765	Europe/Berlin
 Acajutla		Sonsonate Department	El Salvador	SV	13.59	22763	America/El_Salvador
-Klatovy		Plzeň Region	Czechia	CZ	49.40	22763	Europe/Prague
 Baravāt	Baravat	Kerman	Iran	IR	29.07	22761	Asia/Tehran
 Barro		Ceará	Brazil	BR	-7.18	22758	America/Fortaleza
 The Crossings		Florida	United States	US	25.67	22758	America/New_York
@@ -24834,7 +24856,6 @@ Godalming		England	United Kingdom	GB	51.19	22689	Europe/London
 Da Nyin Kone		Yangon	Myanmar	MM	16.93	22688	Asia/Yangon
 Matinkylä	Matinkylae	Uusimaa	Finland	FI	60.16	22688	Europe/Helsinki
 Mingda		Chongqing	China	CN	30.73	22686	Asia/Shanghai
-Bystrc		South Moravian	Czechia	CZ	49.23	22685	Europe/Prague
 Kirovgrad		Sverdlovsk Oblast	Russia	RU	57.43	22685	Asia/Yekaterinburg
 Oak Ridge		Florida	United States	US	28.47	22685	America/New_York
 Rosemont		California	United States	US	38.55	22681	America/Los_Angeles
@@ -24931,6 +24952,7 @@ Barreira		Ceará	Brazil	BR	-4.29	22573	America/Fortaleza
 San Vicente		O'Higgins Region	Chile	CL	-34.43	22572	America/Santiago
 Campoalegre		Huila Department	Colombia	CO	2.68	22568	America/Bogota
 Nāgod	Nagod	Madhya Pradesh	India	IN	24.57	22568	Asia/Kolkata
+Valašské Meziříčí	Valasske Mezirici	Zlín	Czechia	CZ	49.47	22568	Europe/Prague
 Apas		Central Visayas	Philippines	PH	10.34	22566	Asia/Manila
 Farmington		Utah	United States	US	40.98	22566	America/Denver
 Magenta		Lombardy	Italy	IT	45.46	22566	Europe/Rome
@@ -24978,7 +25000,6 @@ Bankāpur	Bankapur	Karnataka	India	IN	14.92	22529	Asia/Kolkata
 Gambiran Satu		East Java	Indonesia	ID	-8.39	22525	Asia/Jakarta
 Sidi Rahal		Casablanca-Settat	Morocco	MA	33.48	22525	Africa/Casablanca
 North Augusta		South Carolina	United States	US	33.50	22522	America/New_York
-Krnov		Moravian-Silesian Region	Czechia	CZ	50.09	22518	Europe/Prague
 Godoli		Maharashtra	India	IN	17.67	22517	Asia/Kolkata
 Diest		Flanders	Belgium	BE	50.99	22516	Europe/Brussels
 Murayama		Yamagata	Japan	JP	38.47	22516	Asia/Tokyo
@@ -25100,7 +25121,6 @@ Deogarh		Odisha	India	IN	21.54	22390	Asia/Kolkata
 Freire		Araucania	Chile	CL	-38.95	22390	America/Santiago
 Chuka		Tharaka - Nithi	Kenya	KE	-0.33	22388	Africa/Nairobi
 Muritiba		Bahia	Brazil	BR	-12.92	22388	America/Bahia
-Litvínov	Litvinov	Ústí nad Labem Region	Czechia	CZ	50.60	22387	Europe/Prague
 Radcliff		Kentucky	United States	US	37.84	22387	America/New_York
 Boukoumbé	Boukoumbe	Atakora	Benin	BJ	10.18	22386	Africa/Porto-Novo
 Imperial		Madrid	Spain	ES	40.41	22385	Europe/Madrid
@@ -25133,7 +25153,6 @@ Apuí	Apui	Amazonas	Brazil	BR	-7.20	22359	America/Manaus
 Cumaru do Norte		Pará	Brazil	BR	-7.83	22359	America/Belem
 Timurni		Madhya Pradesh	India	IN	22.37	22359	Asia/Kolkata
 Thornaby-on-Tees		England	United Kingdom	GB	54.53	22356	Europe/London
-Strakonice		South Bohemian Region	Czechia	CZ	49.26	22355	Europe/Prague
 Pachgaon		Maharashtra	India	IN	16.66	22353	Asia/Kolkata
 San José de Barlovento	San Jose de Barlovento	Miranda	Venezuela	VE	10.30	22352	America/Caracas
 New Brighton		Minnesota	United States	US	45.07	22351	America/Chicago
@@ -25180,6 +25199,7 @@ Baraki Barak		Logar	Afghanistan	AF	33.97	22305	Asia/Kabul
 Dax		New Aquitaine	France	FR	43.71	22305	Europe/Paris
 Coswig		Saxony	Germany	DE	51.13	22304	Europe/Berlin
 Tabligbo		Maritime	Togo	TG	6.58	22304	Africa/Lome
+Krnov		Moravian-Silesian Region	Czechia	CZ	50.09	22303	Europe/Prague
 Aghsu		Agsu District	Azerbaijan	AZ	40.57	22300	Asia/Baku
 Bundibugyo		Western Region	Uganda	UG	0.71	22300	Africa/Kampala
 Piúma	Piuma	Espírito Santo	Brazil	BR	-20.84	22300	America/Sao_Paulo
@@ -25207,6 +25227,7 @@ Mutuípe	Mutuipe	Bahia	Brazil	BR	-13.23	22282	America/Bahia
 San Martín	San Martin	Meta Department	Colombia	CO	3.70	22281	America/Bogota
 Monte Aprazível	Monte Aprazivel	São Paulo	Brazil	BR	-20.77	22280	America/Sao_Paulo
 Senden		Bavaria	Germany	DE	48.32	22275	Europe/Berlin
+Strakonice		South Bohemian Region	Czechia	CZ	49.26	22275	Europe/Prague
 Kasamatsuchō	Kasamatsucho	Gifu	Japan	JP	35.37	22273	Asia/Tokyo
 Khanpur Mahar		Sindh	Pakistan	PK	27.84	22273	Asia/Karachi
 Lordelo do Ouro		Porto	Portugal	PT	41.15	22270	Europe/Lisbon
@@ -25217,6 +25238,7 @@ Demba		Kasai-Central	Democratic Republic of the Congo	CD	-5.50	22263	Africa/Lubu
 Hingorja		Sindh	Pakistan	PK	27.21	22263	Asia/Karachi
 Koprivnica		Koprivnica-Križevci	Croatia	HR	46.16	22262	Europe/Zagreb
 Oakdale		California	United States	US	37.77	22259	America/Los_Angeles
+Litvínov	Litvinov	Ústí nad Labem Region	Czechia	CZ	50.60	22258	Europe/Prague
 Darien		Illinois	United States	US	41.75	22256	America/Chicago
 Wanshun		Chongqing	China	CN	30.04	22256	Asia/Shanghai
 Gulebage		Xinjiang	China	CN	38.41	22255	Asia/Urumqi
@@ -25430,7 +25452,6 @@ Haderslev		South Denmark	Denmark	DK	55.25	22011	Europe/Copenhagen
 Ottosdal		North West	South Africa	ZA	-26.81	22011	Africa/Johannesburg
 Greystones		Leinster	Ireland	IE	53.14	22009	Europe/Dublin
 Mersing		Johor	Malaysia	MY	2.43	22007	Asia/Kuala_Lumpur
-Sokolov		Carlsbad Region	Czechia	CZ	50.18	22007	Europe/Prague
 Bom Jesus dos Perdões	Bom Jesus dos Perdoes	São Paulo	Brazil	BR	-23.14	22006	America/Sao_Paulo
 Tubmanburg		Bomi County	Liberia	LR	6.87	22005	Africa/Monrovia
 Fécamp	Fecamp	Normandy	France	FR	49.76	22003	Europe/Paris
@@ -25543,6 +25564,7 @@ Sankt Pölten	Sankt Poelten	Lower Austria	Austria	AT	48.21	21911	Europe/Vienna
 Nishiarai		Tokyo	Japan	JP	35.78	21910	Asia/Tokyo
 Reyes Acozac		México	Mexico	MX	19.78	21910	America/Mexico_City
 Seesen		Lower Saxony	Germany	DE	51.89	21909	Europe/Berlin
+Sokolov		Carlsbad Region	Czechia	CZ	50.18	21908	Europe/Prague
 Paosha		Gansu	China	CN	33.72	21907	Asia/Shanghai
 Labis		Johor	Malaysia	MY	2.38	21906	Asia/Kuala_Lumpur
 Polichalur		Tamil Nadu	India	IN	12.99	21906	Asia/Kolkata
@@ -25663,6 +25685,7 @@ Ogura		Gunma	Japan	JP	36.46	21792	Asia/Tokyo
 Kırkağaç	Kirkagac	Manisa	Turkey	TR	39.11	21789	Europe/Istanbul
 Santa María Atzompa	Santa Maria Atzompa	Oaxaca	Mexico	MX	17.10	21788	America/Mexico_City
 Tāzah Khūrmātū	Tazah Khurmatu	Kirkuk	Iraq	IQ	35.30	21788	Asia/Baghdad
+Kutná Hora	Kutna Hora	Central Bohemia	Czechia	CZ	49.95	21787	Europe/Prague
 Aghajari		Khuzestan	Iran	IR	30.70	21785	Asia/Tehran
 Küçükçiğli	Kuecuekcigli	İzmir Province	Turkey	TR	38.51	21784	Europe/Istanbul
 Jainagar		Bihar	India	IN	26.59	21782	Asia/Kolkata
@@ -25694,6 +25717,7 @@ Pātūr	Patur	Maharashtra	India	IN	20.46	21747	Asia/Kolkata
 Sugar Hill		Georgia	United States	US	34.11	21747	America/New_York
 Westchase		Florida	United States	US	28.06	21747	America/New_York
 Kebonarun		Central Java	Indonesia	ID	-7.70	21745	Asia/Jakarta
+Beroun		Central Bohemia	Czechia	CZ	49.96	21744	Europe/Prague
 Shibetsu		Hokkaido	Japan	JP	43.66	21744	Asia/Tokyo
 Ōyama	Oyama	Shizuoka	Japan	JP	34.60	21744	Asia/Tokyo
 Kamienna Góra	Kamienna Gora	Lower Silesia	Poland	PL	50.78	21743	Europe/Warsaw
@@ -25784,7 +25808,6 @@ Legnago		Veneto	Italy	IT	45.19	21646	Europe/Rome
 El Salto		Jalisco	Mexico	MX	20.52	21644	America/Mexico_City
 Yasothon		Yasothon	Thailand	TH	15.79	21643	Asia/Bangkok
 Karben		Hesse	Germany	DE	50.23	21642	Europe/Berlin
-Kutná Hora	Kutna Hora	Central Bohemia	Czechia	CZ	49.95	21642	Europe/Prague
 Hadley Wood		England	United Kingdom	GB	51.67	21639	Europe/London
 Oguta		Imo State	Nigeria	NG	5.71	21639	Africa/Lagos
 Núcleo Bandeirante	Nucleo Bandeirante	Federal District	Brazil	BR	-15.87	21636	America/Sao_Paulo
@@ -25882,7 +25905,6 @@ Wexford		Leinster	Ireland	IE	52.33	21524	Europe/Dublin
 Ladário	Ladario	Mato Grosso do Sul	Brazil	BR	-19.00	21522	America/Campo_Grande
 Pedro Canário	Pedro Canario	Espírito Santo	Brazil	BR	-18.03	21522	America/Bahia
 Annecy-le-Vieux		Rhône-Alpes	France	FR	45.92	21521	Europe/Paris
-Beroun		Central Bohemia	Czechia	CZ	49.96	21521	Europe/Prague
 Selydove		Donetsk	Ukraine	UA	48.15	21521	Europe/Kyiv
 Kilwa Masoko		Lindi	Tanzania	TZ	-8.93	21519	Africa/Dar_es_Salaam
 Boca da Mata		Alagoas	Brazil	BR	-9.64	21517	America/Maceio
@@ -26136,6 +26158,7 @@ Arzignano		Veneto	Italy	IT	45.52	21247	Europe/Rome
 Dunbar-Southlands		British Columbia	Canada	CA	49.24	21245	America/Vancouver
 Galébré	Galebre	Goh-Djiboua	Ivory Coast	CI	6.01	21245	Africa/Abidjan
 Groß-Umstadt	Gross-Umstadt	Hesse	Germany	DE	49.87	21245	Europe/Berlin
+Kopřivnice	Koprivnice	Moravian-Silesian Region	Czechia	CZ	49.60	21245	Europe/Prague
 Traunreut		Bavaria	Germany	DE	47.96	21244	Europe/Berlin
 Katutura		Khomas Region	Namibia	NA	-22.52	21243	Africa/Windhoek
 Muara Bungo		Jambi	Indonesia	ID	-1.49	21243	Asia/Jakarta
@@ -26439,6 +26462,7 @@ Fuente del Berro		Madrid	Spain	ES	40.42	20929	Europe/Madrid
 Valença do Piauí	Valenca do Piaui	Piauí	Brazil	BR	-6.41	20929	America/Fortaleza
 Ichinoe		Tokyo	Japan	JP	35.69	20927	Asia/Tokyo
 Renens		Vaud	Switzerland	CH	46.54	20927	Europe/Zurich
+Brandýs nad Labem-Stará Boleslav	Brandys nad Labem-Stara Boleslav	Central Bohemia	Czechia	CZ	50.19	20926	Europe/Prague
 El Grullo		Jalisco	Mexico	MX	19.81	20924	America/Mexico_City
 Vinnamāla	Vinnamala	Andhra Pradesh	India	IN	13.91	20924	Asia/Kolkata
 Acajete		Puebla	Mexico	MX	19.11	20923	America/Mexico_City
@@ -27019,6 +27043,7 @@ Middletown		Delaware	United States	US	39.45	20372	America/New_York
 Sarwar		Rajasthan	India	IN	26.24	20372	Asia/Kolkata
 Yende Millimou		Faranah	Guinea	GN	8.89	20372	Africa/Conakry
 Blaj		Alba County	Romania	RO	46.18	20371	Europe/Bucharest
+Jindřichův Hradec	Jindrichuv Hradec	South Bohemian Region	Czechia	CZ	49.14	20369	Europe/Prague
 Carcavelos		Lisbon	Portugal	PT	38.69	20366	Europe/Lisbon
 Werdohl		North Rhine-Westphalia	Germany	DE	51.26	20366	Europe/Berlin
 Havelock		North Carolina	United States	US	34.88	20364	America/New_York
@@ -27077,7 +27102,6 @@ Bohumín	Bohumin	Moravian-Silesian Region	Czechia	CZ	49.90	20315	Europe/Prague
 Oakleaf Plantation		Florida	United States	US	30.17	20315	America/New_York
 Bakoti		Western	Gambia	GM	13.43	20314	Africa/Banjul
 Boca Suno		Orellana Province	Ecuador	EC	-0.70	20313	America/Guayaquil
-Brandýs nad Labem-Stará Boleslav	Brandys nad Labem-Stara Boleslav	Central Bohemia	Czechia	CZ	50.19	20313	Europe/Prague
 Pontarlier		Bourgogne	France	FR	46.90	20313	Europe/Paris
 Wednesbury		England	United Kingdom	GB	52.55	20313	Europe/London
 Farum		Capital Region	Denmark	DK	55.81	20312	Europe/Copenhagen
@@ -27090,6 +27114,7 @@ Provenals del Poblenou		Catalonia	Spain	ES	41.41	20306	Europe/Madrid
 Senta		Vojvodina	Serbia	RS	45.93	20302	Europe/Belgrade
 Umm Shawkah		Sennar	Sudan	SD	13.32	20302	Africa/Khartoum
 Dalap-Uliga-Dorrit		Majuro Atoll	Marshall Islands	MH	7.09	20301	Pacific/Majuro
+Mělník	Melnik	Central Bohemia	Czechia	CZ	50.35	20301	Europe/Prague
 Peterlee		England	United Kingdom	GB	54.76	20300	Europe/London
 Saatlı	Saatli	Saatlı	Azerbaijan	AZ	39.93	20300	Asia/Baku
 Maradong		Sarawak	Malaysia	MY	2.08	20299	Asia/Kuching
@@ -27215,6 +27240,7 @@ Takanabe		Miyazaki	Japan	JP	32.13	20185	Asia/Tokyo
 Carolina		Mpumalanga	South Africa	ZA	-26.07	20184	Africa/Johannesburg
 Greenville		Sinoe County	Liberia	LR	5.01	20184	Africa/Monrovia
 Zestaponi		Imereti	Georgia	GE	42.11	20183	Asia/Tbilisi
+Kojomkul		Chuy Region	Kyrgyzstan	KG	42.87	20182	Asia/Bishkek
 Aspe		Valencia	Spain	ES	38.35	20180	Europe/Madrid
 Montville Center		Connecticut	United States	US	41.48	20180	America/New_York
 Mers el Kebir		Oran	Algeria	DZ	35.73	20178	Africa/Algiers
@@ -27404,7 +27430,6 @@ Rāya	Raya	Uttar Pradesh	India	IN	27.56	20008	Asia/Kolkata
 Gawler		South Australia	Australia	AU	-34.60	20006	Australia/Adelaide
 Heusweiler		Saarland	Germany	DE	49.34	20006	Europe/Berlin
 Tupanciretã	Tupancireta	Rio Grande do Sul	Brazil	BR	-29.08	20005	America/Sao_Paulo
-Blansko		South Moravian	Czechia	CZ	49.36	20002	Europe/Prague
 Aurora		Piedmont	Italy	IT	45.08	20001	Europe/Rome
 Batang Berjuntai		Selangor	Malaysia	MY	3.38	20001	Asia/Kuala_Lumpur
 Liubotyn		Kharkiv	Ukraine	UA	49.95	20001	Europe/Kyiv
@@ -27444,6 +27469,7 @@ Kiratu		Arusha	Tanzania	TZ	-3.33	20000	Africa/Dar_es_Salaam
 Krestovskiy ostrov		Leningradskaya Oblast'	Russia	RU	59.97	20000	Europe/Moscow
 La Defense		Île-de-France	France	FR	48.89	20000	Europe/Paris
 Lauttasaari		Uusimaa	Finland	FI	60.16	20000	Europe/Helsinki
+Lavinio		Lazio	Italy	IT	41.50	20000	Europe/Rome
 Limhamn		Skåne	Sweden	SE	55.58	20000	Europe/Stockholm
 Makuyuni		Arusha	Tanzania	TZ	-3.55	20000	Africa/Dar_es_Salaam
 Matongo		Mara	Tanzania	TZ	-1.47	20000	Africa/Dar_es_Salaam
@@ -27586,6 +27612,7 @@ Umirim		Ceará	Brazil	BR	-3.68	19903	America/Fortaleza
 Kanjiramkulam		Kerala	India	IN	8.36	19902	Asia/Kolkata
 Kébémer	Kebemer	Louga	Senegal	SN	15.37	19902	Africa/Dakar
 Chebli		Blida	Algeria	DZ	36.58	19901	Africa/Algiers
+Blansko		South Moravian	Czechia	CZ	49.36	19900	Europe/Prague
 Anūppur	Anuppur	Madhya Pradesh	India	IN	23.10	19899	Asia/Kolkata
 Dickinson		Texas	United States	US	29.46	19895	America/Chicago
 Hörstel	Hoerstel	North Rhine-Westphalia	Germany	DE	52.30	19894	Europe/Berlin
@@ -28068,6 +28095,7 @@ Irlam		England	United Kingdom	GB	53.44	19442	Europe/London
 Miguelópolis	Miguelopolis	São Paulo	Brazil	BR	-20.18	19441	America/Sao_Paulo
 Ochtrup		North Rhine-Westphalia	Germany	DE	52.21	19441	Europe/Berlin
 North Battleford		Saskatchewan	Canada	CA	52.78	19440	America/Regina
+Freguesia		Rio de Janeiro	Brazil	BR	-22.79	19437	America/Sao_Paulo
 Écully	Ecully	Rhône-Alpes	France	FR	45.77	19437	Europe/Paris
 Hazel Dell		Washington	United States	US	45.67	19435	America/Los_Angeles
 Longkong		Chongqing	China	CN	30.04	19435	Asia/Shanghai
@@ -28298,7 +28326,6 @@ Dizangué	Dizangue	Littoral	Cameroon	CM	3.77	19243	Africa/Douala
 El Dividive		Trujillo	Venezuela	VE	9.48	19243	America/Caracas
 Ourolândia	Ourolandia	Bahia	Brazil	BR	-10.97	19243	America/Bahia
 Engaru		Hokkaido	Japan	JP	44.05	19241	Asia/Tokyo
-Jirkov		Ústí nad Labem Region	Czechia	CZ	50.50	19240	Europe/Prague
 Kesinga		Odisha	India	IN	20.19	19239	Asia/Kolkata
 Wadowice		Lesser Poland	Poland	PL	49.88	19238	Europe/Warsaw
 Kampong Kadok		Kelantan	Malaysia	MY	6.00	19233	Asia/Kuala_Lumpur
@@ -28306,7 +28333,6 @@ Manatí	Manati	Atlántico	Colombia	CO	10.45	19233	America/Bogota
 Pariquera-Açu	Pariquera-Acu	São Paulo	Brazil	BR	-24.71	19233	America/Sao_Paulo
 Pisz		Warmia-Masuria	Poland	PL	53.63	19232	Europe/Warsaw
 Kuala Kedah		Kedah	Malaysia	MY	6.10	19231	Asia/Kuala_Lumpur
-Mělník	Melnik	Central Bohemia	Czechia	CZ	50.35	19231	Europe/Prague
 Novoanninskiy		Volgograd Oblast	Russia	RU	50.53	19231	Europe/Volgograd
 Broadview Heights		Ohio	United States	US	41.31	19229	America/New_York
 Upper Saint Clair		Pennsylvania	United States	US	40.34	19229	America/New_York
@@ -28514,6 +28540,7 @@ Itatinga		São Paulo	Brazil	BR	-23.10	19070	America/Sao_Paulo
 East Massapequa		New York	United States	US	40.67	19069	America/New_York
 Fresno		Texas	United States	US	29.54	19069	America/Chicago
 Marmande		New Aquitaine	France	FR	44.50	19069	Europe/Paris
+Jirkov		Ústí nad Labem Region	Czechia	CZ	50.50	19067	Europe/Prague
 Amherst Center		Massachusetts	United States	US	42.38	19065	America/New_York
 Montrose		Colorado	United States	US	38.48	19062	America/Denver
 Värnamo	Vaernamo	Jönköping	Sweden	SE	57.19	19061	Europe/Stockholm
@@ -28601,6 +28628,7 @@ Melville		New York	United States	US	40.79	18985	America/New_York
 Tiruvattār	Tiruvattar	Tamil Nadu	India	IN	8.33	18985	Asia/Kolkata
 Barão de Grajaú	Barao de Grajau	Maranhão	Brazil	BR	-6.76	18984	America/Fortaleza
 Kesariyā	Kesariya	Bihar	India	IN	26.35	18984	Asia/Kolkata
+Žatec	Zatec	Ústí nad Labem Region	Czechia	CZ	50.33	18984	Europe/Prague
 Kew Gardens		New York	United States	US	40.71	18983	America/New_York
 Petworth		District of Columbia	United States	US	38.95	18983	America/New_York
 Bhor		Maharashtra	India	IN	18.15	18982	Asia/Kolkata
@@ -28632,7 +28660,6 @@ Rio Rico		Arizona	United States	US	31.47	18962	America/Phoenix
 Sanxi		Chongqing	China	CN	31.13	18961	Asia/Shanghai
 Parnamirim		Pernambuco	Brazil	BR	-8.09	18960	America/Recife
 Benthuizen		South Holland	The Netherlands	NL	52.08	18959	Europe/Amsterdam
-Žatec	Zatec	Ústí nad Labem Region	Czechia	CZ	50.33	18959	Europe/Prague
 Ala Moana - Kakaʻako	Ala Moana - Kaka'ako	Hawaii	United States	US	21.30	18957	Pacific/Honolulu
 So Uk		Sham Shui Po District	Hong Kong	HK	22.34	18956	Asia/Hong_Kong
 Murray		Kentucky	United States	US	36.61	18954	America/Chicago
@@ -28857,7 +28884,6 @@ Serrita		Pernambuco	Brazil	BR	-7.93	18764	America/Recife
 Casa de Oro-Mount Helix		California	United States	US	32.76	18762	America/Los_Angeles
 Villa Rica		Cauca Department	Colombia	CO	2.51	18761	America/Bogota
 Embi		Aktobe	Kazakhstan	KZ	48.83	18760	Asia/Aqtobe
-Kadaň	Kadan	Ústí nad Labem Region	Czechia	CZ	50.38	18759	Europe/Prague
 Paranda		Maharashtra	India	IN	18.26	18758	Asia/Kolkata
 Epitaciolândia	Epitaciolandia	Acre	Brazil	BR	-11.03	18757	America/Rio_Branco
 Sunchales		Santa Fe	Argentina	AR	-30.94	18757	America/Argentina/Cordoba
@@ -29214,6 +29240,7 @@ Altona Meadows		Victoria	Australia	AU	-37.88	18479	Australia/Melbourne
 Badīyah	Badiyah	Northeastern Governorate	Oman	OM	22.45	18479	Asia/Muscat
 Downtown Eastside		British Columbia	Canada	CA	49.28	18477	America/Vancouver
 Kalabo		Western Province	Zambia	ZM	-14.99	18477	Africa/Lusaka
+Kherāmeh	Kherameh	Fars	Iran	IR	29.50	18477	Asia/Tehran
 Kolkhozobod		Khatlon Province	Tajikistan	TJ	37.59	18476	Asia/Dushanbe
 Barkā Kānā	Barka Kana	Jharkhand	India	IN	23.62	18475	Asia/Kolkata
 Mirangaba		Bahia	Brazil	BR	-10.95	18474	America/Bahia
@@ -29714,6 +29741,7 @@ Auburn Bay		Alberta	Canada	CA	50.89	18090	America/Edmonton
 Boali		Ombella-M'Poko	Central African Republic	CF	4.80	18090	Africa/Bangui
 Monroe		Washington	United States	US	47.86	18090	America/Los_Angeles
 Baoro		Nana-Mambéré	Central African Republic	CF	5.67	18089	Africa/Bangui
+Kadaň	Kadan	Ústí nad Labem Region	Czechia	CZ	50.38	18088	Europe/Prague
 Dikodougou		Savanes District	Ivory Coast	CI	9.07	18087	Africa/Abidjan
 Boconoito		Portuguesa	Venezuela	VE	8.85	18086	America/Caracas
 Eslam Qaleh		Herat	Afghanistan	AF	34.67	18086	Asia/Kabul
@@ -29733,12 +29761,12 @@ Limerick		Pennsylvania	United States	US	40.23	18074	America/New_York
 Māchai	Machai	Karnataka	India	IN	15.79	18073	Asia/Kolkata
 Ban Chalong		Phuket	Thailand	TH	7.84	18072	Asia/Bangkok
 Mililani Mauka / Launani Valley		Hawaii	United States	US	21.48	18072	Pacific/Honolulu
-Louny		Ústí nad Labem Region	Czechia	CZ	50.36	18068	Europe/Prague
 Eruvādi	Eruvadi	Tamil Nadu	India	IN	8.44	18067	Asia/Kolkata
 Namminikara		Kerala	India	IN	10.43	18067	Asia/Kolkata
 Blundell		British Columbia	Canada	CA	49.16	18065	America/Vancouver
 Diósgyőr	Diosgyor	Borsod-Abaúj-Zemplén	Hungary	HU	48.10	18065	Europe/Budapest
 Wilton		Connecticut	United States	US	41.20	18062	America/New_York
+Louny		Ústí nad Labem Region	Czechia	CZ	50.36	18061	Europe/Prague
 Rhenen		Utrecht	The Netherlands	NL	51.96	18061	Europe/Amsterdam
 Bīdestān	Bidestan	Qazvin Province	Iran	IR	36.23	18060	Asia/Tehran
 Tamallalt		Marrakesh-Safi	Morocco	MA	31.82	18060	Africa/Casablanca
@@ -29868,7 +29896,6 @@ Palazzolo sull'Oglio		Lombardy	Italy	IT	45.60	17973	Europe/Rome
 Dumjor		West Bengal	India	IN	22.62	17972	Asia/Kolkata
 Rano		Kano State	Nigeria	NG	11.56	17972	Africa/Lagos
 Teloi Kanan		Kedah	Malaysia	MY	5.72	17972	Asia/Kuala_Lumpur
-Hranice		Olomouc Region	Czechia	CZ	49.55	17969	Europe/Prague
 Kishaba		Okinawa	Japan	JP	26.30	17969	Asia/Tokyo
 Tsuha		Okinawa	Japan	JP	26.66	17969	Asia/Tokyo
 New Mills		England	United Kingdom	GB	53.37	17968	Europe/London
@@ -29940,6 +29967,7 @@ Ituaçu	Ituacu	Bahia	Brazil	BR	-13.81	17914	America/Bahia
 Saiyad-ul-ajaib		Delhi	India	IN	28.52	17914	Asia/Kolkata
 Bad Saulgau		Baden-Wurttemberg	Germany	DE	48.02	17911	Europe/Berlin
 Kasli		Chelyabinsk	Russia	RU	55.89	17911	Asia/Yekaterinburg
+Hranice		Olomouc Region	Czechia	CZ	49.55	17910	Europe/Prague
 Józefów	Jozefow	Mazovia	Poland	PL	52.14	17910	Europe/Warsaw
 Montigny-lès-Cormeilles	Montigny-les-Cormeilles	Île-de-France	France	FR	48.98	17910	Europe/Paris
 Carnegie		Victoria	Australia	AU	-37.89	17909	Australia/Melbourne
@@ -30455,6 +30483,7 @@ North Babylon		New York	United States	US	40.72	17509	America/New_York
 Adriano		Lombardy	Italy	IT	45.51	17508	Europe/Rome
 Axochiapan		Morelos	Mexico	MX	18.50	17508	America/Mexico_City
 Lat Yao		Nakhon Sawan	Thailand	TH	15.75	17506	Asia/Bangkok
+Bağlar Mahallesi	Baglar Mahallesi	Iğdır	Turkey	TR	39.93	17505	Europe/Istanbul
 Liuyin		Chongqing	China	CN	29.96	17505	Asia/Shanghai
 McKenzie Towne		Alberta	Canada	CA	50.91	17505	America/Edmonton
 Boujniba		Beni Mellal-Khenifra	Morocco	MA	32.90	17504	Africa/Casablanca
@@ -30601,7 +30630,6 @@ White Oak		Maryland	United States	US	39.04	17403	America/New_York
 Deux-Montagnes		Quebec	Canada	CA	45.53	17402	America/Toronto
 San Rafael de Onoto		Portuguesa	Venezuela	VE	9.68	17402	America/Caracas
 Bermo		Jharkhand	India	IN	23.79	17401	Asia/Kolkata
-Otrokovice		Zlín	Czechia	CZ	49.21	17401	Europe/Prague
 Shioiri		Kagawa	Japan	JP	34.16	17401	Asia/Tokyo
 Khongapani		Chhattisgarh	India	IN	23.19	17400	Asia/Kolkata
 Lyepyel’	Lyepyel'	Vitebsk	Belarus	BY	54.88	17400	Europe/Minsk
@@ -30706,6 +30734,7 @@ Fos-sur-Mer		Provence-Alpes-Côte d'Azur	France	FR	43.44	17317	Europe/Paris
 Mae Ramat		Tak	Thailand	TH	16.98	17316	Asia/Bangkok
 Castelfranco Emilia		Emilia-Romagna	Italy	IT	44.59	17315	Europe/Rome
 Cham		Bavaria	Germany	DE	49.23	17314	Europe/Berlin
+Říčany	Ricany	Central Bohemia	Czechia	CZ	49.99	17314	Europe/Prague
 Otacílio Costa	Otacilio Costa	Santa Catarina	Brazil	BR	-27.48	17312	America/Sao_Paulo
 La Cruz		Valparaiso	Chile	CL	-32.83	17310	America/Santiago
 Lom Sak		Phetchabun	Thailand	TH	16.78	17309	Asia/Bangkok
@@ -30803,6 +30832,7 @@ Kretinga		Klaipėda County	Lithuania	LT	55.89	17249	Europe/Vilnius
 Chenini Nahal		Gabès Governorate	Tunisia	TN	33.87	17248	Africa/Tunis
 Gongtan		Chongqing	China	CN	28.91	17248	Asia/Shanghai
 Palangarai		Tamil Nadu	India	IN	11.20	17248	Asia/Kolkata
+Slaný	Slany	Central Bohemia	Czechia	CZ	50.23	17247	Europe/Prague
 Virajpet		Karnataka	India	IN	12.20	17246	Asia/Kolkata
 Arsk		Tatarstan Republic	Russia	RU	56.09	17243	Europe/Moscow
 Pieksämäki	Pieksaemaeki	South Savo	Finland	FI	62.30	17243	Europe/Helsinki
@@ -30816,6 +30846,7 @@ Fada		Ennedi-Ouest	Chad	TD	17.19	17240	Africa/Ndjamena
 Lincoln		Auckland	New Zealand	NZ	-36.86	17240	Pacific/Auckland
 Pudūr	Pudur	Tamil Nadu	India	IN	11.44	17240	Asia/Kolkata
 Te Atatu South		Auckland	New Zealand	NZ	-36.86	17240	Pacific/Auckland
+Otrokovice		Zlín	Czechia	CZ	49.21	17239	Europe/Prague
 Bālugaon	Balugaon	Odisha	India	IN	20.18	17238	Asia/Kolkata
 Rožnov pod Radhoštěm	Roznov pod Radhostem	Zlín	Czechia	CZ	49.46	17238	Europe/Prague
 Ílhavo	Ilhavo	Aveiro	Portugal	PT	40.60	17236	Europe/Lisbon
@@ -30943,7 +30974,6 @@ Albadéria	Albaderia	Faranah	Guinea	GN	9.55	17147	Africa/Conakry
 Balāţah	Balatah	West Bank	Palestinian Territory	PS	32.21	17146	Asia/Hebron
 Mahayag		Zamboanga Peninsula	Philippines	PH	8.12	17144	Asia/Manila
 Veracruz		Panamá Oeste Province	Panama	PA	8.89	17144	America/Panama
-Říčany	Ricany	Central Bohemia	Czechia	CZ	49.99	17143	Europe/Prague
 Itaquitinga		Pernambuco	Brazil	BR	-7.67	17142	America/Recife
 Bristol		Virginia	United States	US	36.60	17141	America/New_York
 Engadine		New South Wales	Australia	AU	-34.07	17141	Australia/Sydney
@@ -31070,7 +31100,6 @@ Mentana		Lazio	Italy	IT	42.04	17047	Europe/Rome
 Castilla		Madrid	Spain	ES	40.47	17046	Europe/Madrid
 Ilhota		Santa Catarina	Brazil	BR	-26.90	17046	America/Sao_Paulo
 Alfragide		Lisbon	Portugal	PT	38.73	17044	Europe/Lisbon
-Benešov	Benesov	Central Bohemia	Czechia	CZ	49.78	17043	Europe/Prague
 Gossau		Saint Gallen	Switzerland	CH	47.42	17043	Europe/Zurich
 Ouinhi		Zou	Benin	BJ	7.08	17043	Africa/Porto-Novo
 Mahébourg	Mahebourg	Grand Port	Mauritius	MU	-20.41	17042	Indian/Mauritius
@@ -31089,6 +31118,7 @@ Nerviano		Lombardy	Italy	IT	45.55	17030	Europe/Rome
 Solânea	Solanea	Paraíba	Brazil	BR	-6.75	17030	America/Fortaleza
 Kusum Pur		Delhi	India	IN	28.55	17028	Asia/Kolkata
 Hochheim am Main		Hesse	Germany	DE	50.01	17027	Europe/Berlin
+Benešov	Benesov	Central Bohemia	Czechia	CZ	49.78	17025	Europe/Prague
 Mwingi		Kitui County	Kenya	KE	-0.94	17025	Africa/Nairobi
 Den Chai		Phrae	Thailand	TH	17.98	17019	Asia/Bangkok
 São Sepé	Sao Sepe	Rio Grande do Sul	Brazil	BR	-30.16	17019	America/Sao_Paulo
@@ -31909,7 +31939,6 @@ Bethpage		New York	United States	US	40.74	16429	America/New_York
 Bilohirsk		Crimea	Ukraine	UA	45.06	16428	Europe/Simferopol
 Toyota		Aomori	Japan	JP	40.75	16428	Asia/Tokyo
 Erenhot		Inner Mongolia	China	CN	43.65	16427	Asia/Shanghai
-Neratovice		Central Bohemia	Czechia	CZ	50.26	16427	Europe/Prague
 Neópolis	Neopolis	Sergipe	Brazil	BR	-10.32	16426	America/Maceio
 Kindi		Centre-Ouest	Burkina Faso	BF	12.44	16424	Africa/Ouagadougou
 Zafra		Extremadura	Spain	ES	38.43	16424	Europe/Madrid
@@ -31970,6 +31999,7 @@ Sunset		Florida	United States	US	25.71	16389	America/New_York
 Nova Resende		Minas Gerais	Brazil	BR	-21.13	16387	America/Sao_Paulo
 Padampur		Odisha	India	IN	21.00	16387	Asia/Kolkata
 Prospect Heights		Illinois	United States	US	42.10	16386	America/Chicago
+Bou Hadjar		El Tarf	Algeria	DZ	36.50	16385	Africa/Algiers
 Curti		Goa	India	IN	15.42	16385	Asia/Kolkata
 Loxstedt		Lower Saxony	Germany	DE	53.47	16382	Europe/Berlin
 Kirchhain		Hesse	Germany	DE	50.83	16381	Europe/Berlin
@@ -31998,7 +32028,6 @@ Las Gabias		Andalusia	Spain	ES	37.14	16369	Europe/Madrid
 Forssa		Kanta-Häme	Finland	FI	60.81	16368	Europe/Helsinki
 Kladow		State of Berlin	Germany	DE	52.45	16368	Europe/Berlin
 Tianjia		Chongqing	China	CN	30.09	16368	Asia/Shanghai
-Uherský Brod	Uhersky Brod	Zlín	Czechia	CZ	49.03	16367	Europe/Prague
 Bargūr	Bargur	Tamil Nadu	India	IN	12.54	16366	Asia/Kolkata
 Bon Air		Virginia	United States	US	37.52	16366	America/New_York
 Saint-Cyr-l'École	Saint-Cyr-l'Ecole	Île-de-France	France	FR	48.80	16365	Europe/Paris
@@ -32047,7 +32076,6 @@ Zhushan		Chongqing	China	CN	30.73	16331	Asia/Shanghai
 Toukountouna		Atakora	Benin	BJ	10.50	16330	Africa/Porto-Novo
 Guardamar del Segura		Valencia	Spain	ES	38.09	16329	Europe/Madrid
 Jataúba	Jatauba	Pernambuco	Brazil	BR	-7.99	16328	America/Recife
-Jičín	Jicin	Hradec Králové Region	Czechia	CZ	50.44	16328	Europe/Prague
 Sananduva		Rio Grande do Sul	Brazil	BR	-27.95	16328	America/Sao_Paulo
 Shuzenji		Shizuoka	Japan	JP	34.97	16328	Asia/Tokyo
 Kotapārh	Kotaparh	Chhattisgarh	India	IN	19.14	16326	Asia/Kolkata
@@ -32112,7 +32140,9 @@ Pindaí	Pindai	Bahia	Brazil	BR	-14.49	16285	America/Bahia
 Arumanai		Tamil Nadu	India	IN	8.37	16283	Asia/Kolkata
 Anandpur		Punjab	India	IN	31.24	16282	Asia/Kolkata
 Remagen		Rheinland-Pfalz	Germany	DE	50.58	16280	Europe/Berlin
+Uherský Brod	Uhersky Brod	Zlín	Czechia	CZ	49.03	16280	Europe/Prague
 Kabo		Ouham-Fafa	Central African Republic	CF	7.70	16279	Africa/Bangui
+Neratovice		Central Bohemia	Czechia	CZ	50.26	16279	Europe/Prague
 Omalur		Tamil Nadu	India	IN	11.74	16279	Asia/Kolkata
 Raposos		Minas Gerais	Brazil	BR	-19.97	16279	America/Sao_Paulo
 Zumarraga		Eastern Visayas	Philippines	PH	11.64	16279	Asia/Manila
@@ -32280,7 +32310,6 @@ Ginosa		Apulia	Italy	IT	40.58	16151	Europe/Rome
 Jollyville		Texas	United States	US	30.44	16151	America/Chicago
 Brake (Unterweser)		Lower Saxony	Germany	DE	53.33	16150	Europe/Berlin
 Caldera		Atacama	Chile	CL	-27.07	16150	America/Santiago
-Dvůr Králové nad Labem	Dvur Kralove nad Labem	Hradec Králové Region	Czechia	CZ	50.43	16150	Europe/Prague
 Maaspoort		North Brabant	The Netherlands	NL	51.73	16150	Europe/Amsterdam
 Penicuik		Scotland	United Kingdom	GB	55.83	16150	Europe/London
 Sānwer	Sanwer	Madhya Pradesh	India	IN	22.97	16150	Asia/Kolkata
@@ -32424,6 +32453,7 @@ Vatra Dornei		Suceava	Romania	RO	47.35	16054	Europe/Bucharest
 Pohjois-Hervanta		Pirkanmaa	Finland	FI	61.45	16053	Europe/Helsinki
 Saint-Fons		Rhône-Alpes	France	FR	45.71	16053	Europe/Paris
 Bad Segeberg		Schleswig-Holstein	Germany	DE	53.94	16052	Europe/Berlin
+Jičín	Jicin	Hradec Králové Region	Czechia	CZ	50.44	16052	Europe/Prague
 Landerneau		Brittany	France	FR	48.45	16052	Europe/Paris
 Dyer		Indiana	United States	US	41.49	16051	America/Chicago
 Mount Pleasant		Texas	United States	US	33.16	16051	America/Chicago
@@ -32444,6 +32474,7 @@ Weg naar Zee		Paramaribo District	Suriname	SR	5.87	16037	America/Paramaribo
 Tonga		West	Cameroon	CM	4.97	16036	Africa/Douala
 Đinh Văn	GJinh Van	Lam Dong	Vietnam	VN	11.79	16036	Asia/Ho_Chi_Minh
 Świerczewo	Swierczewo	West Pomerania	Poland	PL	53.43	16034	Europe/Warsaw
+Ea Pốc	Ea Poc	Dak Lak	Vietnam	VN	12.78	16033	Asia/Ho_Chi_Minh
 Worcester Park		England	United Kingdom	GB	51.38	16031	Europe/London
 Mount Davis		Central and Western	Hong Kong	HK	22.28	16030	Asia/Hong_Kong
 Americus		Georgia	United States	US	32.07	16028	America/New_York
@@ -32798,6 +32829,7 @@ Saint-Henri		Quebec	Canada	CA	45.47	15800	America/Toronto
 Lianhu		Chongqing	China	CN	29.70	15797	Asia/Shanghai
 Minamiminowa		Nagano	Japan	JP	35.87	15797	Asia/Tokyo
 Molakālumuru	Molakalumuru	Karnataka	India	IN	14.72	15797	Asia/Kolkata
+Nymburk		Central Bohemia	Czechia	CZ	50.19	15795	Europe/Prague
 Conceição do Almeida	Conceicao do Almeida	Bahia	Brazil	BR	-12.78	15794	America/Bahia
 Gaoulou		Bas-Sassandra District	Ivory Coast	CI	5.03	15794	Africa/Abidjan
 Daggakraal		Mpumalanga	South Africa	ZA	-27.13	15793	Africa/Johannesburg
@@ -32956,7 +32988,6 @@ Amizmiz		Marrakesh-Safi	Morocco	MA	31.22	15685	Africa/Casablanca
 Ṭinṭâne	Tintane	Hodh El Gharbi	Mauritania	MR	16.39	15684	Africa/Nouakchott
 Taylor-Massey		Ontario	Canada	CA	43.70	15683	America/Toronto
 Rakovník	Rakovnik	Central Bohemia	Czechia	CZ	50.10	15682	Europe/Prague
-Ostrov		Carlsbad Region	Czechia	CZ	50.31	15681	Europe/Prague
 Sashiki		Kumamoto	Japan	JP	32.30	15681	Asia/Tokyo
 Carterton		England	United Kingdom	GB	51.76	15680	Europe/London
 Ezine		Canakkale	Turkey	TR	39.79	15677	Europe/Istanbul
@@ -33057,6 +33088,7 @@ Tilst		Central Jutland	Denmark	DK	56.19	15617	Europe/Copenhagen
 Bang Mun Nak		Phichit	Thailand	TH	16.03	15616	Asia/Bangkok
 Kara-Kulja		Osh Region	Kyrgyzstan	KG	40.63	15616	Asia/Bishkek
 Karabanovo		Vladimir Oblast	Russia	RU	56.31	15615	Europe/Moscow
+Ostrov		Carlsbad Region	Czechia	CZ	50.31	15615	Europe/Prague
 Klosterneuburg		Lower Austria	Austria	AT	48.31	15614	Europe/Vienna
 Namwala		Southern Province	Zambia	ZM	-15.75	15614	Africa/Lusaka
 Belle Vale		England	United Kingdom	GB	53.39	15613	Europe/London
@@ -33525,6 +33557,7 @@ Santomera		Murcia	Spain	ES	38.06	15319	Europe/Madrid
 Boshrūyeh	Boshruyeh	South Khorasan Province	Iran	IR	33.87	15318	Asia/Tehran
 Manor Park		England	United Kingdom	GB	51.55	15318	Europe/London
 Bellevue		Wisconsin	United States	US	44.44	15317	America/Chicago
+Dvůr Králové nad Labem	Dvur Kralove nad Labem	Hradec Králové Region	Czechia	CZ	50.43	15316	Europe/Prague
 Miguelturra		Castille-La Mancha	Spain	ES	38.96	15316	Europe/Madrid
 Ocna Mureş	Ocna Mures	Alba County	Romania	RO	46.38	15316	Europe/Bucharest
 Romblon		Mimaropa	Philippines	PH	12.58	15316	Asia/Manila
@@ -33822,7 +33855,6 @@ Elwood		Victoria	Australia	AU	-37.88	15153	Australia/Melbourne
 Belvedere Park		Georgia	United States	US	33.75	15152	America/New_York
 Ottakkadai		Tamil Nadu	India	IN	9.96	15152	Asia/Kolkata
 Ripon		California	United States	US	37.74	15151	America/Los_Angeles
-Ústí nad Orlicí	Usti nad Orlici	Pardubice Region	Czechia	CZ	49.97	15151	Europe/Prague
 Burwood		Victoria	Australia	AU	-37.85	15147	Australia/Melbourne
 Rossville		Maryland	United States	US	39.34	15147	America/New_York
 la Guineueta		Catalonia	Spain	ES	41.44	15147	Europe/Madrid
@@ -33953,7 +33985,6 @@ Cambuci		Rio de Janeiro	Brazil	BR	-21.58	15070	America/Sao_Paulo
 Front Royal		Virginia	United States	US	38.92	15070	America/New_York
 Künzelsau	Kuenzelsau	Baden-Wurttemberg	Germany	DE	49.28	15070	Europe/Berlin
 Panth Pīplia	Panth Piplia	Madhya Pradesh	India	IN	24.20	15070	Asia/Kolkata
-Slaný	Slany	Central Bohemia	Czechia	CZ	50.23	15070	Europe/Prague
 Kabompo		North-Western	Zambia	ZM	-13.59	15069	Africa/Lusaka
 Weston		Wisconsin	United States	US	44.89	15069	America/Chicago
 Bange		Fukushima	Japan	JP	37.56	15068	Asia/Tokyo
@@ -34004,7 +34035,6 @@ La Trinité	La Trinite	Martinique	Martinique	MQ	14.74	15040	America/Martinique
 Tamarana		Paraná	Brazil	BR	-23.72	15040	America/Sao_Paulo
 Trossingen		Baden-Wurttemberg	Germany	DE	48.08	15040	Europe/Berlin
 Makindu		Makueni County	Kenya	KE	-2.28	15038	Africa/Nairobi
-Bruntál	Bruntal	Moravian-Silesian Region	Czechia	CZ	49.99	15037	Europe/Prague
 Găeşti	Gaesti	Dâmbovița County	Romania	RO	44.72	15037	Europe/Bucharest
 Rocca di Papa		Lazio	Italy	IT	41.77	15036	Europe/Rome
 Auburndale		Florida	United States	US	28.07	15035	America/New_York
@@ -34043,7 +34073,6 @@ Andorinha		Bahia	Brazil	BR	-10.34	15012	America/Bahia
 Alto Lucero		Veracruz	Mexico	MX	20.95	15011	America/Mexico_City
 Tulchyn		Vinnytsia	Ukraine	UA	48.67	15011	Europe/Kyiv
 Batavia		New York	United States	US	43.00	15010	America/New_York
-Česká Třebová	Ceska Trebova	Pardubice Region	Czechia	CZ	49.90	15010	Europe/Prague
 Avon		Île-de-France	France	FR	48.40	15009	Europe/Paris
 Mahanje		Ruvuma	Tanzania	TZ	-9.93	15009	Africa/Dar_es_Salaam
 Dionísio Cerqueira	Dionisio Cerqueira	Santa Catarina	Brazil	BR	-26.25	15008	America/Sao_Paulo
