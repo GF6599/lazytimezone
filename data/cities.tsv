@@ -34091,7 +34091,9 @@ Kartuzy		Pomerania	Poland	PL	54.33	15002	Europe/Warsaw
 Torres Novas		Santarém	Portugal	PT	39.48	15002	Europe/Lisbon
 Weißwasser	Weisswasser	Saxony	Germany	DE	51.50	15002	Europe/Berlin
 Dumas		Texas	United States	US	35.87	15001	America/Chicago
+Ebaye		Kwajalein Atoll	Marshall Islands	MH	8.77	15000	Pacific/Kwajalein
 Nuuk		Sermersooq	Greenland	GL	64.18	14798	America/Nuuk
+Weno		Chuuk	Micronesia	FM	7.45	13856	Pacific/Chuuk
 Belmopan		Cayo District	Belize	BZ	17.25	13381	America/Belize
 Avarua		Rarotonga	Cook Islands	CK	-21.21	13373	Pacific/Rarotonga
 Tórshavn	Torshavn	Streymoy	Faroe Islands	FO	62.01	13200	Atlantic/Faroe
@@ -34100,25 +34102,55 @@ Pago Pago		Eastern District	American Samoa	AS	-14.28	11500	Pacific/Pago_Pago
 Basse-Terre		Guadeloupe	Guadeloupe	GP	16.00	11472	America/Guadeloupe
 Mariehamn		Mariehamn	Aland Islands	AX	60.10	10682	Europe/Mariehamn
 Kralendijk		Bonaire	Bonaire, Saint Eustatius and Saba 	BQ	12.15	10620	America/Kralendijk
+Tofol		Kosrae	Micronesia	FM	5.32	9686	Pacific/Kosrae
+Sitka		Alaska	United States	US	57.05	8863	America/Sitka
 Harewood		British Columbia	Canada	CA	49.15	8769	America/Vancouver
 Road Town			British Virgin Islands	VG	18.43	8449	America/Tortola
+Menominee		Michigan	United States	US	45.11	8382	America/Menominee
+Happy Valley-Goose Bay		Newfoundland and Labrador	Canada	CA	53.30	7572	America/Goose_Bay
 Saint George's		Saint George Parish	Grenada	GD	12.05	7500	America/Grenada
+Iqaluit		Nunavut	Canada	CA	63.75	7429	America/Iqaluit
+Hanga Roa		Valparaiso	Chile	CL	-27.15	7322	Pacific/Easter
+Puerto Baquerizo Moreno		Galápagos	Ecuador	EC	-0.90	7290	Pacific/Galapagos
+Tell City		Indiana	United States	US	37.95	7255	America/Indiana/Tell_City
 Palikir		Pohnpei State	Micronesia	FM	6.92	6942	Pacific/Pohnpei
 Valletta		Valletta	Malta	MT	35.90	6794	Europe/Malta
 Funafuti		Funafuti	Tuvalu	TV	-8.52	6320	Pacific/Funafuti
 Saint-Pierre		Saint-Pierre	Saint Pierre and Miquelon	PM	46.78	6200	America/Miquelon
+Monticello		Kentucky	United States	US	36.83	6090	America/Kentucky/Monticello
 Gustavia			Saint Barthelemy	BL	17.90	5988	America/St_Barthelemy
 Marigot			Saint Martin	MF	18.07	5700	America/Marigot
+Creston		British Columbia	Canada	CA	49.10	5583	America/Creston
 Vaduz		Vaduz	Liechtenstein	LI	47.14	5197	Europe/Vaduz
 Lobamba		Hhohho Region	Eswatini	SZ	-26.47	4557	Africa/Mbabane
 San Marino		San Marino	San Marino	SM	43.94	4500	Europe/San_Marino
+Saint-Augustin		Quebec	Canada	CA	51.23	3961	America/Blanc-Sablon
+Nome		Alaska	United States	US	64.50	3806	America/Nome
 Cockburn Town			Turks and Caicos Islands	TC	21.46	3720	America/Grand_Turk
+Knox		Indiana	United States	US	41.30	3597	America/Indiana/Knox
+Beulah		North Dakota	United States	US	47.26	3393	America/North_Dakota/Beulah
+Inuvik		Northwest Territories	Canada	CA	68.36	3243	America/Inuvik
+Vila dos Remédios	Vila dos Remedios	Pernambuco	Brazil	BR	-3.84	3167	America/Noronha
+Downtown			British Indian Ocean Territory	IO	-7.26	3000	Indian/Chagos
+Rankin Inlet		Nunavut	Canada	CA	62.81	2975	America/Rankin_Inlet
+Atikokan		Ontario	Canada	CA	48.76	2753	America/Atikokan
+Fort Nelson		British Columbia	Canada	CA	58.81	2611	America/Fort_Nelson
+Winamac		Indiana	United States	US	41.05	2402	America/Indiana/Winamac
 Longyearbyen		Svalbard	Svalbard and Jan Mayen	SJ	78.22	2368	Arctic/Longyearbyen
+Petersburg		Indiana	United States	US	38.49	2347	America/Indiana/Petersburg
 Stanley			Falkland Islands	FK	-51.69	2213	Atlantic/Stanley
 The Valley		The Valley	Anguilla	AI	18.22	2035	America/Anguilla
 Ciudad de la Paz		Djibloho	Equatorial Guinea	GQ	1.59	2000	Africa/Malabo
+Tabwakea Village		Line Islands	Kiribati	KI	2.02	1881	Pacific/Kiritimati
+Cambridge Bay		Nunavut	Canada	CA	69.11	1760	America/Cambridge_Bay
+Vevay		Indiana	United States	US	38.75	1679	America/Indiana/Vevay
+Büsingen	Busingen	Baden-Wurttemberg	Germany	DE	47.70	1473	Europe/Busingen
+Metlakatla		Alaska	United States	US	55.13	1405	America/Metlakatla
 Philipsburg			Sint Maarten	SX	18.03	1400	America/Lower_Princes
+Dawson City		Yukon	Canada	CA	64.06	1375	America/Dawson
+Taiohae		Marquesas Islands	French Polynesia	PF	-8.91	1224	Pacific/Marquesas
 Mata-Utu		Uvea	Wallis and Futuna	WF	-13.28	1200	Pacific/Wallis
+Rikitea		Tuamotu-Gambier Islands	French Polynesia	PF	-23.12	1103	Pacific/Gambier
 Yaren		Yaren District	Nauru	NR	-0.55	1100	Pacific/Nauru
 Hagåtña	Hagatna	Hagatna	Guam	GU	13.48	1051	Pacific/Guam
 Brades		Saint Peter	Montserrat	MS	16.79	1000	America/Montserrat
@@ -34126,8 +34158,12 @@ Hamilton		Hamilton city	Bermuda	BM	32.29	902	Atlantic/Bermuda
 Kingston			Norfolk Island	NF	-29.05	880	Pacific/Norfolk
 Vatican City			Vatican	VA	41.90	829	Europe/Vatican
 Jamestown		Saint Helena	Saint Helena	SH	-15.92	637	Atlantic/St_Helena
+English		Indiana	United States	US	38.33	630	America/Indiana/Marengo
 Alofi			Niue	NU	-19.05	624	Pacific/Niue
+Center		North Dakota	United States	US	47.12	564	America/North_Dakota/Center
+Nukunonu		Nukunonu	Tokelau	TK	-9.20	531	Pacific/Fakaofo
 Flying Fish Cove			Christmas Island	CX	-10.42	500	Indian/Christmas
+Waitangi		Chatham Islands	New Zealand	NZ	-43.95	140	Pacific/Chatham
 West Island			Cocos Islands	CC	-12.16	120	Indian/Cocos
 Liberpolis		County of Osijek-Baranja	Croatia	HR	45.77	63	Europe/Zagreb
 Adamstown			Pitcairn	PN	-25.07	46	Pacific/Pitcairn

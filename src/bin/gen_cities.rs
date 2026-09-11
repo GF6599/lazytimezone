@@ -1,18 +1,27 @@
 //! Generates `data/cities.tsv` from the GeoNames dumps.
 //!
-//! The input directory must hold `cities15000.txt`,
+//! The input directory must hold `cities15000.txt`, `cities1000.txt`,
 //! `admin1CodesASCII.txt` and `countryInfo.txt`. The `gen-cities`
 //! recipe in the justfile downloads them and runs this binary.
+//!
+//! `cities15000.txt` holds every place above 15,000 people and every
+//! national capital, which leaves 62 timezones with no city at all.
+//! `cities1000.txt` reaches 36 of them, and the generator takes one
+//! row from it for each.
 //!
 //! The output is the city catalogue that the app embeds at compile
 //! time: one tab-separated row per city, sorted by population, so the
 //! loader inherits a relevance order without storing scores.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::path::PathBuf;
 
 use chrono_tz::Tz;
+
+/// GeoNames feature code for the seat of a first-order administrative
+/// division, such as a territory capital.
+const FIRST_ORDER_SEAT: &str = "PPLA";
 
 /// One output row. The field order matches the columns in the TSV.
 #[derive(Debug)]
@@ -46,9 +55,23 @@ fn main() -> Result<(), Box<dyn Error>> {
             .map_err(|e| format!("cities15000.txt line {}: {e}", number + 1))?;
         rows.push(row);
     }
+
+    let fallback_txt = std::fs::read_to_string(dir.join("cities1000.txt"))?;
+    let fallback_lines = {
+        let covered: HashSet<&str> = rows.iter().map(|r| r.tz.as_str()).collect();
+        pick_fallback_lines(&fallback_txt, &covered)
+    };
+    let fallback_count = fallback_lines.len();
+    for line in fallback_lines {
+        let row = parse_city_line(line, &admin1, &countries)
+            .map_err(|e| format!("cities1000.txt: {e}"))?;
+        rows.push(row);
+    }
+
     sort_rows(&mut rows);
     std::fs::write(&output, render_tsv(&rows))?;
     eprintln!("wrote {} cities to {output}", rows.len());
+    eprintln!("{fallback_count} of them cover a zone cities15000.txt misses");
     Ok(())
 }
 
@@ -140,6 +163,49 @@ fn parse_city_line(
         population,
         tz: tz.to_string(),
     })
+}
+
+/// Picks one line of the fallback dump for each zone `covered` does not
+/// hold. Columns read: 7 feature code, 14 population, 17 IANA timezone.
+///
+/// GeoNames tags some rows with a zone they do not belong to.
+/// `Pacific/Chatham` carries two Auckland suburbs of 4,000 people each,
+/// against the 140 of the one real island settlement, so a pick by
+/// population alone names a place outside the zone. A first-order
+/// administrative seat therefore beats any larger row, and population
+/// decides only where the zone has no seat.
+///
+/// The scan is deliberately cheap and reads three columns, because
+/// [`parse_city_line`] rejects an unknown country or timezone outright.
+/// Running it over the whole fallback dump would abort the generation
+/// over a row this function discards.
+fn pick_fallback_lines<'a>(text: &'a str, covered: &HashSet<&str>) -> Vec<&'a str> {
+    type Rank<'r> = (u8, u64, std::cmp::Reverse<&'r str>);
+    let mut best: BTreeMap<&'a str, (Rank<'a>, &'a str)> = BTreeMap::new();
+    for line in text.lines() {
+        let cols: Vec<&str> = line.trim_end_matches('\r').split('\t').collect();
+        let (Some(name), Some(feature), Some(population), Some(tz)) =
+            (cols.get(1), cols.get(7), cols.get(14), cols.get(17))
+        else {
+            continue;
+        };
+        if covered.contains(tz) {
+            continue;
+        }
+        let rank: Rank<'a> = (
+            u8::from(*feature == FIRST_ORDER_SEAT),
+            population.parse().unwrap_or(0),
+            std::cmp::Reverse(*name),
+        );
+        best.entry(tz)
+            .and_modify(|slot| {
+                if rank > slot.0 {
+                    *slot = (rank, line);
+                }
+            })
+            .or_insert((rank, line));
+    }
+    best.into_values().map(|(_, line)| line).collect()
 }
 
 /// Population descending, then name, then zone, then country code, so
