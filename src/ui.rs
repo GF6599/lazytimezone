@@ -528,7 +528,9 @@ fn draw_favorite_panel(
     };
     let selected = panel_pos == app.selected_panel;
     let local = utc_now.with_timezone(&entry.tz);
-    let is_day = is_daytime_at_latitude(entry.latitude, &local);
+    let is_day = entry
+        .latitude
+        .map(|lat| is_daytime_at_latitude(lat, &local));
 
     let border_color = if selected { tc.accent } else { tc.border };
     let title_style = if selected {
@@ -549,10 +551,12 @@ fn draw_favorite_panel(
     let inner = block.inner(rect);
     frame.render_widget(block, rect);
 
-    let time_style = if is_day {
-        Style::default().fg(tc.good).add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(tc.muted).add_modifier(Modifier::BOLD)
+    let time_style = match is_day {
+        Some(true) => Style::default().fg(tc.good).add_modifier(Modifier::BOLD),
+        Some(false) => Style::default().fg(tc.muted).add_modifier(Modifier::BOLD),
+        // A fixed offset has no daylight, so neither the day nor the
+        // night colour would be true of it.
+        None => Style::default().fg(tc.fg).add_modifier(Modifier::BOLD),
     };
     let hero_offset = utc_now
         .with_timezone(&app.selection.tz)
@@ -582,13 +586,19 @@ fn draw_favorite_panel(
         body.push(Line::from(vec![
             Span::styled(format_utc_offset(offset_secs), Style::default().fg(tc.info)),
             Span::styled(
-                format!(" \u{00b7} {}", entry.tz.name()),
+                if entry.is_fixed_offset() {
+                    " \u{00b7} Fixed offset".to_string()
+                } else {
+                    format!(" \u{00b7} {}", entry.tz.name())
+                },
                 Style::default().fg(tc.muted),
             ),
         ]));
     }
-    if inner.height >= 4 {
-        body.push(sun_line(entry.latitude, &local, tc));
+    if inner.height >= 4
+        && let Some(lat) = entry.latitude
+    {
+        body.push(sun_line(lat, &local, tc));
     }
     frame.render_widget(
         Paragraph::new(body).style(Style::default().bg(tc.bg)),
