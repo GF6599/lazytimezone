@@ -1198,6 +1198,23 @@ mod tests {
     }
 
     #[test]
+    fn the_browse_list_offers_cities_and_no_fixed_offsets() {
+        let mut app = test_app();
+
+        apply_query(&mut app, "");
+
+        let rows = app.filtered_view.len();
+        assert!(rows > 0);
+        assert!(
+            (0..rows).all(|n| {
+                let idx = app.filtered_view.rows()[n].catalogue_idx;
+                !app.catalogue.get(idx).unwrap().is_fixed_offset()
+            }),
+            "browsing lists places, so a fixed offset is reached by search only"
+        );
+    }
+
+    #[test]
     fn a_favorited_small_city_appears_above_the_majors() {
         let mut app = test_app();
         apply_query(&mut app, "portland maine");

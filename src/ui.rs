@@ -1012,6 +1012,45 @@ mod tests {
         );
     }
 
+    /// A wall holding one fixed-offset favorite, keyed the way the
+    /// config file stores it.
+    fn fixed_offset_app(city: &str) -> App {
+        App::with_config(config::Config {
+            favorites: vec![config::FavoriteEntry::City {
+                city: city.to_string(),
+                admin1: String::new(),
+                cc: String::new(),
+            }],
+            ..config::Config::default()
+        })
+    }
+
+    #[test]
+    fn a_fixed_offset_panel_says_what_it_is_and_never_shows_the_iana_name() {
+        let mut app = fixed_offset_app("UTC-5");
+
+        let screen = render_app(&mut app, 100, 30).join("\n");
+
+        assert!(screen.contains("UTC-5"), "the panel names the offset");
+        assert!(screen.contains("Fixed offset"), "got:\n{screen}");
+        assert!(
+            !screen.contains("Etc/"),
+            "the inverted IANA name must never reach the screen, got:\n{screen}"
+        );
+    }
+
+    #[test]
+    fn a_fixed_offset_panel_has_no_sunrise_line() {
+        let mut app = fixed_offset_app("UTC");
+
+        let screen = render_app(&mut app, 100, 30).join("\n");
+
+        assert!(
+            !screen.contains("rise ") && !screen.contains("sun up") && !screen.contains("sun down"),
+            "a fixed offset is nowhere, so it has no sunrise, got:\n{screen}"
+        );
+    }
+
     #[test]
     fn the_wall_shows_a_panel_per_favorite() {
         let mut app = wall_app(&["tokyo", "london"]);

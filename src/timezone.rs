@@ -279,6 +279,7 @@ mod tests {
 
     use super::*;
     use chrono::TimeZone;
+    use chrono::offset::Offset;
 
     fn approx(a: f64, b: f64, tol: f64) -> bool {
         (a - b).abs() < tol
@@ -429,6 +430,42 @@ mod tests {
         // forbids anything louder there), so this count comparison is
         // where a skip becomes a failure.
         assert_eq!(all_timezones().len(), data_rows(CITIES_TSV).count());
+    }
+
+    #[test]
+    fn the_catalogue_offers_utc_and_a_row_for_each_fixed_offset() {
+        let fixed: Vec<&TimezoneEntry> = all_timezones()
+            .iter()
+            .filter(|e| e.is_fixed_offset())
+            .collect();
+
+        assert_eq!(fixed.len(), 27, "UTC-12 through UTC+14 inclusive");
+        assert!(fixed.iter().any(|e| e.city == "UTC"));
+        assert!(fixed.iter().all(|e| e.latitude.is_none()));
+    }
+
+    /// The IANA names invert the sign: `Etc/GMT+5` is UTC-5. A row that
+    /// carried the name straight through would put every western
+    /// fixed offset on the opposite side of UTC.
+    #[test]
+    fn a_fixed_offset_row_reports_the_offset_its_name_claims() {
+        let now = chrono::Utc::now();
+        for (city, expected_hours) in [("UTC-5", -5), ("UTC+5", 5), ("UTC", 0), ("UTC+14", 14)] {
+            let entry = all_timezones()
+                .iter()
+                .find(|e| e.city == city)
+                .unwrap_or_else(|| panic!("{city} is not in the catalogue"));
+            let actual = now
+                .with_timezone(&entry.tz)
+                .offset()
+                .fix()
+                .local_minus_utc();
+            assert_eq!(
+                actual,
+                expected_hours * 3600,
+                "{city} resolves to {actual}s"
+            );
+        }
     }
 
     #[test]
