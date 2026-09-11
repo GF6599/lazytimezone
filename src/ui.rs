@@ -528,7 +528,9 @@ fn draw_favorite_panel(
     };
     let selected = panel_pos == app.selected_panel;
     let local = utc_now.with_timezone(&entry.tz);
-    let is_day = is_daytime_at_latitude(entry.latitude, &local);
+    let is_day = entry
+        .latitude
+        .map(|lat| is_daytime_at_latitude(lat, &local));
 
     let border_color = if selected { tc.accent } else { tc.border };
     let title_style = if selected {
@@ -549,10 +551,12 @@ fn draw_favorite_panel(
     let inner = block.inner(rect);
     frame.render_widget(block, rect);
 
-    let time_style = if is_day {
-        Style::default().fg(tc.good).add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(tc.muted).add_modifier(Modifier::BOLD)
+    let time_style = match is_day {
+        Some(true) => Style::default().fg(tc.good).add_modifier(Modifier::BOLD),
+        Some(false) => Style::default().fg(tc.muted).add_modifier(Modifier::BOLD),
+        // A fixed offset has no daylight, so neither the day nor the
+        // night colour would be true of it.
+        None => Style::default().fg(tc.fg).add_modifier(Modifier::BOLD),
     };
     let hero_offset = utc_now
         .with_timezone(&app.selection.tz)
@@ -582,13 +586,19 @@ fn draw_favorite_panel(
         body.push(Line::from(vec![
             Span::styled(format_utc_offset(offset_secs), Style::default().fg(tc.info)),
             Span::styled(
-                format!(" \u{00b7} {}", entry.tz.name()),
+                if entry.is_fixed_offset() {
+                    " \u{00b7} Fixed offset".to_string()
+                } else {
+                    format!(" \u{00b7} {}", entry.tz.name())
+                },
                 Style::default().fg(tc.muted),
             ),
         ]));
     }
-    if inner.height >= 4 {
-        body.push(sun_line(entry.latitude, &local, tc));
+    if inner.height >= 4
+        && let Some(lat) = entry.latitude
+    {
+        body.push(sun_line(lat, &local, tc));
     }
     frame.render_widget(
         Paragraph::new(body).style(Style::default().bg(tc.bg)),
@@ -1009,6 +1019,45 @@ mod tests {
         assert!(
             rendered.contains("press / to add a city"),
             "got:\n{rendered}"
+        );
+    }
+
+    /// A wall holding one fixed-offset favorite, keyed the way the
+    /// config file stores it.
+    fn fixed_offset_app(city: &str) -> App {
+        App::with_config(config::Config {
+            favorites: vec![config::FavoriteEntry::City {
+                city: city.to_string(),
+                admin1: String::new(),
+                cc: String::new(),
+            }],
+            ..config::Config::default()
+        })
+    }
+
+    #[test]
+    fn a_fixed_offset_panel_says_what_it_is_and_never_shows_the_iana_name() {
+        let mut app = fixed_offset_app("UTC-5");
+
+        let screen = render_app(&mut app, 100, 30).join("\n");
+
+        assert!(screen.contains("UTC-5"), "the panel names the offset");
+        assert!(screen.contains("Fixed offset"), "got:\n{screen}");
+        assert!(
+            !screen.contains("Etc/"),
+            "the inverted IANA name must never reach the screen, got:\n{screen}"
+        );
+    }
+
+    #[test]
+    fn a_fixed_offset_panel_has_no_sunrise_line() {
+        let mut app = fixed_offset_app("UTC");
+
+        let screen = render_app(&mut app, 100, 30).join("\n");
+
+        assert!(
+            !screen.contains("rise ") && !screen.contains("sun up") && !screen.contains("sun down"),
+            "a fixed offset is nowhere, so it has no sunrise, got:\n{screen}"
         );
     }
 

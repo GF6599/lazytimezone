@@ -43,10 +43,20 @@ pub struct TimezoneEntry {
     /// Latitude in degrees (positive = north). Drives the day/night
     /// colouring via [`is_daytime_at_latitude`]: for high-latitude
     /// cities the daylight window varies dramatically by season.
-    pub latitude: f64,
+    /// `None` for a fixed offset, which is not a place and so has no
+    /// sunrise.
+    pub latitude: Option<f64>,
     /// GeoNames population: the ranking signal for search and for
     /// the one-representative-per-zone lookups.
     pub population: u64,
+}
+
+impl TimezoneEntry {
+    /// True for a UTC offset with no place behind it. Such a row has no
+    /// sunrise, and it never observes daylight saving.
+    pub fn is_fixed_offset(&self) -> bool {
+        self.latitude.is_none()
+    }
 }
 
 /// The full city catalogue, parsed from the embedded TSV once.
@@ -57,7 +67,12 @@ pub struct TimezoneEntry {
 /// here directly.
 pub fn all_timezones() -> &'static [TimezoneEntry] {
     static CATALOGUE: OnceLock<Vec<TimezoneEntry>> = OnceLock::new();
-    CATALOGUE.get_or_init(|| data_rows(CITIES_TSV).filter_map(parse_city_row).collect())
+    CATALOGUE.get_or_init(|| {
+        data_rows(CITIES_TSV)
+            .filter_map(parse_city_row)
+            .chain(fixed_offset_entries())
+            .collect()
+    })
 }
 
 /// Data lines of an embedded TSV: comment and blank lines skipped.
@@ -74,6 +89,7 @@ fn parse_city_row(line: &'static str) -> Option<TimezoneEntry> {
     let country = cols.next()?;
     let cc = cols.next()?;
     let latitude: f64 = cols.next()?.parse().ok()?;
+    let latitude = Some(latitude);
     let population: u64 = cols.next()?.parse().ok()?;
     let tz: Tz = cols.next()?.parse().ok()?;
     Some(TimezoneEntry {
@@ -168,8 +184,61 @@ pub(crate) fn country_search_aliases(country: &str) -> &'static [&'static str] {
     }
 }
 
+/// The fixed UTC offsets, as display name and the zone that serves it.
+///
+/// The IANA names invert the sign, so `UTC-5` is served by `Etc/GMT+5`.
+/// The name here is the one the user sees and the one the config file
+/// stores, so the inverted form never leaves this table.
+/// `a_fixed_offset_row_reports_the_offset_its_name_claims` checks every
+/// pair against the real offset.
+const FIXED_OFFSETS: &[(&str, Tz)] = &[
+    ("UTC+14", Tz::Etc__GMTMinus14),
+    ("UTC+13", Tz::Etc__GMTMinus13),
+    ("UTC+12", Tz::Etc__GMTMinus12),
+    ("UTC+11", Tz::Etc__GMTMinus11),
+    ("UTC+10", Tz::Etc__GMTMinus10),
+    ("UTC+9", Tz::Etc__GMTMinus9),
+    ("UTC+8", Tz::Etc__GMTMinus8),
+    ("UTC+7", Tz::Etc__GMTMinus7),
+    ("UTC+6", Tz::Etc__GMTMinus6),
+    ("UTC+5", Tz::Etc__GMTMinus5),
+    ("UTC+4", Tz::Etc__GMTMinus4),
+    ("UTC+3", Tz::Etc__GMTMinus3),
+    ("UTC+2", Tz::Etc__GMTMinus2),
+    ("UTC+1", Tz::Etc__GMTMinus1),
+    ("UTC", Tz::UTC),
+    ("UTC-1", Tz::Etc__GMTPlus1),
+    ("UTC-2", Tz::Etc__GMTPlus2),
+    ("UTC-3", Tz::Etc__GMTPlus3),
+    ("UTC-4", Tz::Etc__GMTPlus4),
+    ("UTC-5", Tz::Etc__GMTPlus5),
+    ("UTC-6", Tz::Etc__GMTPlus6),
+    ("UTC-7", Tz::Etc__GMTPlus7),
+    ("UTC-8", Tz::Etc__GMTPlus8),
+    ("UTC-9", Tz::Etc__GMTPlus9),
+    ("UTC-10", Tz::Etc__GMTPlus10),
+    ("UTC-11", Tz::Etc__GMTPlus11),
+    ("UTC-12", Tz::Etc__GMTPlus12),
+];
+
+fn fixed_offset_entries() -> impl Iterator<Item = TimezoneEntry> {
+    FIXED_OFFSETS.iter().map(|&(city, tz)| TimezoneEntry {
+        city,
+        ascii: "",
+        admin1: "",
+        country: "",
+        cc: "",
+        tz,
+        latitude: None,
+        population: 0,
+    })
+}
+
 /// Catalogue index of the most populous city of each zone, in
 /// catalogue (population) order. This is the unsearched browse list.
+///
+/// A fixed offset is left out: browsing lists places, and 27 offsets
+/// among the zones would bury them.
 pub fn zone_representatives() -> &'static [usize] {
     static REPS: OnceLock<Vec<usize>> = OnceLock::new();
     REPS.get_or_init(|| {
@@ -177,6 +246,7 @@ pub fn zone_representatives() -> &'static [usize] {
         all_timezones()
             .iter()
             .enumerate()
+            .filter(|(_, e)| !e.is_fixed_offset())
             .filter(|(_, e)| seen.insert(e.tz))
             .map(|(i, _)| i)
             .collect()
@@ -196,7 +266,7 @@ pub(crate) fn latitude_for(tz: Tz) -> Option<f64> {
     all_timezones()
         .iter()
         .find(|e| e.tz == tz)
-        .map(|e| e.latitude)
+        .and_then(|e| e.latitude)
 }
 
 /// Returns `(sunrise, sunset)` as fractional hours of local clock
@@ -279,6 +349,7 @@ mod tests {
 
     use super::*;
     use chrono::TimeZone;
+    use chrono::offset::Offset;
 
     fn approx(a: f64, b: f64, tol: f64) -> bool {
         (a - b).abs() < tol
@@ -305,7 +376,8 @@ mod tests {
         assert!(
             all_timezones()
                 .iter()
-                .all(|e| (-90.0..=90.0).contains(&e.latitude))
+                .filter_map(|e| e.latitude)
+                .all(|lat| (-90.0..=90.0).contains(&lat))
         );
     }
 
@@ -359,11 +431,14 @@ mod tests {
             if !seen.insert(entry.tz) {
                 continue;
             }
+            let Some(latitude) = entry.latitude else {
+                continue;
+            };
             for instant in [midyear, midwinter] {
                 let local = instant.with_timezone(&entry.tz);
                 assert_eq!(
                     is_daytime_at(entry.tz, &local),
-                    is_daytime_at_latitude(entry.latitude, &local),
+                    is_daytime_at_latitude(latitude, &local),
                     "{} disagrees at {local}",
                     entry.city
                 );
@@ -427,8 +502,53 @@ mod tests {
     fn every_data_row_parses_into_the_catalogue() {
         // The loader skips a malformed row silently (the panic lint
         // forbids anything louder there), so this count comparison is
-        // where a skip becomes a failure.
-        assert_eq!(all_timezones().len(), data_rows(CITIES_TSV).count());
+        // where a skip becomes a failure. The fixed offsets are built in
+        // code rather than read from the file, so they are not counted.
+        assert_eq!(
+            all_timezones()
+                .iter()
+                .filter(|e| !e.is_fixed_offset())
+                .count(),
+            data_rows(CITIES_TSV).count()
+        );
+    }
+
+    #[test]
+    fn the_catalogue_offers_utc_and_a_row_for_each_fixed_offset() {
+        let fixed: Vec<&TimezoneEntry> = all_timezones()
+            .iter()
+            .filter(|e| e.is_fixed_offset())
+            .collect();
+
+        assert_eq!(fixed.len(), 27, "UTC-12 through UTC+14 inclusive");
+        assert!(fixed.iter().any(|e| e.city == "UTC"));
+        assert!(fixed.iter().all(|e| e.latitude.is_none()));
+    }
+
+    /// The IANA names invert the sign: `Etc/GMT+5` is UTC-5. A row that
+    /// carried the name straight through would put every western
+    /// fixed offset on the opposite side of UTC.
+    #[test]
+    fn a_fixed_offset_row_reports_the_offset_its_name_claims() {
+        let now = chrono::Utc::now();
+        for entry in all_timezones().iter().filter(|e| e.is_fixed_offset()) {
+            let claimed: i32 = match entry.city.strip_prefix("UTC") {
+                Some("") => 0,
+                Some(rest) => rest.parse().expect("a signed hour count"),
+                None => panic!("a fixed offset must be named UTC, got {}", entry.city),
+            };
+            let actual = now
+                .with_timezone(&entry.tz)
+                .offset()
+                .fix()
+                .local_minus_utc();
+            assert_eq!(
+                actual,
+                claimed * 3600,
+                "{} resolves to {actual}s, so the table row is wrong",
+                entry.city
+            );
+        }
     }
 
     #[test]
