@@ -1,13 +1,15 @@
 //! Generates `data/cities.tsv` from the GeoNames dumps.
 //!
 //! The input directory must hold `cities15000.txt`, `cities1000.txt`,
-//! `admin1CodesASCII.txt` and `countryInfo.txt`. The `gen-cities`
-//! recipe in the justfile downloads them and runs this binary.
+//! `admin1CodesASCII.txt`, `countryInfo.txt` and the tz database
+//! `zone.tab`. The `gen-cities` recipe in the justfile downloads them
+//! and runs this binary.
 //!
 //! `cities15000.txt` holds every place above 15,000 people and every
 //! national capital, which leaves 62 timezones with no city at all.
 //! `cities1000.txt` reaches 36 of them, and the generator takes one
-//! row from it for each.
+//! row from it for each. The other 26 are research stations and small
+//! islands with no GeoNames city, so `zone.tab` places each one.
 //!
 //! The output is the city catalogue that the app embeds at compile
 //! time: one tab-separated row per city, sorted by population, so the
@@ -68,10 +70,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         rows.push(row);
     }
 
+    let zone_tab = std::fs::read_to_string(dir.join("zone.tab"))?;
+    let zone_table_rows = {
+        let covered: HashSet<&str> = rows.iter().map(|r| r.tz.as_str()).collect();
+        zone_table_rows(&zone_tab, &covered, &countries)?
+    };
+    let zone_table_count = zone_table_rows.len();
+    rows.extend(zone_table_rows);
+
     sort_rows(&mut rows);
     std::fs::write(&output, render_tsv(&rows))?;
     eprintln!("wrote {} cities to {output}", rows.len());
     eprintln!("{fallback_count} of them cover a zone cities15000.txt misses");
+    eprintln!("{zone_table_count} of them come from zone.tab alone");
     Ok(())
 }
 
@@ -206,6 +217,88 @@ fn pick_fallback_lines<'a>(text: &'a str, covered: &HashSet<&str>) -> Vec<&'a st
             .or_insert((rank, line));
     }
     best.into_values().map(|(_, line)| line).collect()
+}
+
+/// One row for each `zone.tab` zone that `covered` does not hold.
+/// Columns: 0 country code, 1 ISO 6709 coordinates, 2 zone, 3 comment.
+///
+/// The place name is the last part of the zone name. The comment
+/// replaces it only when the two have the same letters, which restores
+/// the spelling the zone name squashes ("Dumont-d'Urville") and never
+/// swaps in a description such as "Phoenix Islands" for Kanton.
+fn zone_table_rows(
+    text: &str,
+    covered: &HashSet<&str>,
+    countries: &HashMap<String, String>,
+) -> Result<Vec<CityRow>, String> {
+    let mut rows = Vec::new();
+    for line in text
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let cols: Vec<&str> = line.split('\t').collect();
+        let (Some(cc), Some(coords), Some(tz)) = (cols.first(), cols.get(1), cols.get(2)) else {
+            return Err(format!("zone.tab: short row {line:?}"));
+        };
+        if covered.contains(tz) {
+            continue;
+        }
+        tz.parse::<Tz>()
+            .map_err(|_| format!("zone.tab: unknown IANA timezone {tz:?}"))?;
+        let country = countries
+            .get(*cc)
+            .ok_or_else(|| format!("zone.tab: unknown country code {cc:?}"))?;
+        let segment = tz.rsplit('/').next().unwrap_or(tz).replace('_', " ");
+        let name = match cols.get(3) {
+            Some(comment) if same_letters(comment, &segment) => comment.to_string(),
+            _ => segment,
+        };
+        rows.push(CityRow {
+            name,
+            ascii: String::new(),
+            admin1: String::new(),
+            country: country.clone(),
+            cc: cc.to_string(),
+            latitude: iso6709_latitude(coords).map_err(|e| format!("zone.tab {tz}: {e}"))?,
+            population: 0,
+            tz: tz.to_string(),
+        });
+    }
+    Ok(rows)
+}
+
+fn same_letters(a: &str, b: &str) -> bool {
+    let letters = |s: &str| -> String {
+        s.chars()
+            .filter(|c| c.is_alphabetic())
+            .flat_map(char::to_lowercase)
+            .collect()
+    };
+    letters(a) == letters(b)
+}
+
+/// The latitude half of an ISO 6709 pair, `±DDMM` or `±DDMMSS`, such as
+/// the `-7750` of `-7750+16636`.
+fn iso6709_latitude(coords: &str) -> Result<f64, String> {
+    let end = coords
+        .get(1..)
+        .and_then(|rest| rest.find(['+', '-']))
+        .ok_or_else(|| format!("bad coordinates {coords:?}"))?
+        + 1;
+    let (sign, digits) = coords[..end].split_at(1);
+    let sign = if sign == "-" { -1.0 } else { 1.0 };
+    let part = |range: std::ops::Range<usize>| -> Result<f64, String> {
+        digits
+            .get(range)
+            .and_then(|s| s.parse::<f64>().ok())
+            .ok_or_else(|| format!("bad coordinates {coords:?}"))
+    };
+    let seconds = match digits.len() {
+        4 => 0.0,
+        6 => part(4..6)?,
+        _ => return Err(format!("bad coordinates {coords:?}")),
+    };
+    Ok(sign * (part(0..2)? + part(2..4)? / 60.0 + seconds / 3600.0))
 }
 
 /// Population descending, then name, then zone, then country code, so

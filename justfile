@@ -51,6 +51,7 @@ gen-cities:
     unzip -o -q target/geonames/cities1000.zip -d target/geonames
     test -f target/geonames/admin1CodesASCII.txt || curl -fsSL -o target/geonames/admin1CodesASCII.txt https://download.geonames.org/export/dump/admin1CodesASCII.txt
     test -f target/geonames/countryInfo.txt || curl -fsSL -o target/geonames/countryInfo.txt https://download.geonames.org/export/dump/countryInfo.txt
+    test -f target/geonames/zone.tab || curl -fsSL https://data.iana.org/time-zones/releases/tzdata2025b.tar.gz | tar -xz -C target/geonames zone.tab
     cargo run --bin gen_cities -- target/geonames data/cities.tsv
 
 # Build release binaries and copy to dist/
