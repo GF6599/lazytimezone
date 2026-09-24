@@ -515,23 +515,44 @@ mod tests {
         );
     }
 
+    /// The catalogue offers every whole-hour fixed offset.
+    /// Given the offsets from UTC-12 to UTC+14,
+    /// when the fixed-offset rows are read from the catalogue,
+    /// then there is one row for each, and the zero offset is named UTC.
+    /// Why it matters: an offset with no row cannot be found or saved.
     #[test]
     fn the_catalogue_offers_utc_and_a_row_for_each_fixed_offset() {
-        let fixed: Vec<&TimezoneEntry> = all_timezones()
+        // Given:
+        let mut expected: Vec<String> = (-12..=14)
+            .map(|hours: i32| match hours {
+                0 => "UTC".to_string(),
+                _ => format!("UTC{hours:+}"),
+            })
+            .collect();
+        expected.sort();
+
+        // When:
+        let mut names: Vec<&str> = all_timezones()
             .iter()
             .filter(|e| e.is_fixed_offset())
+            .map(|e| e.city)
             .collect();
+        names.sort_unstable();
 
-        assert_eq!(fixed.len(), 27, "UTC-12 through UTC+14 inclusive");
-        assert!(fixed.iter().any(|e| e.city == "UTC"));
-        assert!(fixed.iter().all(|e| e.latitude.is_none()));
+        // Then:
+        assert_eq!(names, expected);
     }
 
-    /// The IANA names invert the sign: `Etc/GMT+5` is UTC-5. A row that
-    /// carried the name straight through would put every western
-    /// fixed offset on the opposite side of UTC.
+    /// Each fixed-offset row keeps the offset its name claims.
+    /// Given every fixed-offset row in the catalogue,
+    /// when each one resolves its offset now,
+    /// then the offset equals the hours in its name.
+    /// Why it matters: the IANA names invert the sign, since `Etc/GMT+5`
+    /// is UTC-5, so a row copied from the name puts the offset on the
+    /// wrong side of UTC.
     #[test]
     fn a_fixed_offset_row_reports_the_offset_its_name_claims() {
+        // Given:
         let now = chrono::Utc::now();
         for entry in all_timezones().iter().filter(|e| e.is_fixed_offset()) {
             let claimed: i32 = match entry.city.strip_prefix("UTC") {
@@ -539,15 +560,19 @@ mod tests {
                 Some(rest) => rest.parse().expect("a signed hour count"),
                 None => panic!("a fixed offset must be named UTC, got {}", entry.city),
             };
+
+            // When:
             let actual = now
                 .with_timezone(&entry.tz)
                 .offset()
                 .fix()
                 .local_minus_utc();
+
+            // Then:
             assert_eq!(
                 actual,
                 claimed * 3600,
-                "{} resolves to {actual}s, so the table row is wrong",
+                "{} resolves to {actual}s",
                 entry.city
             );
         }
@@ -675,99 +700,48 @@ mod tests {
         }
     }
 
-    /// One zone for each way the catalogue can miss a settlement that
-    /// the main GeoNames dump leaves out: an island group, a territory
-    /// capital, and a United States sub-zone.
+    /// Each zone the main city dump misses shows one real place.
+    /// Given zones that `cities15000` holds no city for,
+    /// when the catalogue rows for each zone are read,
+    /// then each zone holds exactly the one place named here.
+    /// Why it matters: a zone with no row cannot be found or saved, and a
+    /// row picked by population alone names an Auckland suburb for the
+    /// Chatham Islands.
     #[test]
-    fn the_catalogue_reaches_zones_the_main_dump_leaves_out() {
-        let zones = [
-            "Pacific/Chatham",
-            "Pacific/Chuuk",
-            "Pacific/Kiritimati",
-            "Pacific/Easter",
-            "America/Iqaluit",
-            "America/Indiana/Vevay",
-        ];
-
-        for zone in zones {
-            let tz: Tz = zone.parse().expect("the test names a real zone");
-            assert!(
-                all_timezones().iter().any(|e| e.tz == tz),
-                "{zone} has no catalogue row"
-            );
-        }
-    }
-
-    /// Kiritimati has no administrative seat in the GeoNames data, so
-    /// the largest settlement is the only sound choice. London Village
-    /// is a close second and would collide with `Europe/London`.
-    #[test]
-    fn a_zone_with_no_seat_takes_its_largest_settlement() {
-        let tz: Tz = "Pacific/Kiritimati".parse().expect("a real zone");
-
-        let cities: Vec<&str> = all_timezones()
-            .iter()
-            .filter(|e| e.tz == tz)
-            .map(|e| e.city)
-            .collect();
-
-        assert_eq!(cities, ["Tabwakea Village"]);
-    }
-
-    /// GeoNames puts two Auckland suburbs in `Pacific/Chatham`, and each
-    /// is far larger than the one real island settlement. A row chosen
-    /// by population alone therefore names the wrong place.
-    #[test]
-    fn the_chatham_row_is_the_island_settlement() {
-        let tz: Tz = "Pacific/Chatham".parse().expect("a real zone");
-
-        let cities: Vec<&str> = all_timezones()
-            .iter()
-            .filter(|e| e.tz == tz)
-            .map(|e| e.city)
-            .collect();
-
-        assert_eq!(cities, ["Waitangi"]);
-    }
-
-    /// Research stations, atolls and small settlements have no row in any
-    /// GeoNames city dump. The tz database zone table still places each
-    /// one, and an alias such as `Pacific/Midway` is a place a person
-    /// searches for even though it shares its clock with another zone.
-    #[test]
-    fn a_zone_no_city_dump_carries_takes_its_place_from_the_zone_table() {
+    fn each_zone_the_main_dump_misses_shows_one_real_place() {
+        // Given:
         let expected = [
+            // GeoNames tags two larger Auckland suburbs with this zone, and
+            // the first-order seat must win over them.
+            ("Pacific/Chatham", "Waitangi"),
+            // No seat here, so the largest settlement wins.
+            ("Pacific/Kiritimati", "Tabwakea Village"),
+            ("Pacific/Chuuk", "Weno"),
+            ("Pacific/Easter", "Hanga Roa"),
+            ("America/Iqaluit", "Iqaluit"),
+            ("America/Indiana/Vevay", "Vevay"),
+            // No GeoNames city at all, so the zone table places these.
             ("Antarctica/Casey", "Casey"),
             ("Australia/Lord_Howe", "Lord Howe"),
             ("Asia/Ust-Nera", "Ust-Nera"),
             ("Pacific/Kanton", "Kanton"),
+            // An alias of Pacific/Pago_Pago, and still a place people search for.
             ("Pacific/Midway", "Midway"),
+            // The zone name squashes this spelling, and the zone table has it.
+            ("Antarctica/DumontDUrville", "Dumont-d'Urville"),
         ];
 
-        for (zone, city) in expected {
+        for (zone, place) in expected {
+            // When:
             let tz: Tz = zone.parse().expect("the test names a real zone");
-            let cities: Vec<&str> = all_timezones()
+            let places: Vec<&str> = all_timezones()
                 .iter()
                 .filter(|e| e.tz == tz)
                 .map(|e| e.city)
                 .collect();
-            assert_eq!(cities, [city], "{zone}");
+
+            // Then:
+            assert_eq!(places, [place], "{zone}");
         }
-    }
-
-    /// The zone name squashes "Dumont-d'Urville" into ASCII. The zone
-    /// table comment spells it in full, and it has the same letters, so
-    /// the comment can only correct the spelling, not name another place.
-    #[test]
-    fn a_squashed_zone_name_takes_the_spelling_the_zone_table_gives() {
-        let tz: Tz = "Antarctica/DumontDUrville".parse().expect("a real zone");
-
-        let cities: Vec<&str> = all_timezones()
-            .iter()
-            .filter(|e| e.tz == tz)
-            .map(|e| e.city)
-            .collect();
-
-        assert_eq!(cities, ["Dumont-d'Urville"]);
     }
 }
