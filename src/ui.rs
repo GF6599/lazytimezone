@@ -1035,29 +1035,28 @@ mod tests {
         })
     }
 
+    /// A fixed-offset favorite shows as its offset and nothing else.
+    /// Given a wall with the UTC-5 fixed offset,
+    /// when the wall renders,
+    /// then its panel names UTC-5 as a fixed offset, with no zone name
+    /// and no sunrise line.
+    /// Why it matters: the zone name inverts the sign, since `Etc/GMT+5`
+    /// is UTC-5, and a fixed offset has no place, so it has no sunrise.
     #[test]
-    fn a_fixed_offset_panel_says_what_it_is_and_never_shows_the_iana_name() {
+    fn a_fixed_offset_panel_shows_the_offset_and_no_zone_name_or_sunrise() {
+        // Given:
         let mut app = fixed_offset_app("UTC-5");
 
+        // When:
         let screen = render_app(&mut app, 100, 30).join("\n");
 
-        assert!(screen.contains("UTC-5"), "the panel names the offset");
+        // Then:
+        assert!(screen.contains("UTC-5"), "got:\n{screen}");
         assert!(screen.contains("Fixed offset"), "got:\n{screen}");
-        assert!(
-            !screen.contains("Etc/"),
-            "the inverted IANA name must never reach the screen, got:\n{screen}"
-        );
-    }
-
-    #[test]
-    fn a_fixed_offset_panel_has_no_sunrise_line() {
-        let mut app = fixed_offset_app("UTC");
-
-        let screen = render_app(&mut app, 100, 30).join("\n");
-
+        assert!(!screen.contains("Etc/"), "got:\n{screen}");
         assert!(
             !screen.contains("rise ") && !screen.contains("sun up") && !screen.contains("sun down"),
-            "a fixed offset is nowhere, so it has no sunrise, got:\n{screen}"
+            "got:\n{screen}"
         );
     }
 
