@@ -484,6 +484,8 @@ mod tests {
             (Tz::Africa__Cairo, 30.04, "Cairo"),
             (Tz::Pacific__Auckland, -36.85, "Auckland"),
             (Tz::America__Los_Angeles, 34.05, "Los Angeles"),
+            (Tz::America__Resolute, 74.70, "Resolute"),
+            (Tz::Antarctica__Casey, -66.28, "Casey"),
         ];
         for (tz, expected, name) in cases {
             let actual =
@@ -726,5 +728,46 @@ mod tests {
             .collect();
 
         assert_eq!(cities, ["Waitangi"]);
+    }
+
+    /// Research stations, atolls and small settlements have no row in any
+    /// GeoNames city dump. The tz database zone table still places each
+    /// one, and an alias such as `Pacific/Midway` is a place a person
+    /// searches for even though it shares its clock with another zone.
+    #[test]
+    fn a_zone_no_city_dump_carries_takes_its_place_from_the_zone_table() {
+        let expected = [
+            ("Antarctica/Casey", "Casey"),
+            ("Australia/Lord_Howe", "Lord Howe"),
+            ("Asia/Ust-Nera", "Ust-Nera"),
+            ("Pacific/Kanton", "Kanton"),
+            ("Pacific/Midway", "Midway"),
+        ];
+
+        for (zone, city) in expected {
+            let tz: Tz = zone.parse().expect("the test names a real zone");
+            let cities: Vec<&str> = all_timezones()
+                .iter()
+                .filter(|e| e.tz == tz)
+                .map(|e| e.city)
+                .collect();
+            assert_eq!(cities, [city], "{zone}");
+        }
+    }
+
+    /// The zone name squashes "Dumont-d'Urville" into ASCII. The zone
+    /// table comment spells it in full, and it has the same letters, so
+    /// the comment can only correct the spelling, not name another place.
+    #[test]
+    fn a_squashed_zone_name_takes_the_spelling_the_zone_table_gives() {
+        let tz: Tz = "Antarctica/DumontDUrville".parse().expect("a real zone");
+
+        let cities: Vec<&str> = all_timezones()
+            .iter()
+            .filter(|e| e.tz == tz)
+            .map(|e| e.city)
+            .collect();
+
+        assert_eq!(cities, ["Dumont-d'Urville"]);
     }
 }
