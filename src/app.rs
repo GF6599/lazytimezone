@@ -1240,10 +1240,17 @@ mod tests {
         assert_eq!(entry.city, "Tokyo");
     }
 
+    /// A saved favorite with no catalogue row survives the next save.
+    /// Given a config file whose only favorite names no catalogue row,
+    /// when the user adds London,
+    /// then the file holds both London and the unmatched favorite.
+    /// Why it matters: a save that writes only the matched favorites
+    /// deletes the unmatched ones from the user's file.
     #[test]
     fn a_favorite_the_catalogue_cannot_match_stays_in_the_config_file() {
+        // Given:
         let tmp = TempConfigPath::new();
-        let renamed = config::FavoriteEntry::City {
+        let unmatched = config::FavoriteEntry::City {
             city: "Tokyo".to_string(),
             admin1: "Renamed Prefecture".to_string(),
             cc: "JP".to_string(),
@@ -1252,24 +1259,29 @@ mod tests {
             &tmp.path(),
             &config::Config {
                 theme: "Default".to_string(),
-                favorites: vec![renamed.clone()],
+                favorites: vec![unmatched.clone()],
             },
         )
         .unwrap();
-
         let mut app = App::new(Some(tmp.path()));
+
+        // When:
         apply_query(&mut app, "london");
         app.commit_search_result_and_exit();
 
-        assert_eq!(
-            app.favorites.len(),
-            1,
-            "an unmatched favorite has no catalogue row, so it cannot be a panel"
-        );
+        // Then:
         let (saved, _) = config::try_load(&tmp.path()).unwrap();
+        let saved_london = saved.favorites.iter().any(
+            |f| matches!(f, config::FavoriteEntry::City { city, .. } if city.as_str() == "London"),
+        );
         assert!(
-            saved.favorites.contains(&renamed),
-            "a favorite the catalogue cannot match must survive the save, got {:?}",
+            saved_london,
+            "the save did not run, got {:?}",
+            saved.favorites
+        );
+        assert!(
+            saved.favorites.contains(&unmatched),
+            "the save dropped the unmatched favorite, got {:?}",
             saved.favorites
         );
     }
