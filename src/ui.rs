@@ -966,17 +966,22 @@ mod tests {
             .collect()
     }
 
-    /// Measures the hero art as (rows with block glyphs, widest ink
-    /// span in cells), so a test can tell one art scale from another.
+    /// Whether `c` is a block or octant glyph, the characters the hero
+    /// art is drawn in. No text, border or panel uses them.
+    fn is_art_glyph(c: char) -> bool {
+        c != ' ' && ratatui::symbols::pixel::OCTANTS.contains(&c)
+    }
+
+    /// Measures the hero art as (rows with art glyphs, widest ink span
+    /// in cells), so a test can tell one art scale from another.
     fn hero_ink(rows: &[String]) -> (usize, usize) {
-        let is_block = |c: char| matches!(c, '\u{2588}' | '\u{2580}' | '\u{2584}');
         let mut ink_rows = 0;
         let mut min_col = usize::MAX;
         let mut max_col = 0;
         for row in rows {
             let mut inked = false;
             for (col, c) in row.chars().enumerate() {
-                if is_block(c) {
+                if is_art_glyph(c) {
                     inked = true;
                     min_col = min_col.min(col);
                     max_col = max_col.max(col);
@@ -1277,26 +1282,69 @@ mod tests {
 
         let rendered = render_app(&mut app, 80, 12).join("\n");
 
-        for glyph in ['\u{2588}', '\u{2580}', '\u{2584}'] {
-            assert!(
-                !rendered.contains(glyph),
-                "block art on a 12-row terminal:\n{rendered}"
-            );
-        }
+        assert!(
+            !rendered.chars().any(is_art_glyph),
+            "block art on a 12-row terminal:\n{rendered}"
+        );
         assert!(rendered.contains("UTC"), "got:\n{rendered}");
     }
 
+    /// A narrow terminal gets a smaller clock, and only the narrowest
+    /// falls back to text.
+    ///
+    /// Given: a terminal tall enough for the medium clock.
+    /// When: it is drawn at 66, 64 and 30 columns.
+    /// Then: 64 columns draw fewer art rows than 66 but still some art,
+    /// and 30 columns draw no art.
+    ///
+    /// Why it matters: the clock is the main thing the app shows, so a
+    /// terminal two columns short of one size should get the next size
+    /// down, not lose the art altogether.
     #[test]
-    fn the_hero_art_only_renders_where_its_64_columns_fit() {
+    fn a_narrower_terminal_steps_the_clock_down_a_size_before_text() {
+        // Given:
         let mut app = wall_app(&["tokyo"]);
 
-        // 64 columns hold the art with no margin, which reads as
-        // clipped against the frame; the gate asks for 66.
-        let narrow = render_app(&mut app, 64, 24).join("\n");
-        assert!(!narrow.contains('\u{2588}'), "got:\n{narrow}");
+        // When:
+        let (rows_at_66, _) = hero_ink(&render_app(&mut app, 66, 24));
+        let narrow = render_app(&mut app, 64, 24);
+        let (rows_at_64, _) = hero_ink(&narrow);
+        let (rows_at_30, _) = hero_ink(&render_app(&mut app, 30, 24));
 
-        let wide = render_app(&mut app, 66, 24).join("\n");
-        assert!(wide.contains('\u{2588}'), "got:\n{wide}");
+        // Then:
+        assert!(
+            rows_at_66 > rows_at_64 && rows_at_64 > 0,
+            "66 columns: {rows_at_66} art rows, 64 columns: {rows_at_64}:\n{}",
+            narrow.join("\n")
+        );
+        assert_eq!(rows_at_30, 0, "art on a 30-column terminal");
+    }
+
+    /// The hero digits draw their curves in octant cells.
+    ///
+    /// Given: a terminal that holds the medium clock.
+    /// When: the frame is drawn.
+    /// Then: the art uses a glyph finer than a half block.
+    ///
+    /// Why it matters: half blocks give one dot across a cell, so a
+    /// curve steps in whole cells. Octants give two across and four
+    /// down, which is what makes the curves smooth.
+    #[test]
+    fn the_hero_digits_draw_their_curves_in_octant_cells() {
+        // Given:
+        let mut app = wall_app(&["tokyo"]);
+
+        // When:
+        let rendered = render_app(&mut app, 100, 40).join("\n");
+
+        // Then:
+        let half_blocks = [' ', '\u{2588}', '\u{2580}', '\u{2584}'];
+        assert!(
+            rendered
+                .chars()
+                .any(|c| is_art_glyph(c) && !half_blocks.contains(&c)),
+            "no glyph finer than a half block:\n{rendered}"
+        );
     }
 
     #[test]
