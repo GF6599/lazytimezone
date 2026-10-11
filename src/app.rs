@@ -1544,6 +1544,35 @@ mod tests {
         }
     }
 
+    /// A config file that names Rose Pine opens the app in Rose Pine.
+    ///
+    /// Given: a config file whose theme is "Rose Pine".
+    /// When: the app starts with that file.
+    /// Then: the theme is Rose Pine, not the Default fallback.
+    ///
+    /// Why it matters: an unknown label falls back to Default with only
+    /// a warning, so a theme the cycle offers but the loader cannot
+    /// read is lost on every restart.
+    #[test]
+    fn a_config_file_that_names_rose_pine_opens_in_rose_pine() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        config::try_save(
+            &tmp.path(),
+            &config::Config {
+                theme: "Rose Pine".to_string(),
+                favorites: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        // When:
+        let app = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(app.theme.label(), "Rose Pine");
+    }
+
     #[test]
     fn theme_from_label_unknown_defaults() {
         assert_eq!(Theme::from_label("NonExistent"), Theme::Default);
