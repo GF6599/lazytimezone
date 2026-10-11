@@ -25,6 +25,7 @@ mod app;
 mod cli;
 mod clipboard;
 mod config;
+mod digits;
 mod events;
 mod search;
 mod theme;
