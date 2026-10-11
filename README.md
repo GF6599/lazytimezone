@@ -12,7 +12,7 @@ A terminal world clock browser. Search by city, region, country, or UTC offset, 
 - **Favorite wall.** Each favorite city is a framed panel with its own time, date, and offset from the main clock. The panels stretch to the terminal width, and a tall terminal adds the timezone and the sunrise and sunset times. Move between panels, promote one to the main clock, and reorder them. The app saves the wall.
 - **34,000 cities.** Every GeoNames place above 15,000 people, with its state and country.
 - **Add-city search.** Press `/`, type a city, a state, a country, or a UTC offset, and pick a result. Examples: `+5:30`, `UTC-8`, `portland maine`, `asia +9`.
-- **6 themes.** The app saves your choice.
+- **7 themes.** The app saves your choice.
 - **Clipboard copy.** Copy the current time of the main clock.
 
 ## Install
@@ -104,7 +104,7 @@ A search can match an alias city or a geographic keyword. The table then shows t
 
 ## Configuration
 
-Press `t` to cycle the theme. The cycle order is Default, Dracula, Solarized, Nord, Monokai, and Gruvbox.
+Press `t` to cycle the theme. The cycle order is Default, Dracula, Solarized, Nord, Monokai, Gruvbox, and Rose Pine.
 
 The app writes the theme and the favorites to `~/.config/lazytimezone/config.toml`. When `$XDG_CONFIG_HOME` is set, the app writes to `$XDG_CONFIG_HOME/lazytimezone/config.toml` instead. Pass `--config <path>` to read and write a different file, for example one file per project or a scratch file for a test run.
 
