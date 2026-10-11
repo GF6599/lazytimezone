@@ -1,4 +1,4 @@
-//! # Theme system — six colour palettes.
+//! # Theme system — seven colour palettes.
 //!
 //! Each theme is a flat [`ThemeColors`] struct with semantic colour
 //! slots (`accent`, `good`, `warning`, …) rather than component-
@@ -21,6 +21,7 @@ pub enum Theme {
     Nord,
     Monokai,
     Gruvbox,
+    RosePine,
 }
 
 impl Theme {
@@ -32,6 +33,7 @@ impl Theme {
             Theme::Nord => "Nord",
             Theme::Monokai => "Monokai",
             Theme::Gruvbox => "Gruvbox",
+            Theme::RosePine => "Rose Pine",
         }
     }
 
@@ -42,7 +44,8 @@ impl Theme {
             Theme::Solarized => Theme::Nord,
             Theme::Nord => Theme::Monokai,
             Theme::Monokai => Theme::Gruvbox,
-            Theme::Gruvbox => Theme::Default,
+            Theme::Gruvbox => Theme::RosePine,
+            Theme::RosePine => Theme::Default,
         }
     }
 
@@ -54,6 +57,7 @@ impl Theme {
             Theme::Nord => nord_colors(),
             Theme::Monokai => monokai_colors(),
             Theme::Gruvbox => gruvbox_colors(),
+            Theme::RosePine => rose_pine_colors(),
         }
     }
 
@@ -79,6 +83,8 @@ impl Theme {
             Some(Theme::Monokai)
         } else if label.eq_ignore_ascii_case("Gruvbox") {
             Some(Theme::Gruvbox)
+        } else if label.eq_ignore_ascii_case("Rose Pine") {
+            Some(Theme::RosePine)
         } else {
             None
         }
@@ -214,5 +220,25 @@ fn gruvbox_colors() -> ThemeColors {
         status_bg: Color::Rgb(211, 134, 155),
         status_fg: Color::Rgb(40, 40, 40),
         star: Color::Rgb(250, 189, 47),
+    }
+}
+
+/// The main Rose Pine palette, with each slot's role named beside it.
+/// Leaf, the only green, comes from rose-pine/neovim, because the
+/// palette itself has none for the `good` slot.
+fn rose_pine_colors() -> ThemeColors {
+    ThemeColors {
+        bg: Color::Reset,
+        fg: Color::Rgb(224, 222, 244),               // text
+        muted: Color::Rgb(110, 106, 134),            // muted
+        border: Color::Rgb(64, 61, 82),              // highlight med
+        title: Color::Rgb(235, 188, 186),            // rose
+        accent: Color::Rgb(156, 207, 216),           // foam
+        accent_secondary: Color::Rgb(196, 167, 231), // iris
+        good: Color::Rgb(149, 177, 172),             // leaf
+        info: Color::Rgb(156, 207, 216),             // foam
+        status_bg: Color::Rgb(49, 116, 143),         // pine
+        status_fg: Color::Rgb(224, 222, 244),        // text
+        star: Color::Rgb(246, 193, 119),             // gold
     }
 }

@@ -1522,6 +1522,7 @@ mod tests {
             Theme::Nord,
             Theme::Monokai,
             Theme::Gruvbox,
+            Theme::RosePine,
             Theme::Default,
         ];
         for expected in themes {
@@ -1539,6 +1540,7 @@ mod tests {
             Theme::Nord,
             Theme::Monokai,
             Theme::Gruvbox,
+            Theme::RosePine,
         ] {
             assert_eq!(Theme::from_label(theme.label()), theme);
         }
