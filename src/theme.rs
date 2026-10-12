@@ -242,3 +242,50 @@ fn rose_pine_colors() -> ThemeColors {
         star: Color::Rgb(246, 193, 119),             // gold
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::panic)]
+
+    use super::*;
+
+    fn luminance(colour: Color) -> f64 {
+        let Color::Rgb(r, g, b) = colour else {
+            panic!("not an RGB colour: {colour:?}");
+        };
+        0.2126 * f64::from(r) + 0.7152 * f64::from(g) + 0.0722 * f64::from(b)
+    }
+
+    /// Every theme steps up in brightness from border through muted and
+    /// subtle to text.
+    ///
+    /// Given: each theme in the cycle.
+    /// When: its grey slots are ranked by luminance.
+    /// Then: border < muted < subtle < fg.
+    ///
+    /// Why it matters: the sky is drawn in subtle so it stays visible but
+    /// under the text. A subtle slot at or below muted, or at or above
+    /// text, breaks that in one theme only.
+    #[test]
+    fn every_theme_steps_from_border_through_muted_and_subtle_to_text() {
+        let mut theme = Theme::Default;
+        loop {
+            // Given:
+            let tc = theme.colors();
+
+            // When:
+            let ladder = [tc.border, tc.muted, tc.subtle, tc.fg].map(luminance);
+
+            // Then:
+            assert!(
+                ladder.windows(2).all(|pair| pair[0] < pair[1]),
+                "{}: border, muted, subtle, fg luminance {ladder:?}",
+                theme.label()
+            );
+            theme = theme.next();
+            if theme == Theme::Default {
+                break;
+            }
+        }
+    }
+}

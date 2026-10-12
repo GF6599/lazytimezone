@@ -2188,4 +2188,147 @@ mod tests {
             "the overlay names these keys, the README does not: {missing:?}"
         );
     }
+
+    /// The colour of every Braille cell in a frame, with its glyph.
+    fn braille_cells(buffer: &ratatui::buffer::Buffer) -> Vec<(char, Color)> {
+        (0..buffer.area.height)
+            .flat_map(|y| (0..buffer.area.width).map(move |x| (x, y)))
+            .filter_map(|pos| {
+                let glyph = buffer[pos].symbol().chars().next()?;
+                ('\u{2801}'..='\u{28ff}')
+                    .contains(&glyph)
+                    .then_some((glyph, buffer[pos].fg))
+            })
+            .collect()
+    }
+
+    /// The map draws land on the day side in the day colour, land on the
+    /// night side in the night colour, and a plain favourite's dot in
+    /// the text colour.
+    ///
+    /// Given: London (selected) and Tokyo at noon UTC on 21 June, which
+    /// is 13:00 in London and 21:00 in Tokyo, in the map view.
+    /// When: the frame is drawn.
+    /// Then: the land around London's dot is in the day colour, the land
+    /// around Tokyo's dot is in the night colour, Tokyo's dot is in the
+    /// text colour, and every other Braille cell is the dim night stipple.
+    ///
+    /// Why it matters: the land colour shows where it is day, with the
+    /// same colours as the day strip and the clock. A plain dot in the
+    /// day colour would vanish on day land.
+    #[test]
+    fn the_map_colours_land_by_day_and_night() {
+        // Given:
+        let mut app = favorites_app(&[("London", "England", "GB"), ("Tokyo", "Tokyo", "JP")]);
+        app.toggle_map();
+        let tc = app.theme.colors();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 100, 40, midsummer_noon_utc());
+
+        // Then:
+        let dots = map_dots(&buffer);
+        let london = dots.iter().find(|d| d.2 == tc.star).copied();
+        let tokyo = dots.iter().find(|d| d.2 != tc.star).copied();
+        let (Some(london), Some(tokyo)) = (london, tokyo) else {
+            panic!("dots: {dots:?}");
+        };
+        assert_eq!(tokyo.2, tc.fg, "Tokyo's dot");
+        let land_around = |(x, y, _): (u16, u16, Color)| -> Vec<Color> {
+            (y.saturating_sub(1)..=y + 1)
+                .flat_map(|row| (x.saturating_sub(2)..=x + 2).map(move |column| (column, row)))
+                .filter_map(|pos| {
+                    let glyph = buffer[pos].symbol().chars().next()?;
+                    let colour = buffer[pos].fg;
+                    (('\u{2801}'..='\u{28ff}').contains(&glyph) && colour != tc.border)
+                        .then_some(colour)
+                })
+                .collect()
+        };
+        let day_land = land_around(london);
+        assert!(!day_land.is_empty(), "no land around London");
+        assert!(
+            day_land.iter().all(|&c| c == tc.good),
+            "London: {day_land:?}"
+        );
+        let night_land = land_around(tokyo);
+        assert!(!night_land.is_empty(), "no land around Tokyo");
+        assert!(
+            night_land.iter().all(|&c| c == tc.accent_secondary),
+            "Tokyo: {night_land:?}"
+        );
+        let cells = braille_cells(&buffer);
+        assert!(
+            cells
+                .iter()
+                .all(|&(_, c)| c == tc.good || c == tc.accent_secondary || c == tc.border),
+            "a map cell in another colour: {cells:?}"
+        );
+    }
+
+    /// The night sky draws its stars in the subtle colour, and a
+    /// twinkling star at its peak in the text colour.
+    ///
+    /// Given: Tokyo on the main clock at night.
+    /// When: the panel view is drawn at one second and the next.
+    /// Then: every peak glyph is in the text colour, every other star is
+    /// subtle, and a peak glyph is drawn at least once.
+    ///
+    /// Why it matters: a sky in a dim colour is close to invisible, and
+    /// the twinkle reads only when the peak is a step brighter than the
+    /// other stars.
+    #[test]
+    fn night_stars_are_subtle_and_a_twinkle_peaks_in_text_colour() {
+        // Given:
+        let mut app = wall_app(&["tokyo"]);
+        let tc = app.theme.colors();
+        let night = midsummer_noon_utc();
+
+        // When:
+        let cells: Vec<(char, Color)> = [night, night + TimeDelta::seconds(1)]
+            .into_iter()
+            .flat_map(|now| braille_cells(&render_buffer_at(&mut app, 100, 48, now)))
+            .collect();
+
+        // Then:
+        let peak = '\u{283f}';
+        assert!(
+            cells.iter().any(|&(glyph, _)| glyph == peak),
+            "no twinkle peak"
+        );
+        for (glyph, colour) in cells {
+            let expected = if glyph == peak { tc.fg } else { tc.subtle };
+            assert_eq!(colour, expected, "star {glyph:?}");
+        }
+    }
+
+    /// Every star lights at least two Braille dots.
+    ///
+    /// Given: Tokyo on the main clock at night.
+    /// When: the panel view is drawn at one second and the next.
+    /// Then: every star glyph has two or more of its eight dots raised.
+    ///
+    /// Why it matters: a one-dot glyph is about two pixels wide at a
+    /// normal font size, so no colour makes it easy to see.
+    #[test]
+    fn every_star_lights_at_least_two_dots() {
+        // Given:
+        let mut app = wall_app(&["tokyo"]);
+        let night = midsummer_noon_utc();
+
+        // When:
+        let cells: Vec<(char, Color)> = [night, night + TimeDelta::seconds(1)]
+            .into_iter()
+            .flat_map(|now| braille_cells(&render_buffer_at(&mut app, 100, 48, now)))
+            .collect();
+
+        // Then:
+        assert!(!cells.is_empty(), "no sky");
+        let faint: Vec<char> = cells
+            .iter()
+            .map(|&(glyph, _)| glyph)
+            .filter(|&glyph| (u32::from(glyph) - 0x2800).count_ones() < 2)
+            .collect();
+        assert!(faint.is_empty(), "one-dot stars: {faint:?}");
+    }
 }
