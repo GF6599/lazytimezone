@@ -17,6 +17,7 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
+use chrono::offset::Offset;
 use chrono::{DateTime, Datelike, Timelike};
 use chrono_tz::Tz;
 
@@ -41,7 +42,7 @@ pub struct TimezoneEntry {
     /// IANA timezone identifier from [`chrono_tz`].
     pub tz: Tz,
     /// Where the city is. Drives the day/night colouring via
-    /// [`is_daytime_at_latitude`]: for high-latitude cities the
+    /// [`is_daytime_at_coordinates`]: for high-latitude cities the
     /// daylight window varies dramatically by season. `None` for a
     /// fixed offset, which is not a place and so has no sunrise.
     pub coordinates: Option<Coordinates>,
@@ -280,18 +281,13 @@ pub(crate) fn coordinates_for(tz: Tz) -> Option<Coordinates> {
         .and_then(|e| e.coordinates)
 }
 
-/// Returns `(sunrise, sunset)` as fractional hours of local clock
-/// time using a simplified solar-position model.
+/// Returns `(sunrise, sunset)` as fractional hours of solar time, a
+/// window centred on solar noon at 12:00, using a simplified
+/// solar-position model. [`sun_times`] moves it onto a local clock.
 ///
 /// Inputs:
 /// - `latitude_deg` — positive = north, negative = south
 /// - `day_of_year` — 1..=366 (e.g. from `chrono::Datelike::ordinal`)
-///
-/// The model assumes solar noon at 12:00 local time, which is off by
-/// the equation of time (±15 min through the year) and the city's
-/// longitude position within its timezone. For a "is it daytime?"
-/// boolean the error is negligible except within minutes of sunrise
-/// or sunset, where the question itself is ambiguous.
 ///
 /// Polar regions:
 /// - Polar day → returns `(0.0, 24.0)` (sun never sets)
@@ -318,20 +314,44 @@ pub(crate) fn sun_window(latitude_deg: f64, day_of_year: u32) -> (f64, f64) {
     (12.0 - half_day_hours, 12.0 + half_day_hours)
 }
 
+/// Solar noon on `local`'s clock, in hours after midnight: 12, plus 4
+/// minutes for each degree west, plus the zone's UTC offset on that
+/// date. It can fall past 24, as on Kiritimati at 36.5. It leaves out
+/// the equation of time, which moves solar noon by up to 16 minutes
+/// through the year.
+fn solar_noon(longitude: f64, local: &DateTime<Tz>) -> f64 {
+    let offset_hours = f64::from(local.offset().fix().local_minus_utc()) / 3600.0;
+    12.0 - longitude / 15.0 + offset_hours
+}
+
+/// Returns `(sunrise, sunset)` at `place` on `local`'s date, in hours
+/// of `local`'s clock. Either can fall below 0 or past 24 when the
+/// place's solar noon sits far from 12:00 on its clock.
+pub(crate) fn sun_times(place: Coordinates, local: &DateTime<Tz>) -> (f64, f64) {
+    let (sunrise, sunset) = sun_window(place.latitude, local.ordinal());
+    let shift = solar_noon(place.longitude, local) - 12.0;
+    (sunrise + shift, sunset + shift)
+}
+
 /// Returns true when `local` falls inside the daytime window for the
 /// given timezone. Falls back to a 6..18 window when no curated
-/// latitude exists for `tz`.
+/// coordinates exist for `tz`.
 pub fn is_daytime_at(tz: Tz, local: &DateTime<Tz>) -> bool {
     match coordinates_for(tz) {
-        Some(c) => is_daytime_at_latitude(c.latitude, local),
+        Some(place) => is_daytime_at_coordinates(place, local),
         None => (6..18).contains(&local.hour()),
     }
 }
 
-pub fn is_daytime_at_latitude(latitude_deg: f64, local: &DateTime<Tz>) -> bool {
-    let (sunrise, sunset) = sun_window(latitude_deg, local.ordinal());
+/// Measures the time from solar noon around the 24-hour clock, so a
+/// solar noon that wraps past midnight still holds midday inside the
+/// window.
+pub fn is_daytime_at_coordinates(place: Coordinates, local: &DateTime<Tz>) -> bool {
+    let (sunrise, sunset) = sun_window(place.latitude, local.ordinal());
+    let half_day = (sunset - sunrise) / 2.0;
     let hour = local.hour() as f64 + local.minute() as f64 / 60.0;
-    hour >= sunrise && hour < sunset
+    let from_noon = (hour - solar_noon(place.longitude, local) + 12.0).rem_euclid(24.0) - 12.0;
+    -half_day <= from_noon && from_noon < half_day
 }
 
 /// Formats a UTC offset in seconds to a human-readable string like
@@ -519,7 +539,7 @@ mod tests {
                 let local = instant.with_timezone(&entry.tz);
                 assert_eq!(
                     is_daytime_at(entry.tz, &local),
-                    is_daytime_at_latitude(coordinates.latitude, &local),
+                    is_daytime_at_coordinates(coordinates, &local),
                     "{} disagrees at {local}",
                     entry.city
                 );
