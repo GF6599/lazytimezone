@@ -37,6 +37,7 @@ struct CityRow {
     country: String,
     cc: String,
     latitude: f64,
+    longitude: f64,
     population: u64,
     tz: String,
 }
@@ -114,7 +115,7 @@ fn parse_countries(text: &str) -> HashMap<String, String> {
 }
 
 /// Parses one `cities15000.txt` row. Columns used: 1 name, 2 ascii
-/// name, 4 latitude, 8 country code, 10 admin1 code, 14 population,
+/// name, 4 latitude, 5 longitude, 8 country code, 10 admin1 code, 14 population,
 /// 17 IANA timezone.
 ///
 /// An unknown timezone or country is an error, not a fallback: both
@@ -139,6 +140,12 @@ fn parse_city_line(
         .map_err(|e| format!("bad latitude {:?}: {e}", cols[4]))?;
     if !(-90.0..=90.0).contains(&latitude) {
         return Err(format!("latitude {latitude} out of range"));
+    }
+    let longitude: f64 = cols[5]
+        .parse()
+        .map_err(|e| format!("bad longitude {:?}: {e}", cols[5]))?;
+    if !(-180.0..=180.0).contains(&longitude) {
+        return Err(format!("longitude {longitude} out of range"));
     }
     let cc = cols[8].trim();
     let country = countries
@@ -171,6 +178,7 @@ fn parse_city_line(
         country: country.clone(),
         cc: cc.to_string(),
         latitude,
+        longitude,
         population,
         tz: tz.to_string(),
     })
@@ -253,13 +261,15 @@ fn zone_table_rows(
             Some(comment) if same_letters(comment, &segment) => comment.to_string(),
             _ => segment,
         };
+        let (latitude, longitude) = iso6709(coords).map_err(|e| format!("zone.tab {tz}: {e}"))?;
         rows.push(CityRow {
             name,
             ascii: String::new(),
             admin1: String::new(),
             country: country.clone(),
             cc: cc.to_string(),
-            latitude: iso6709_latitude(coords).map_err(|e| format!("zone.tab {tz}: {e}"))?,
+            latitude,
+            longitude,
             population: 0,
             tz: tz.to_string(),
         });
@@ -277,28 +287,39 @@ fn same_letters(a: &str, b: &str) -> bool {
     letters(a) == letters(b)
 }
 
-/// The latitude half of an ISO 6709 pair, `±DDMM` or `±DDMMSS`, such as
-/// the `-7750` of `-7750+16636`.
-fn iso6709_latitude(coords: &str) -> Result<f64, String> {
-    let end = coords
+/// An ISO 6709 pair such as `-7750+16636`: latitude as `±DDMM` or
+/// `±DDMMSS`, then longitude as `±DDDMM` or `±DDDMMSS`.
+fn iso6709(coords: &str) -> Result<(f64, f64), String> {
+    let bad = || format!("bad coordinates {coords:?}");
+    let split = coords
         .get(1..)
         .and_then(|rest| rest.find(['+', '-']))
-        .ok_or_else(|| format!("bad coordinates {coords:?}"))?
+        .ok_or_else(bad)?
         + 1;
-    let (sign, digits) = coords[..end].split_at(1);
-    let sign = if sign == "-" { -1.0 } else { 1.0 };
-    let part = |range: std::ops::Range<usize>| -> Result<f64, String> {
-        digits
-            .get(range)
-            .and_then(|s| s.parse::<f64>().ok())
-            .ok_or_else(|| format!("bad coordinates {coords:?}"))
+    let (latitude, longitude) = coords.split_at(split);
+    Ok((
+        iso6709_angle(latitude, 2).ok_or_else(bad)?,
+        iso6709_angle(longitude, 3).ok_or_else(bad)?,
+    ))
+}
+
+/// One signed ISO 6709 angle with `degree_digits` digits of degrees,
+/// then minutes, then optional seconds.
+fn iso6709_angle(angle: &str, degree_digits: usize) -> Option<f64> {
+    let (sign, digits) = angle.split_at_checked(1)?;
+    let sign = match sign {
+        "+" => 1.0,
+        "-" => -1.0,
+        _ => return None,
     };
-    let seconds = match digits.len() {
-        4 => 0.0,
-        6 => part(4..6)?,
-        _ => return Err(format!("bad coordinates {coords:?}")),
+    let part = |range: std::ops::Range<usize>| digits.get(range)?.parse::<f64>().ok();
+    let d = degree_digits;
+    let seconds = match digits.len().checked_sub(d)? {
+        2 => 0.0,
+        4 => part(d + 2..d + 4)?,
+        _ => return None,
     };
-    Ok(sign * (part(0..2)? + part(2..4)? / 60.0 + seconds / 3600.0))
+    Some(sign * (part(0..d)? + part(d..d + 2)? / 60.0 + seconds / 3600.0))
 }
 
 /// Population descending, then name, then zone, then country code, so
@@ -318,17 +339,18 @@ fn render_tsv(rows: &[CityRow]) -> String {
     let mut out = String::from(
         "# City catalogue derived from GeoNames (https://www.geonames.org/), CC BY 4.0.\n\
          # Regenerate with: just gen-cities\n\
-         # name\tascii\tadmin1\tcountry\tcc\tlatitude\tpopulation\ttz\n",
+         # name\tascii\tadmin1\tcountry\tcc\tlatitude\tlongitude\tpopulation\ttz\n",
     );
     for row in rows {
         out.push_str(&format!(
-            "{}\t{}\t{}\t{}\t{}\t{:.2}\t{}\t{}\n",
+            "{}\t{}\t{}\t{}\t{}\t{:.2}\t{:.2}\t{}\t{}\n",
             row.name,
             row.ascii,
             row.admin1,
             row.country,
             row.cc,
             row.latitude,
+            row.longitude,
             row.population,
             row.tz
         ));

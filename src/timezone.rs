@@ -3,7 +3,7 @@
 //! The city catalogue is generated data: `data/cities.tsv` derives
 //! from GeoNames through the `gen_cities` binary (the `gen-cities`
 //! recipe) and is embedded at compile time. One row is one city with
-//! its state, country, latitude, population, and IANA timezone. The
+//! its state, country, coordinates, population, and IANA timezone. The
 //! file is sorted by population, so the catalogue's index order is
 //! already a relevance order.
 //!
@@ -40,12 +40,11 @@ pub struct TimezoneEntry {
     pub cc: &'static str,
     /// IANA timezone identifier from [`chrono_tz`].
     pub tz: Tz,
-    /// Latitude in degrees (positive = north). Drives the day/night
-    /// colouring via [`is_daytime_at_latitude`]: for high-latitude
-    /// cities the daylight window varies dramatically by season.
-    /// `None` for a fixed offset, which is not a place and so has no
-    /// sunrise.
-    pub latitude: Option<f64>,
+    /// Where the city is. Drives the day/night colouring via
+    /// [`is_daytime_at_latitude`]: for high-latitude cities the
+    /// daylight window varies dramatically by season. `None` for a
+    /// fixed offset, which is not a place and so has no sunrise.
+    pub coordinates: Option<Coordinates>,
     /// GeoNames population: the ranking signal for search and for
     /// the one-representative-per-zone lookups.
     pub population: u64,
@@ -55,8 +54,16 @@ impl TimezoneEntry {
     /// True for a UTC offset with no place behind it. Such a row has no
     /// sunrise, and it never observes daylight saving.
     pub fn is_fixed_offset(&self) -> bool {
-        self.latitude.is_none()
+        self.coordinates.is_none()
     }
+}
+
+/// A position in degrees: latitude positive north, longitude positive
+/// east.
+#[derive(Debug, Clone, Copy)]
+pub struct Coordinates {
+    pub latitude: f64,
+    pub longitude: f64,
 }
 
 /// The full city catalogue, parsed from the embedded TSV once.
@@ -80,7 +87,7 @@ fn data_rows(tsv: &'static str) -> impl Iterator<Item = &'static str> {
     tsv.lines().filter(|l| !l.starts_with('#') && !l.is_empty())
 }
 
-/// Parses one `name  ascii  admin1  country  cc  lat  pop  tz` row.
+/// Parses one `name  ascii  admin1  country  cc  lat  lon  pop  tz` row.
 fn parse_city_row(line: &'static str) -> Option<TimezoneEntry> {
     let mut cols = line.split('\t');
     let city = cols.next()?;
@@ -89,7 +96,11 @@ fn parse_city_row(line: &'static str) -> Option<TimezoneEntry> {
     let country = cols.next()?;
     let cc = cols.next()?;
     let latitude: f64 = cols.next()?.parse().ok()?;
-    let latitude = Some(latitude);
+    let longitude: f64 = cols.next()?.parse().ok()?;
+    let coordinates = Some(Coordinates {
+        latitude,
+        longitude,
+    });
     let population: u64 = cols.next()?.parse().ok()?;
     let tz: Tz = cols.next()?.parse().ok()?;
     Some(TimezoneEntry {
@@ -99,7 +110,7 @@ fn parse_city_row(line: &'static str) -> Option<TimezoneEntry> {
         country,
         cc,
         tz,
-        latitude,
+        coordinates,
         population,
     })
 }
@@ -229,7 +240,7 @@ fn fixed_offset_entries() -> impl Iterator<Item = TimezoneEntry> {
         country: "",
         cc: "",
         tz,
-        latitude: None,
+        coordinates: None,
         population: 0,
     })
 }
@@ -260,13 +271,13 @@ pub(crate) fn region_of(tz: Tz) -> &'static str {
 }
 
 /// Linear over the catalogue. A caller that already holds the
-/// [`TimezoneEntry`] should read `entry.latitude` and call
-/// [`is_daytime_at_latitude`] instead of paying for the search.
-pub(crate) fn latitude_for(tz: Tz) -> Option<f64> {
+/// [`TimezoneEntry`] should read `entry.coordinates` instead of paying
+/// for the search.
+pub(crate) fn coordinates_for(tz: Tz) -> Option<Coordinates> {
     all_timezones()
         .iter()
         .find(|e| e.tz == tz)
-        .and_then(|e| e.latitude)
+        .and_then(|e| e.coordinates)
 }
 
 /// Returns `(sunrise, sunset)` as fractional hours of local clock
@@ -311,8 +322,8 @@ pub(crate) fn sun_window(latitude_deg: f64, day_of_year: u32) -> (f64, f64) {
 /// given timezone. Falls back to a 6..18 window when no curated
 /// latitude exists for `tz`.
 pub fn is_daytime_at(tz: Tz, local: &DateTime<Tz>) -> bool {
-    match latitude_for(tz) {
-        Some(lat) => is_daytime_at_latitude(lat, local),
+    match coordinates_for(tz) {
+        Some(c) => is_daytime_at_latitude(c.latitude, local),
         None => (6..18).contains(&local.hour()),
     }
 }
@@ -432,14 +443,14 @@ mod tests {
             if !seen.insert(entry.tz) {
                 continue;
             }
-            let Some(latitude) = entry.latitude else {
+            let Some(coordinates) = entry.coordinates else {
                 continue;
             };
             for instant in [midyear, midwinter] {
                 let local = instant.with_timezone(&entry.tz);
                 assert_eq!(
                     is_daytime_at(entry.tz, &local),
-                    is_daytime_at_latitude(latitude, &local),
+                    is_daytime_at_latitude(coordinates.latitude, &local),
                     "{} disagrees at {local}",
                     entry.city
                 );
@@ -453,19 +464,6 @@ mod tests {
         let (sunrise, sunset) = sun_window(80.0, 355);
         assert_eq!(sunrise, 12.0);
         assert_eq!(sunset, 12.0);
-    }
-
-    #[test]
-    fn major_cities_have_curated_latitudes() {
-        for tz in [
-            Tz::Europe__London,
-            Tz::Asia__Tokyo,
-            Tz::America__New_York,
-            Tz::Australia__Sydney,
-            Tz::Atlantic__Reykjavik,
-        ] {
-            assert!(latitude_for(tz).is_some(), "missing latitude for {tz:?}");
-        }
     }
 
     /// Spot-checks for well-known city coordinates. These are deliberately

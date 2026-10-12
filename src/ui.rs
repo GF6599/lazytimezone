@@ -469,8 +469,8 @@ fn draw_favorite_panel(
     let selected = panel_pos == app.selected_panel;
     let local = utc_now.with_timezone(&entry.tz);
     let is_day = entry
-        .latitude
-        .map(|lat| is_daytime_at_latitude(lat, &local));
+        .coordinates
+        .map(|c| is_daytime_at_latitude(c.latitude, &local));
 
     let border_color = if selected { tc.accent } else { tc.border };
     let title_style = if selected {
@@ -533,13 +533,15 @@ fn draw_favorite_panel(
             Style::default().fg(tc.muted),
         ),
     ]));
-    if let Some(lat) = entry.latitude {
-        body.push(sun_line(lat, &local, tc));
+    if let Some(c) = entry.coordinates {
+        body.push(sun_line(c.latitude, &local, tc));
     }
     // The strip outranks the zone and sun lines, which repeat what it
     // shows, so it takes the last row once the time and offset fit.
-    let strip = (inner.width >= STRIP_HOURS && inner.height >= 3)
-        .then(|| day_strip(entry.latitude, entry.tz, app.selection.tz, utc_now, tc));
+    let strip = (inner.width >= STRIP_HOURS && inner.height >= 3).then(|| {
+        let latitude = entry.coordinates.map(|c| c.latitude);
+        day_strip(latitude, entry.tz, app.selection.tz, utc_now, tc)
+    });
     body.truncate(usize::from(inner.height) - usize::from(strip.is_some()));
     body.extend(strip);
     frame.render_widget(
