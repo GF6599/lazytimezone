@@ -38,7 +38,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
     symbols::Marker,
     text::{Line, Span},
-    widgets::canvas::{Canvas, Map, MapResolution},
+    widgets::canvas::{Canvas, Map, MapResolution, Points},
     widgets::{Block, Borders, Clear, Paragraph},
 };
 use std::borrow::Cow;
@@ -677,15 +677,23 @@ fn draw_map(
     // The selected dot is printed last, so it stays on top of a
     // neighbour in the same cell.
     dots.sort_by_key(|&(_, _, selected)| selected);
+    let night = night_stipple(utc_now, map_width, map_rows);
     let map = Canvas::default()
         .marker(Marker::Braille)
         .x_bounds([-180.0, 180.0])
         .y_bounds([MAP_SOUTH, MAP_NORTH])
         .background_color(tc.bg)
         .paint(|ctx| {
+            ctx.draw(&Points {
+                coords: &night,
+                color: tc.border,
+            });
+            // A later layer replaces a cell an earlier one drew, so the
+            // coastline stays whole where it crosses the night side.
+            ctx.layer();
             ctx.draw(&Map {
                 resolution: MapResolution::High,
-                color: tc.border,
+                color: tc.muted,
             });
             for &(longitude, latitude, selected) in &dots {
                 let colour = if selected { tc.star } else { tc.accent };
@@ -703,6 +711,37 @@ fn draw_map(
             .style(Style::default().bg(tc.bg)),
         legend_area,
     );
+}
+
+/// The night side of a map `columns` cells wide and `rows` tall, as
+/// (longitude, latitude) points on every other Braille dot across and
+/// down, so night reads as a stipple and day stays clear.
+///
+/// Each point asks [`is_daytime_at_coordinates`] at `utc_now` on the UTC
+/// clock, the same sun model the panels and day strips use, so a
+/// city's dot and its panel always agree on whether it is night.
+fn night_stipple(utc_now: &DateTime<Utc>, columns: u16, rows: u16) -> Vec<(f64, f64)> {
+    let utc = utc_now.with_timezone(&Tz::UTC);
+    let across = u32::from(columns);
+    let down = u32::from(rows) * 2;
+    let step_x = 360.0 / f64::from(across);
+    let step_y = (MAP_NORTH - MAP_SOUTH) / f64::from(down);
+    (0..down)
+        .flat_map(|j| (0..across).map(move |i| (i, j)))
+        .map(|(i, j)| {
+            (
+                -180.0 + (f64::from(i) + 0.25) * step_x,
+                MAP_SOUTH + (f64::from(j) + 0.25) * step_y,
+            )
+        })
+        .filter(|&(longitude, latitude)| {
+            let place = Coordinates {
+                latitude,
+                longitude,
+            };
+            !is_daytime_at_coordinates(place, &utc)
+        })
+        .collect()
 }
 
 /// Every favourite as `City HH:MM`, wrapped onto as many lines as
