@@ -1428,9 +1428,9 @@ mod tests {
     /// Given: London and Tokyo on the wall, Tokyo on the main clock, at
     /// noon UTC on 21 June, which is 21:00 in Tokyo and 13:00 in London.
     /// When: the wall is drawn with room for the strips.
-    /// Then: column 21 is day in London and night in Tokyo, column 12
-    /// is night in London and day in Tokyo, and column 21 carries the
-    /// marker colour in both strips.
+    /// Then: column 21 (13:30 in London) is day in London and night in
+    /// Tokyo, column 8 (00:30 in London) is night in London and day in
+    /// Tokyo, and column 21 carries the marker colour in both strips.
     ///
     /// Why it matters: the strip answers when everyone is awake, which
     /// only works if one column is one instant in every panel and the
@@ -1450,11 +1450,11 @@ mod tests {
         let (_, _, london) = &strips[0];
         let (_, _, tokyo) = &strips[1];
         assert!(
-            is_day_cell(london[21]) && is_night_cell(london[12]),
+            is_day_cell(london[21]) && is_night_cell(london[8]),
             "London: {london:?}"
         );
         assert!(
-            is_night_cell(tokyo[21]) && is_day_cell(tokyo[12]),
+            is_night_cell(tokyo[21]) && is_day_cell(tokyo[8]),
             "Tokyo: {tokyo:?}"
         );
         let marker = app.theme.colors().star;
