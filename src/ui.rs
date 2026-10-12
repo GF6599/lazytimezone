@@ -33,13 +33,14 @@ use chrono_tz::Tz;
 
 use ratatui::{
     Frame,
+    buffer::Buffer,
     layout::Alignment,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Position, Rect},
     style::{Color, Modifier, Style},
     symbols::Marker,
     text::{Line, Span},
     widgets::canvas::{Canvas, Map, MapResolution, Points},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 use std::borrow::Cow;
 
@@ -473,8 +474,8 @@ fn draw_wall(
 }
 
 /// Fills `band` with the ambient sky for the main clock's daylight, in
-/// the dim border colour, with a twinkling star at its peak one step
-/// brighter.
+/// the subtle colour, with a twinkling star at its peak in the text
+/// colour.
 fn draw_sky(frame: &mut Frame, app: &App, utc_now: &DateTime<Utc>, band: Rect, tc: &ThemeColors) {
     let is_day = is_daytime_at(app.selection.tz, &utc_now.with_timezone(&app.selection.tz));
     let rows = sky::render(band.width, band.height, utc_now.timestamp(), is_day);
@@ -486,7 +487,7 @@ fn draw_sky(frame: &mut Frame, app: &App, utc_now: &DateTime<Utc>, band: Rect, t
                     .map(|cell| match cell {
                         Some(cell) => Span::styled(
                             cell.glyph.to_string(),
-                            Style::default().fg(if cell.bright { tc.muted } else { tc.border }),
+                            Style::default().fg(if cell.bright { tc.fg } else { tc.subtle }),
                         ),
                         None => Span::raw(" "),
                     })
@@ -664,8 +665,9 @@ const MAP_COLUMNS_PER_ROW: u16 = 5;
 const MAP_SOUTH: f64 = -58.0;
 const MAP_NORTH: f64 = 84.0;
 
-/// Renders the world map view: the coastline, a dot for each favourite
-/// with a place, the selected one in the marker colour, and a legend
+/// Renders the world map view: the night side, the coastline in the day
+/// or the night colour, a dot for each favourite with a place, the
+/// selected one in the marker colour, and a legend
 /// of every favourite's local time under it.
 ///
 /// The legend is the strip `h` and `l` walk, so the wall reports one
@@ -717,7 +719,7 @@ fn draw_map(
     // neighbour in the same cell.
     dots.sort_by_key(|&(_, _, selected)| selected);
     let night = night_stipple(utc_now, map_width, map_rows);
-    let map = Canvas::default()
+    let night_side = Canvas::default()
         .marker(Marker::Braille)
         .x_bounds([-180.0, 180.0])
         .y_bounds([MAP_SOUTH, MAP_NORTH])
@@ -727,18 +729,12 @@ fn draw_map(
                 coords: &night,
                 color: tc.border,
             });
-            // A later layer replaces a cell an earlier one drew, so the
-            // coastline stays whole where it crosses the night side.
-            ctx.layer();
-            ctx.draw(&Map {
-                resolution: MapResolution::High,
-                color: tc.muted,
-            });
         });
-    frame.render_widget(map, map_area);
+    frame.render_widget(night_side, map_area);
+    draw_land(frame.buffer_mut(), map_area, utc_now, tc);
     if !map_area.is_empty() {
         for &(longitude, latitude, selected) in &dots {
-            let colour = if selected { tc.star } else { tc.accent };
+            let colour = if selected { tc.star } else { tc.fg };
             if let Some(cell) = frame
                 .buffer_mut()
                 .cell_mut(map_dot_cell(map_area, longitude, latitude))
@@ -753,6 +749,47 @@ fn draw_map(
             .style(Style::default().bg(tc.bg)),
         legend_area,
     );
+}
+
+/// A canvas paints a shape in one colour, so the land is painted apart
+/// and each cell then takes the day or the night colour.
+fn draw_land(buffer: &mut Buffer, map_area: Rect, utc_now: &DateTime<Utc>, tc: &ThemeColors) {
+    let mut land = Buffer::empty(map_area);
+    Canvas::default()
+        .marker(Marker::Braille)
+        .x_bounds([-180.0, 180.0])
+        .y_bounds([MAP_SOUTH, MAP_NORTH])
+        .paint(|ctx| {
+            ctx.draw(&Map {
+                resolution: MapResolution::High,
+                color: tc.good,
+            });
+        })
+        .render(map_area, &mut land);
+    let utc = utc_now.with_timezone(&Tz::UTC);
+    for pos in map_area.positions() {
+        let symbol = land[pos].symbol();
+        if symbol == " " {
+            continue;
+        }
+        let colour = if is_daytime_at_coordinates(map_cell_place(map_area, pos), &utc) {
+            tc.good
+        } else {
+            tc.accent_secondary
+        };
+        if let Some(cell) = buffer.cell_mut(pos) {
+            cell.set_symbol(symbol).set_fg(colour);
+        }
+    }
+}
+
+fn map_cell_place(map_area: Rect, pos: Position) -> Coordinates {
+    let across = f64::from(pos.x - map_area.x) + 0.5;
+    let down = f64::from(pos.y - map_area.y) + 0.5;
+    Coordinates {
+        latitude: MAP_NORTH - down * (MAP_NORTH - MAP_SOUTH) / f64::from(map_area.height),
+        longitude: -180.0 + across * 360.0 / f64::from(map_area.width),
+    }
 }
 
 /// The cell of `map_area` that holds the Braille dot the canvas paints
@@ -2187,5 +2224,148 @@ mod tests {
             missing.is_empty(),
             "the overlay names these keys, the README does not: {missing:?}"
         );
+    }
+
+    /// The colour of every Braille cell in a frame, with its glyph.
+    fn braille_cells(buffer: &ratatui::buffer::Buffer) -> Vec<(char, Color)> {
+        (0..buffer.area.height)
+            .flat_map(|y| (0..buffer.area.width).map(move |x| (x, y)))
+            .filter_map(|pos| {
+                let glyph = buffer[pos].symbol().chars().next()?;
+                ('\u{2801}'..='\u{28ff}')
+                    .contains(&glyph)
+                    .then_some((glyph, buffer[pos].fg))
+            })
+            .collect()
+    }
+
+    /// The map draws land on the day side in the day colour, land on the
+    /// night side in the night colour, and a plain favourite's dot in
+    /// the text colour.
+    ///
+    /// Given: London (selected) and Tokyo at noon UTC on 21 June, which
+    /// is 13:00 in London and 21:00 in Tokyo, in the map view.
+    /// When: the frame is drawn.
+    /// Then: the land around London's dot is in the day colour, the land
+    /// around Tokyo's dot is in the night colour, Tokyo's dot is in the
+    /// text colour, and every other Braille cell is the dim night stipple.
+    ///
+    /// Why it matters: the land colour shows where it is day, with the
+    /// same colours as the day strip and the clock. A plain dot in the
+    /// day colour would vanish on day land.
+    #[test]
+    fn the_map_colours_land_by_day_and_night() {
+        // Given:
+        let mut app = favorites_app(&[("London", "England", "GB"), ("Tokyo", "Tokyo", "JP")]);
+        app.toggle_map();
+        let tc = app.theme.colors();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 100, 40, midsummer_noon_utc());
+
+        // Then:
+        let dots = map_dots(&buffer);
+        let london = dots.iter().find(|d| d.2 == tc.star).copied();
+        let tokyo = dots.iter().find(|d| d.2 != tc.star).copied();
+        let (Some(london), Some(tokyo)) = (london, tokyo) else {
+            panic!("dots: {dots:?}");
+        };
+        assert_eq!(tokyo.2, tc.fg, "Tokyo's dot");
+        let land_around = |(x, y, _): (u16, u16, Color)| -> Vec<Color> {
+            (y.saturating_sub(1)..=y + 1)
+                .flat_map(|row| (x.saturating_sub(2)..=x + 2).map(move |column| (column, row)))
+                .filter_map(|pos| {
+                    let glyph = buffer[pos].symbol().chars().next()?;
+                    let colour = buffer[pos].fg;
+                    (('\u{2801}'..='\u{28ff}').contains(&glyph) && colour != tc.border)
+                        .then_some(colour)
+                })
+                .collect()
+        };
+        let day_land = land_around(london);
+        assert!(!day_land.is_empty(), "no land around London");
+        assert!(
+            day_land.iter().all(|&c| c == tc.good),
+            "London: {day_land:?}"
+        );
+        let night_land = land_around(tokyo);
+        assert!(!night_land.is_empty(), "no land around Tokyo");
+        assert!(
+            night_land.iter().all(|&c| c == tc.accent_secondary),
+            "Tokyo: {night_land:?}"
+        );
+        let cells = braille_cells(&buffer);
+        assert!(
+            cells
+                .iter()
+                .all(|&(_, c)| c == tc.good || c == tc.accent_secondary || c == tc.border),
+            "a map cell in another colour: {cells:?}"
+        );
+    }
+
+    /// The night sky draws its stars in the subtle colour, and a
+    /// twinkling star at its peak in the text colour.
+    ///
+    /// Given: Tokyo on the main clock at night.
+    /// When: the panel view is drawn at one second and the next.
+    /// Then: every peak glyph is in the text colour, every other star is
+    /// subtle, and a peak glyph is drawn at least once.
+    ///
+    /// Why it matters: a sky in a dim colour is close to invisible, and
+    /// the twinkle reads only when the peak is a step brighter than the
+    /// other stars.
+    #[test]
+    fn night_stars_are_subtle_and_a_twinkle_peaks_in_text_colour() {
+        // Given:
+        let mut app = wall_app(&["tokyo"]);
+        let tc = app.theme.colors();
+        let night = midsummer_noon_utc();
+
+        // When:
+        let cells: Vec<(char, Color)> = [night, night + TimeDelta::seconds(1)]
+            .into_iter()
+            .flat_map(|now| braille_cells(&render_buffer_at(&mut app, 100, 48, now)))
+            .collect();
+
+        // Then:
+        let peak = '\u{283f}';
+        assert!(
+            cells.iter().any(|&(glyph, _)| glyph == peak),
+            "no twinkle peak"
+        );
+        for (glyph, colour) in cells {
+            let expected = if glyph == peak { tc.fg } else { tc.subtle };
+            assert_eq!(colour, expected, "star {glyph:?}");
+        }
+    }
+
+    /// Every star lights at least two Braille dots.
+    ///
+    /// Given: Tokyo on the main clock at night.
+    /// When: the panel view is drawn at one second and the next.
+    /// Then: every star glyph has two or more of its eight dots raised.
+    ///
+    /// Why it matters: a one-dot glyph is about two pixels wide at a
+    /// normal font size, so no colour makes it easy to see.
+    #[test]
+    fn every_star_lights_at_least_two_dots() {
+        // Given:
+        let mut app = wall_app(&["tokyo"]);
+        let night = midsummer_noon_utc();
+
+        // When:
+        let cells: Vec<(char, Color)> = [night, night + TimeDelta::seconds(1)]
+            .into_iter()
+            .flat_map(|now| braille_cells(&render_buffer_at(&mut app, 100, 48, now)))
+            .collect();
+
+        // Then:
+        assert!(!cells.is_empty(), "no sky");
+        let faint: Vec<char> = cells
+            .iter()
+            .map(|&(glyph, _)| glyph)
+            .filter(|&glyph| (u32::from(glyph) - 0x2800).count_ones() < 2)
+            .collect();
+        assert!(faint.is_empty(), "one-dot stars: {faint:?}");
     }
 }

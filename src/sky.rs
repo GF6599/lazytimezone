@@ -14,9 +14,9 @@ pub struct SkyCell {
 }
 
 const STAR_GLYPHS: [char; 8] = [
-    '\u{2801}', '\u{2802}', '\u{2804}', '\u{2840}', '\u{2808}', '\u{2810}', '\u{2820}', '\u{2880}',
+    '\u{2803}', '\u{2818}', '\u{2809}', '\u{2812}', '\u{2811}', '\u{280a}', '\u{2814}', '\u{2822}',
 ];
-const TWINKLE_GLYPHS: [char; 2] = ['\u{283f}', '\u{2802}'];
+const TWINKLE_GLYPHS: [char; 2] = ['\u{283f}', '\u{2812}'];
 /// Out of every hundred cells: how many hold a star, and how many of
 /// those twinkle.
 const STARS_PER_HUNDRED: u64 = 5;

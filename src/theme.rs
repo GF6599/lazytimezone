@@ -105,6 +105,9 @@ pub struct ThemeColors {
     pub fg: Color,
     /// De-emphasised text (countries, regions, date lines).
     pub muted: Color,
+    /// Between `muted` and `fg`: ambient art that must stay readable
+    /// without competing with text.
+    pub subtle: Color,
     pub border: Color,
     pub title: Color,
     /// Primary accent — daytime clock digits, search-active border.
@@ -126,6 +129,7 @@ fn default_colors() -> ThemeColors {
         bg: Color::Reset,
         fg: Color::Rgb(200, 204, 212),
         muted: Color::Rgb(108, 115, 128),
+        subtle: Color::Rgb(154, 160, 170),
         border: Color::Rgb(68, 74, 87),
         title: Color::Rgb(126, 207, 154),
         accent: Color::Rgb(100, 200, 220),
@@ -143,6 +147,7 @@ fn dracula_colors() -> ThemeColors {
         bg: Color::Reset,
         fg: Color::Rgb(248, 248, 242),
         muted: Color::Rgb(98, 114, 164),
+        subtle: Color::Rgb(173, 181, 203),
         border: Color::Rgb(68, 71, 90),
         title: Color::Rgb(80, 250, 123),
         accent: Color::Rgb(139, 233, 253),
@@ -160,6 +165,7 @@ fn solarized_colors() -> ThemeColors {
         bg: Color::Reset,
         fg: Color::Rgb(131, 148, 150),
         muted: Color::Rgb(88, 110, 117),
+        subtle: Color::Rgb(101, 123, 131), // base00
         border: Color::Rgb(7, 54, 66),
         title: Color::Rgb(133, 153, 0),
         accent: Color::Rgb(38, 139, 210),
@@ -177,6 +183,7 @@ fn nord_colors() -> ThemeColors {
         bg: Color::Reset,
         fg: Color::Rgb(216, 222, 233),
         muted: Color::Rgb(76, 86, 106),
+        subtle: Color::Rgb(146, 154, 169),
         border: Color::Rgb(59, 66, 82),
         title: Color::Rgb(163, 190, 140),
         accent: Color::Rgb(136, 192, 208),
@@ -194,6 +201,7 @@ fn monokai_colors() -> ThemeColors {
         bg: Color::Reset,
         fg: Color::Rgb(248, 248, 242),
         muted: Color::Rgb(117, 113, 94),
+        subtle: Color::Rgb(183, 181, 168),
         border: Color::Rgb(73, 72, 62),
         title: Color::Rgb(166, 226, 46),
         accent: Color::Rgb(102, 217, 239),
@@ -211,6 +219,7 @@ fn gruvbox_colors() -> ThemeColors {
         bg: Color::Reset,
         fg: Color::Rgb(235, 219, 178),
         muted: Color::Rgb(146, 131, 116),
+        subtle: Color::Rgb(168, 153, 132), // fg4
         border: Color::Rgb(80, 73, 69),
         title: Color::Rgb(184, 187, 38),
         accent: Color::Rgb(131, 165, 152),
@@ -231,6 +240,7 @@ fn rose_pine_colors() -> ThemeColors {
         bg: Color::Reset,
         fg: Color::Rgb(224, 222, 244),               // text
         muted: Color::Rgb(110, 106, 134),            // muted
+        subtle: Color::Rgb(144, 140, 170),           // subtle
         border: Color::Rgb(64, 61, 82),              // highlight med
         title: Color::Rgb(235, 188, 186),            // rose
         accent: Color::Rgb(156, 207, 216),           // foam
@@ -240,5 +250,52 @@ fn rose_pine_colors() -> ThemeColors {
         status_bg: Color::Rgb(49, 116, 143),         // pine
         status_fg: Color::Rgb(224, 222, 244),        // text
         star: Color::Rgb(246, 193, 119),             // gold
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::panic)]
+
+    use super::*;
+
+    fn luminance(colour: Color) -> f64 {
+        let Color::Rgb(r, g, b) = colour else {
+            panic!("not an RGB colour: {colour:?}");
+        };
+        0.2126 * f64::from(r) + 0.7152 * f64::from(g) + 0.0722 * f64::from(b)
+    }
+
+    /// Every theme steps up in brightness from border through muted and
+    /// subtle to text.
+    ///
+    /// Given: each theme in the cycle.
+    /// When: its grey slots are ranked by luminance.
+    /// Then: border < muted < subtle < fg.
+    ///
+    /// Why it matters: the sky is drawn in subtle so it stays visible but
+    /// under the text. A subtle slot at or below muted, or at or above
+    /// text, breaks that in one theme only.
+    #[test]
+    fn every_theme_steps_from_border_through_muted_and_subtle_to_text() {
+        let mut theme = Theme::Default;
+        loop {
+            // Given:
+            let tc = theme.colors();
+
+            // When:
+            let ladder = [tc.border, tc.muted, tc.subtle, tc.fg].map(luminance);
+
+            // Then:
+            assert!(
+                ladder.windows(2).all(|pair| pair[0] < pair[1]),
+                "{}: border, muted, subtle, fg luminance {ladder:?}",
+                theme.label()
+            );
+            theme = theme.next();
+            if theme == Theme::Default {
+                break;
+            }
+        }
     }
 }
