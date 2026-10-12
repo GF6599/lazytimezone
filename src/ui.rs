@@ -1903,6 +1903,66 @@ mod tests {
         );
     }
 
+    /// A favourite's dot sits in the cell where the canvas draws its
+    /// place.
+    ///
+    /// Given: cities spread over the map, north and south, east and
+    /// west, at three map sizes, and the cell where ratatui's canvas
+    /// paints a Braille dot for each city's coordinates.
+    /// When: the map dot's cell is computed for the same coordinates.
+    /// Then: it is that same cell.
+    ///
+    /// Why it matters: the coastline is drawn in Braille dots, so a
+    /// city's dot must follow the same placement. A text label placed
+    /// by cells drifted up to a cell north-west of its coast, which
+    /// put Sydney off Australia.
+    #[test]
+    fn a_favourites_dot_sits_where_the_canvas_draws_its_place() {
+        use ratatui::widgets::canvas::Points;
+        let places = [
+            ("London", -0.13, 51.51),
+            ("Sydney", 151.21, -33.87),
+            ("Tokyo", 139.69, 35.69),
+            ("Buenos Aires", -58.38, -34.60),
+            ("Nairobi", 36.82, -1.29),
+            ("Tabwakea Village", -157.49, 2.02),
+        ];
+        for (columns, rows) in [(95_u16, 19_u16), (60, 12), (40, 8)] {
+            let area = Rect::new(0, 0, columns, rows);
+            for (name, longitude, latitude) in places {
+                // Given:
+                let mut terminal = Terminal::new(TestBackend::new(columns, rows)).unwrap();
+                terminal
+                    .draw(|frame| {
+                        let canvas = Canvas::default()
+                            .marker(Marker::Braille)
+                            .x_bounds([-180.0, 180.0])
+                            .y_bounds([MAP_SOUTH, MAP_NORTH])
+                            .paint(|ctx| {
+                                ctx.draw(&Points {
+                                    coords: &[(longitude, latitude)],
+                                    color: Color::White,
+                                });
+                            });
+                        frame.render_widget(canvas, area);
+                    })
+                    .unwrap();
+                let buffer = terminal.backend().buffer();
+                let painted: Vec<(u16, u16)> = (0..rows)
+                    .flat_map(|y| (0..columns).map(move |x| (x, y)))
+                    .filter(|&pos| buffer[pos].symbol() != " ")
+                    .collect();
+                assert_eq!(painted.len(), 1, "{name}: {painted:?}");
+
+                // When:
+                let dot = map_dot_cell(area, longitude, latitude);
+
+                // Then:
+                assert_eq!(dot, painted[0], "{name} on a {columns}x{rows} map");
+            }
+        }
+    }
+
     #[test]
     fn an_antarctic_favourite_is_pinned_to_the_maps_edge() {
         // Given:
