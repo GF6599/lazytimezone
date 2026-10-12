@@ -1341,6 +1341,125 @@ mod tests {
         assert!(found, "no panel corner lands beside the right edge");
     }
 
+    /// Finds each panel's day strip as (row, first column, cells), in
+    /// reading order. A strip is 24 day, night or no-daylight cells
+    /// right after a panel's left border.
+    fn day_strips(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, u16, Vec<char>)> {
+        let is_cell = |c: char| matches!(c, '\u{2588}' | '\u{2591}' | '\u{b7}');
+        let mut strips = Vec::new();
+        for y in 0..buffer.area.height {
+            let row: Vec<char> = (0..buffer.area.width)
+                .map(|x| buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
+                .collect();
+            for x in 0..row.len().saturating_sub(24) {
+                if row[x] == '\u{2502}' && row[x + 1..x + 25].iter().all(|&c| is_cell(c)) {
+                    strips.push((y, x as u16 + 1, row[x + 1..x + 25].to_vec()));
+                }
+            }
+        }
+        strips
+    }
+
+    fn midsummer_noon_utc() -> DateTime<Utc> {
+        use chrono::TimeZone;
+        Utc.with_ymd_and_hms(2026, 6, 21, 12, 0, 0).unwrap()
+    }
+
+    /// Each panel shows its city's daylight on the main clock's hours.
+    ///
+    /// Given: Tokyo and London on the wall, London on the main clock,
+    /// at noon UTC on 21 June, which is 13:00 in London.
+    /// When: the wall is drawn with room for the strips.
+    /// Then: column 13 is day in London and night in Tokyo, column 2 is
+    /// night in London and day in Tokyo, and column 13 carries the
+    /// marker colour in both strips.
+    ///
+    /// Why it matters: the strip answers when everyone is awake, which
+    /// only works if one column is one instant in every panel and the
+    /// columns read in the time the user is thinking in.
+    #[test]
+    fn each_panel_shows_its_daylight_on_the_main_clocks_hours() {
+        // Given:
+        let mut app = wall_app(&["tokyo", "london"]);
+        assert_eq!(app.selection.city_name, "London");
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 80, 40, midsummer_noon_utc());
+
+        // Then:
+        let strips = day_strips(&buffer);
+        assert_eq!(strips.len(), 2, "strips: {strips:?}");
+        let (day, night) = ('\u{2588}', '\u{2591}');
+        let (_, _, tokyo) = &strips[0];
+        let (_, _, london) = &strips[1];
+        assert_eq!((london[13], london[2]), (day, night), "London: {london:?}");
+        assert_eq!((tokyo[13], tokyo[2]), (night, day), "Tokyo: {tokyo:?}");
+        let marker = app.theme.colors().star;
+        for (y, x, _) in &strips {
+            assert_eq!(buffer[(x + 13, *y)].fg, marker, "now cell at row {y}");
+        }
+    }
+
+    /// A fixed-offset strip shows no day and no night.
+    ///
+    /// Given: the UTC-5 fixed offset on the wall.
+    /// When: the wall is drawn with room for the strip.
+    /// Then: every cell of its strip is the no-daylight cell.
+    ///
+    /// Why it matters: a fixed offset has no place, so it has no
+    /// sunrise, and a day colour would show daylight that does not
+    /// exist.
+    #[test]
+    fn a_fixed_offset_strip_shows_no_day_and_no_night() {
+        // Given:
+        let mut app = fixed_offset_app("UTC-5");
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 80, 40, midsummer_noon_utc());
+
+        // Then:
+        let strips = day_strips(&buffer);
+        assert_eq!(strips.len(), 1, "strips: {strips:?}");
+        assert!(
+            strips[0].2.iter().all(|&c| c == '\u{b7}'),
+            "cells: {:?}",
+            strips[0].2
+        );
+    }
+
+    /// A short panel keeps its strip and drops the zone name first.
+    ///
+    /// Given: four favourites on a terminal that leaves each panel
+    /// three lines inside.
+    /// When: the wall is drawn.
+    /// Then: every panel shows a strip, and no panel shows its zone
+    /// name.
+    ///
+    /// Why it matters: the zone name and the sun times repeat what the
+    /// strip shows, so the strip is the line worth keeping when a panel
+    /// cannot hold them all.
+    #[test]
+    fn a_short_panel_keeps_its_strip_and_drops_the_zone_name() {
+        // Given:
+        let mut app = wall_app(&["tokyo", "london", "paris", "denver"]);
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 80, 23, midsummer_noon_utc());
+
+        // Then:
+        let strips = day_strips(&buffer);
+        let rendered: String = (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+                    + "\n"
+            })
+            .collect();
+        assert_eq!(strips.len(), 4, "got:\n{rendered}");
+        assert!(!rendered.contains("Asia/Tokyo"), "got:\n{rendered}");
+    }
+
     #[test]
     fn a_tall_panel_shows_the_zone_and_the_sun_window() {
         let mut app = wall_app(&["tokyo"]);
