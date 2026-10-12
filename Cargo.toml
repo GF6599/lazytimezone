@@ -1,6 +1,6 @@
 [package]
 name = "lazytimezone"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 # gen_cities exists as a second binary, so a bare cargo run needs this.
 default-run = "lazytimezone"
