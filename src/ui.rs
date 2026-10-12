@@ -1765,6 +1765,66 @@ mod tests {
     /// Why it matters: the map stops at 58°S to keep Antarctica from
     /// filling a quarter of it, and every Antarctic zone is in the
     /// catalogue, so a dot outside the crop would vanish.
+    /// At an equinox noon UTC the night side is the half of the world
+    /// around the date line.
+    ///
+    /// Given: 20 March 2026 at 12:00 UTC, when the sun is overhead near
+    /// 0° longitude.
+    /// When: the night stipple is laid out for a map.
+    /// Then: every night point lies more than 80° from the prime
+    /// meridian, and some lie within 10° of the date line.
+    ///
+    /// Why it matters: the shading is the map's answer to "where is it
+    /// night now", so its terminator must sit where the sun puts it.
+    #[test]
+    fn the_night_side_at_an_equinox_noon_is_around_the_date_line() {
+        // Given:
+        use chrono::TimeZone;
+        let equinox_noon = Utc.with_ymd_and_hms(2026, 3, 20, 12, 0, 0).unwrap();
+
+        // When:
+        let night = night_stipple(&equinox_noon, 60, 12);
+
+        // Then:
+        assert!(
+            night.iter().all(|&(longitude, _)| longitude.abs() > 80.0),
+            "night near the prime meridian: {night:?}"
+        );
+        assert!(
+            night.iter().any(|&(longitude, _)| longitude.abs() > 170.0),
+            "no night at the date line: {night:?}"
+        );
+    }
+
+    /// At midsummer midnight UTC the far north is still in daylight.
+    ///
+    /// Given: 21 June 2026 at 00:00 UTC.
+    /// When: the night stipple is laid out for a map.
+    /// Then: no night point lies north of 70°, and night does reach
+    /// the far south.
+    ///
+    /// Why it matters: the midnight sun is the case a plain "dark side
+    /// of the globe" drawing gets wrong.
+    #[test]
+    fn the_arctic_has_no_night_at_midsummer_midnight() {
+        // Given:
+        use chrono::TimeZone;
+        let midsummer_midnight = Utc.with_ymd_and_hms(2026, 6, 21, 0, 0, 0).unwrap();
+
+        // When:
+        let night = night_stipple(&midsummer_midnight, 60, 12);
+
+        // Then:
+        assert!(
+            night.iter().all(|&(_, latitude)| latitude < 70.0),
+            "night in the Arctic: {night:?}"
+        );
+        assert!(
+            night.iter().any(|&(_, latitude)| latitude < -40.0),
+            "no night in the far south: {night:?}"
+        );
+    }
+
     #[test]
     fn an_antarctic_favourite_is_pinned_to_the_maps_edge() {
         // Given:
