@@ -38,7 +38,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
     symbols::Marker,
     text::{Line, Span},
-    widgets::canvas::{Canvas, Map, MapResolution},
+    widgets::canvas::{Canvas, Map, MapResolution, Points},
     widgets::{Block, Borders, Clear, Paragraph},
 };
 use std::borrow::Cow;
@@ -677,15 +677,23 @@ fn draw_map(
     // The selected dot is printed last, so it stays on top of a
     // neighbour in the same cell.
     dots.sort_by_key(|&(_, _, selected)| selected);
+    let night = night_stipple(utc_now, map_width, map_rows);
     let map = Canvas::default()
         .marker(Marker::Braille)
         .x_bounds([-180.0, 180.0])
         .y_bounds([MAP_SOUTH, MAP_NORTH])
         .background_color(tc.bg)
         .paint(|ctx| {
+            ctx.draw(&Points {
+                coords: &night,
+                color: tc.border,
+            });
+            // A later layer replaces a cell an earlier one drew, so the
+            // coastline stays whole where it crosses the night side.
+            ctx.layer();
             ctx.draw(&Map {
                 resolution: MapResolution::High,
-                color: tc.border,
+                color: tc.muted,
             });
             for &(longitude, latitude, selected) in &dots {
                 let colour = if selected { tc.star } else { tc.accent };
@@ -703,6 +711,37 @@ fn draw_map(
             .style(Style::default().bg(tc.bg)),
         legend_area,
     );
+}
+
+/// The night side of a map `columns` cells wide and `rows` tall, as
+/// (longitude, latitude) points on every other Braille dot across and
+/// down, so night reads as a stipple and day stays clear.
+///
+/// Each point asks [`is_daytime_at_coordinates`] at `utc_now` on the UTC
+/// clock, the same sun model the panels and day strips use, so a
+/// city's dot and its panel always agree on whether it is night.
+fn night_stipple(utc_now: &DateTime<Utc>, columns: u16, rows: u16) -> Vec<(f64, f64)> {
+    let utc = utc_now.with_timezone(&Tz::UTC);
+    let across = u32::from(columns);
+    let down = u32::from(rows) * 2;
+    let step_x = 360.0 / f64::from(across);
+    let step_y = (MAP_NORTH - MAP_SOUTH) / f64::from(down);
+    (0..down)
+        .flat_map(|j| (0..across).map(move |i| (i, j)))
+        .map(|(i, j)| {
+            (
+                -180.0 + (f64::from(i) + 0.25) * step_x,
+                MAP_SOUTH + (f64::from(j) + 0.25) * step_y,
+            )
+        })
+        .filter(|&(longitude, latitude)| {
+            let place = Coordinates {
+                latitude,
+                longitude,
+            };
+            !is_daytime_at_coordinates(place, &utc)
+        })
+        .collect()
 }
 
 /// Every favourite as `City HH:MM`, wrapped onto as many lines as
@@ -1765,6 +1804,66 @@ mod tests {
     /// Why it matters: the map stops at 58°S to keep Antarctica from
     /// filling a quarter of it, and every Antarctic zone is in the
     /// catalogue, so a dot outside the crop would vanish.
+    /// At an equinox noon UTC the night side is the half of the world
+    /// around the date line.
+    ///
+    /// Given: 20 March 2026 at 12:00 UTC, when the sun is overhead near
+    /// 0° longitude.
+    /// When: the night stipple is laid out for a map.
+    /// Then: every night point lies more than 80° from the prime
+    /// meridian, and some lie within 10° of the date line.
+    ///
+    /// Why it matters: the shading is the map's answer to "where is it
+    /// night now", so its terminator must sit where the sun puts it.
+    #[test]
+    fn the_night_side_at_an_equinox_noon_is_around_the_date_line() {
+        // Given:
+        use chrono::TimeZone;
+        let equinox_noon = Utc.with_ymd_and_hms(2026, 3, 20, 12, 0, 0).unwrap();
+
+        // When:
+        let night = night_stipple(&equinox_noon, 60, 12);
+
+        // Then:
+        assert!(
+            night.iter().all(|&(longitude, _)| longitude.abs() > 80.0),
+            "night near the prime meridian: {night:?}"
+        );
+        assert!(
+            night.iter().any(|&(longitude, _)| longitude.abs() > 170.0),
+            "no night at the date line: {night:?}"
+        );
+    }
+
+    /// At midsummer midnight UTC the far north is still in daylight.
+    ///
+    /// Given: 21 June 2026 at 00:00 UTC.
+    /// When: the night stipple is laid out for a map.
+    /// Then: no night point lies north of 70°, and night does reach
+    /// the far south.
+    ///
+    /// Why it matters: the midnight sun is the case a plain "dark side
+    /// of the globe" drawing gets wrong.
+    #[test]
+    fn the_arctic_has_no_night_at_midsummer_midnight() {
+        // Given:
+        use chrono::TimeZone;
+        let midsummer_midnight = Utc.with_ymd_and_hms(2026, 6, 21, 0, 0, 0).unwrap();
+
+        // When:
+        let night = night_stipple(&midsummer_midnight, 60, 12);
+
+        // Then:
+        assert!(
+            night.iter().all(|&(_, latitude)| latitude < 70.0),
+            "night in the Arctic: {night:?}"
+        );
+        assert!(
+            night.iter().any(|&(_, latitude)| latitude < -40.0),
+            "no night in the far south: {night:?}"
+        );
+    }
+
     #[test]
     fn an_antarctic_favourite_is_pinned_to_the_maps_edge() {
         // Given:
