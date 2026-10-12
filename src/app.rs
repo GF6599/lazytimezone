@@ -9,7 +9,7 @@
 //! | Group | Fields | Persisted? |
 //! |-------|--------|-----------|
 //! | Navigation | `selected_row`, `filtered_view` | No |
-//! | Selection | `selection` (`tz` + `city_name`) | No |
+//! | Selection | `selection` (`tz` + `city_name` + `catalogue_index`) | No |
 //! | Search | `input_mode`, `search_query`, `cursor_position` | No |
 //! | Theme | `theme` | Yes (`~/.config/lazytimezone/config.toml`) |
 //! | Favorites | `favorites`, `selected_panel` | Yes (`~/.config/lazytimezone/config.toml`) |
@@ -353,16 +353,22 @@ pub enum InputMode {
 /// user picks a row that matched on an alias (e.g. searching "boston"
 /// hits the New York entry), the alias label is what they expect to
 /// see, not "New York".
+///
+/// `catalogue_index` is the catalogue entry the selection came from, so
+/// the map can find the main clock's place. The startup UTC clock came
+/// from no entry.
 #[derive(Debug, Clone)]
 pub(crate) struct Selection {
     pub(crate) tz: chrono_tz::Tz,
     pub(crate) city_name: String,
+    pub(crate) catalogue_index: Option<usize>,
 }
 
 impl Selection {
-    pub(crate) fn set(&mut self, tz: chrono_tz::Tz, city_name: impl Into<String>) {
+    pub(crate) fn set(&mut self, idx: usize, tz: chrono_tz::Tz, city_name: impl Into<String>) {
         self.tz = tz;
         self.city_name = city_name.into();
+        self.catalogue_index = Some(idx);
     }
 }
 
@@ -517,6 +523,7 @@ impl App {
             selection: Selection {
                 tz: chrono_tz::Tz::UTC,
                 city_name: "UTC".to_string(),
+                catalogue_index: None,
             },
             theme,
             favorites,
@@ -616,14 +623,12 @@ impl App {
         self.selected_panel = self.favorites.len().saturating_sub(1);
     }
 
-    pub(crate) fn selected_panel_entry(&self) -> Option<&TimezoneEntry> {
-        self.catalogue.get(self.favorites.at(self.selected_panel)?)
-    }
-
     /// Makes the selected panel's city the hero clock.
     pub(crate) fn promote_selected_panel(&mut self) {
-        if let Some(entry) = self.selected_panel_entry() {
-            self.selection.set(entry.tz, entry.city);
+        if let Some(idx) = self.favorites.at(self.selected_panel)
+            && let Some(entry) = self.catalogue.get(idx)
+        {
+            self.selection.set(idx, entry.tz, entry.city);
         }
     }
 
@@ -665,7 +670,7 @@ impl App {
         if let Some((idx, display_name)) = self.current_result()
             && let Some(entry) = self.catalogue.get(idx)
         {
-            self.selection.set(entry.tz, display_name);
+            self.selection.set(idx, entry.tz, display_name);
         }
     }
 
