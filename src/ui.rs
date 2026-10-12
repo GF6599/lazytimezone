@@ -289,6 +289,14 @@ fn hero_variant(area: Rect) -> (HeroVariant, u16) {
     (HeroVariant::Text, 4)
 }
 
+fn clock_colour(app: &App, utc_now: &DateTime<Utc>, tc: &ThemeColors) -> Color {
+    if is_daytime_at(app.selection.tz, &utc_now.with_timezone(&app.selection.tz)) {
+        tc.accent
+    } else {
+        tc.accent_secondary
+    }
+}
+
 /// Renders the hero clock at the size [`hero_variant`] chose.
 ///
 /// ## Day/night colouring
@@ -309,12 +317,7 @@ fn draw_hero_clock(
     tc: &ThemeColors,
 ) {
     let now = utc_now.with_timezone(&app.selection.tz);
-    let is_day = is_daytime_at(app.selection.tz, &now);
-    let clock_color = if is_day {
-        tc.accent
-    } else {
-        tc.accent_secondary
-    };
+    let clock_color = clock_colour(app, utc_now, tc);
 
     let time_str = now.format("%H:%M:%S").to_string();
     let date_str = now.format("%A, %B %d, %Y").to_string();
@@ -665,10 +668,16 @@ const MAP_COLUMNS_PER_ROW: u16 = 5;
 const MAP_SOUTH: f64 = -58.0;
 const MAP_NORTH: f64 = 84.0;
 
+const FAVOURITE_DOT: &str = "\u{25cf}";
+/// The main clock's favourite: a dot inside a ring.
+const MAIN_CLOCK_DOT: &str = "\u{25c9}";
+/// The main clock's city when it is not a favourite.
+const MAIN_CLOCK_RING: &str = "\u{25cb}";
+
 /// Renders the world map view: the night side, the coastline in the day
 /// or the night colour, a dot for each favourite with a place, the
-/// selected one in the marker colour, and a legend
-/// of every favourite's local time under it.
+/// selected one in the marker colour, a mark for the main clock's city,
+/// and a legend of every favourite's local time under it.
 ///
 /// The legend is the strip `h` and `l` walk, so the wall reports one
 /// column per favourite and `j`/`k` stay put.
@@ -707,17 +716,39 @@ fn draw_map(
     }
     .intersection(area);
 
-    let mut dots: Vec<(f64, f64, bool)> = (0..app.favorites.len())
-        .filter_map(|pos| {
-            let entry = app.catalogue.get(app.favorites.at(pos)?)?;
-            let place = entry.coordinates?;
-            let latitude = place.latitude.clamp(MAP_SOUTH, MAP_NORTH);
-            Some((place.longitude, latitude, pos == app.selected_panel))
-        })
-        .collect();
+    let main_clock = app.selection.catalogue_index;
+    let favourite_dots = (0..app.favorites.len()).filter_map(|pos| {
+        let idx = app.favorites.at(pos)?;
+        let place = app.catalogue.get(idx)?.coordinates?;
+        let glyph = if Some(idx) == main_clock {
+            MAIN_CLOCK_DOT
+        } else {
+            FAVOURITE_DOT
+        };
+        let selected = pos == app.selected_panel;
+        Some((
+            selected,
+            place,
+            glyph,
+            if selected { tc.star } else { tc.fg },
+        ))
+    });
+    // The ring goes first, so when the main clock is a favourite its own
+    // ringed dot, written later in the same cell, covers it.
+    let main_clock_ring = main_clock
+        .and_then(|idx| app.catalogue.get(idx)?.coordinates)
+        .map(|place| {
+            (
+                false,
+                place,
+                MAIN_CLOCK_RING,
+                clock_colour(app, utc_now, tc),
+            )
+        });
+    let mut marks: Vec<_> = main_clock_ring.into_iter().chain(favourite_dots).collect();
     // The selected dot is written last, so it stays on top of a
     // neighbour in the same cell.
-    dots.sort_by_key(|&(_, _, selected)| selected);
+    marks.sort_by_key(|&(selected, ..)| selected);
     let night = night_stipple(utc_now, map_width, map_rows);
     let night_side = Canvas::default()
         .marker(Marker::Braille)
@@ -733,13 +764,14 @@ fn draw_map(
     frame.render_widget(night_side, map_area);
     draw_land(frame.buffer_mut(), map_area, utc_now, tc);
     if !map_area.is_empty() {
-        for &(longitude, latitude, selected) in &dots {
-            let colour = if selected { tc.star } else { tc.fg };
-            if let Some(cell) = frame
-                .buffer_mut()
-                .cell_mut(map_dot_cell(map_area, longitude, latitude))
+        for &(_, place, glyph, colour) in &marks {
+            let latitude = place.latitude.clamp(MAP_SOUTH, MAP_NORTH);
+            if let Some(cell) =
+                frame
+                    .buffer_mut()
+                    .cell_mut(map_dot_cell(map_area, place.longitude, latitude))
             {
-                cell.set_symbol("\u{25cf}").set_fg(colour);
+                cell.set_symbol(glyph).set_fg(colour);
             }
         }
     }
@@ -1817,7 +1849,7 @@ mod tests {
 
     /// Every map dot as (column, row, colour), in reading order.
     fn map_dots(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, u16, Color)> {
-        map_marks(buffer, "\u{25cf}")
+        map_marks(buffer, FAVOURITE_DOT)
     }
 
     /// Every cell drawn as `glyph`, as (column, row, colour), in reading
@@ -2374,9 +2406,6 @@ mod tests {
             .collect();
         assert!(faint.is_empty(), "one-dot stars: {faint:?}");
     }
-
-    const MAIN_CLOCK_RING: &str = "\u{25cb}";
-    const MAIN_CLOCK_DOT: &str = "\u{25c9}";
 
     /// A main clock city that is not a favourite gets a ring where it is,
     /// in the big clock's colour.
