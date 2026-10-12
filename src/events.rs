@@ -126,8 +126,9 @@ fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
 }
 
 /// Wall bindings: `h/j/k/l` move between the favorite panels, Enter
-/// promotes one to the hero clock, `f` removes it, `J/K` reorder,
-/// and `/` opens the add-city picker.
+/// promotes one to the hero clock, `f` removes it, `J/K` reorder, `m`
+/// switches to the world map and back, and `/` opens the add-city
+/// picker.
 fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
     match key.code {
         KeyCode::Char('q') => {
@@ -145,6 +146,7 @@ fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Char('J') => app.move_panel_later(),
         KeyCode::Char('K') => app.move_panel_earlier(),
         KeyCode::Char('t') => app.cycle_theme(),
+        KeyCode::Char('m') => app.toggle_map(),
         KeyCode::Char('c') if !key.modifiers.contains(KeyModifiers::CONTROL) => app.copy_time(),
         KeyCode::Char('?') => app.toggle_help(),
         _ => {}
