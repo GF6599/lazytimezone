@@ -465,6 +465,35 @@ mod tests {
         assert_eq!(rows[0].name, "New York");
     }
 
+    /// A zone.tab coordinate pair reads as latitude and longitude.
+    ///
+    /// Given: Casey in degrees and minutes, and New York with seconds.
+    /// When: each pair is parsed.
+    /// Then: both axes come out signed, with three degree digits read
+    /// for longitude.
+    ///
+    /// Why it matters: zone.tab is the only source for the zones no
+    /// city dump covers, and a longitude read with two degree digits
+    /// would put Casey at 11° east, not 110°.
+    #[test]
+    fn a_zone_tab_pair_reads_as_latitude_and_longitude() {
+        // Given:
+        let cases = [
+            ("-6617+11031", -66.28, 110.52),
+            ("+404251-0740023", 40.71, -74.01),
+        ];
+        for (coords, latitude, longitude) in cases {
+            // When:
+            let (lat, lon) = iso6709(coords).unwrap();
+
+            // Then:
+            assert!(
+                (lat - latitude).abs() < 0.01 && (lon - longitude).abs() < 0.01,
+                "{coords}: got ({lat}, {lon})"
+            );
+        }
+    }
+
     #[test]
     fn the_tsv_has_commented_header_lines_and_one_row_per_city() {
         let (admin1, countries) = lookups();
