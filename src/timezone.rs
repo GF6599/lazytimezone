@@ -372,12 +372,13 @@ mod tests {
     }
 
     #[test]
-    fn every_latitude_is_in_range() {
+    fn every_coordinate_is_in_range() {
         assert!(
             all_timezones()
                 .iter()
-                .filter_map(|e| e.latitude)
-                .all(|lat| (-90.0..=90.0).contains(&lat))
+                .filter_map(|e| e.coordinates)
+                .all(|c| (-90.0..=90.0).contains(&c.latitude)
+                    && (-180.0..=180.0).contains(&c.longitude))
         );
     }
 
@@ -467,35 +468,39 @@ mod tests {
         }
     }
 
-    /// Spot-checks for well-known city latitudes. These are deliberately tight
-    /// (±0.05°) so they catch any misalignment between catalogue entries and
-    /// their latitude data. If you add a new city, please add a row here.
+    /// Spot-checks for well-known city coordinates. These are deliberately
+    /// tight (±0.05°) so they catch any misalignment between catalogue
+    /// entries and their coordinates, and the cases cover every sign of
+    /// both axes. Casey comes from zone.tab rather than GeoNames.
     #[test]
-    fn known_city_latitudes_within_tolerance() {
+    fn known_city_coordinates_within_tolerance() {
         use chrono_tz::Tz;
-        let cases: &[(Tz, f64, &str)] = &[
-            (Tz::Europe__London, 51.51, "London"),
-            (Tz::Asia__Tokyo, 35.69, "Tokyo"),
-            (Tz::America__New_York, 40.71, "New York"),
-            (Tz::Australia__Sydney, -33.87, "Sydney"),
-            (Tz::Atlantic__Reykjavik, 64.13, "Reykjavík"),
-            (Tz::America__Argentina__Buenos_Aires, -34.60, "Buenos Aires"),
-            (Tz::Asia__Singapore, 1.29, "Singapore"),
-            (Tz::Africa__Cairo, 30.04, "Cairo"),
-            (Tz::Pacific__Auckland, -36.85, "Auckland"),
-            (Tz::America__Los_Angeles, 34.05, "Los Angeles"),
-            (Tz::America__Resolute, 74.70, "Resolute"),
-            (Tz::Antarctica__Casey, -66.28, "Casey"),
+        let cases: &[(Tz, f64, f64, &str)] = &[
+            (Tz::Europe__London, 51.51, -0.13, "London"),
+            (Tz::Asia__Tokyo, 35.69, 139.69, "Tokyo"),
+            (Tz::America__New_York, 40.71, -74.01, "New York"),
+            (Tz::Australia__Sydney, -33.87, 151.21, "Sydney"),
+            (Tz::Atlantic__Reykjavik, 64.13, -21.90, "Reykjavík"),
+            (
+                Tz::America__Argentina__Buenos_Aires,
+                -34.60,
+                -58.38,
+                "Buenos Aires",
+            ),
+            (Tz::Asia__Singapore, 1.29, 103.85, "Singapore"),
+            (Tz::Africa__Cairo, 30.04, 31.25, "Cairo"),
+            (Tz::Pacific__Auckland, -36.85, 174.76, "Auckland"),
+            (Tz::America__Los_Angeles, 34.05, -118.24, "Los Angeles"),
+            (Tz::America__Resolute, 74.70, -94.83, "Resolute"),
+            (Tz::Antarctica__Casey, -66.28, 110.52, "Casey"),
         ];
-        for (tz, expected, name) in cases {
+        for &(tz, latitude, longitude, name) in cases {
             let actual =
-                latitude_for(*tz).unwrap_or_else(|| panic!("no latitude for {} ({:?})", name, tz));
+                coordinates_for(tz).unwrap_or_else(|| panic!("no coordinates for {name} ({tz:?})"));
             assert!(
-                (actual - expected).abs() < 0.05,
-                "{} latitude mismatch: expected ~{}, got {}",
-                name,
-                expected,
-                actual
+                (actual.latitude - latitude).abs() < 0.05
+                    && (actual.longitude - longitude).abs() < 0.05,
+                "{name}: expected ~({latitude}, {longitude}), got {actual:?}"
             );
         }
     }

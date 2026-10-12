@@ -455,7 +455,7 @@ mod tests {
         assert!(headers.iter().any(|h| h.contains("CC BY 4.0")));
         assert_eq!(
             data[0],
-            "Boston\t\tMassachusetts\tUnited States\tUS\t42.36\t667137\tAmerica/New_York"
+            "Boston\t\tMassachusetts\tUnited States\tUS\t42.36\t-71.06\t667137\tAmerica/New_York"
         );
     }
 }
