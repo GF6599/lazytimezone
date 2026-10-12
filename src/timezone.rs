@@ -413,40 +413,51 @@ mod tests {
         );
     }
 
-    /// Sun times centre on each city's solar noon, not on 12:00.
+    /// Sun times match the almanac within minutes.
     ///
-    /// Given: London, Madrid and Tokyo on 21 June 2026, with their
-    /// almanac sunrise and sunset on the local clock.
+    /// Given: London, Madrid and Tokyo at midsummer 2026, and London in
+    /// October and at midwinter, with their almanac sunrise and sunset
+    /// on the local clock.
     /// When: the sun times are computed from each city's coordinates.
-    /// Then: each falls within 15 minutes of the almanac.
+    /// Then: each falls within 6 minutes of the almanac.
     ///
     /// Why it matters: daylight saving moves the clock an hour from the
     /// sun, and Madrid sits far west of its zone's meridian. A window
     /// centred on 12:00 put London's sunrise at 03:47 against a real
-    /// 04:43, a whole cell out of place in the day strip.
+    /// 04:43, a whole cell out of place in the day strip. In October
+    /// solar noon also runs about 14 minutes early.
     #[test]
-    fn sun_times_centre_on_each_citys_solar_noon() {
+    fn sun_times_match_the_almanac_within_minutes() {
         // Given:
         let cases = [
-            (Tz::Europe__London, 51.51, -0.13, (4, 43), (21, 21)),
-            (Tz::Europe__Madrid, 40.42, -3.70, (6, 44), (21, 48)),
-            (Tz::Asia__Tokyo, 35.69, 139.69, (4, 25), (19, 0)),
+            (Tz::Europe__London, 51.51, -0.13, (6, 21), (4, 43), (21, 21)),
+            (
+                Tz::Europe__London,
+                51.51,
+                -0.13,
+                (10, 12),
+                (7, 22),
+                (18, 12),
+            ),
+            (Tz::Europe__London, 51.51, -0.13, (12, 21), (8, 4), (15, 54)),
+            (Tz::Europe__Madrid, 40.42, -3.70, (6, 21), (6, 44), (21, 48)),
+            (Tz::Asia__Tokyo, 35.69, 139.69, (6, 21), (4, 25), (19, 0)),
         ];
-        for (tz, latitude, longitude, rise, set) in cases {
-            let midsummer = tz.with_ymd_and_hms(2026, 6, 21, 12, 0, 0).unwrap();
+        for (tz, latitude, longitude, (month, day), rise, set) in cases {
+            let date = tz.with_ymd_and_hms(2026, month, day, 12, 0, 0).unwrap();
             let place = Coordinates {
                 latitude,
                 longitude,
             };
 
             // When:
-            let (sunrise, sunset) = sun_times(place, &midsummer);
+            let (sunrise, sunset) = sun_times(place, &date);
 
             // Then:
             let hours = |(h, m): (u32, u32)| f64::from(h) + f64::from(m) / 60.0;
             assert!(
-                approx(sunrise, hours(rise), 0.25) && approx(sunset, hours(set), 0.25),
-                "{tz}: got rise {sunrise:.2}, set {sunset:.2}, almanac {rise:?} {set:?}"
+                approx(sunrise, hours(rise), 0.1) && approx(sunset, hours(set), 0.1),
+                "{tz} {month}-{day}: got rise {sunrise:.2}, set {sunset:.2}, almanac {rise:?} {set:?}"
             );
         }
     }
