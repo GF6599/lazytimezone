@@ -211,6 +211,7 @@ mod tests {
     use crossterm::event::{KeyEvent, KeyEventState};
 
     use super::*;
+    use crate::app::WallView;
     use crate::config;
 
     /// `poll` reports readiness without blocking, which is what a burst
@@ -256,6 +257,31 @@ mod tests {
         let mut app = App::with_config(config::Config::default());
         app.enter_search();
         app
+    }
+
+    /// `m` switches the wall to the world map and back.
+    ///
+    /// Given: the app on the panel wall.
+    /// When: `m` is pressed, then pressed again.
+    /// Then: the first press shows the map and the second the panels.
+    ///
+    /// Why it matters: the map has no other way in, so a key that is in
+    /// the help but not wired would hide the whole view.
+    #[test]
+    fn m_switches_the_wall_to_the_map_and_back() {
+        // Given:
+        let mut app = App::with_config(config::Config::default());
+
+        // When:
+        dispatch_event(&mut app, key('m'));
+        let after_one_press = app.wall_view;
+        dispatch_event(&mut app, key('m'));
+
+        // Then:
+        assert_eq!(
+            (after_one_press, app.wall_view),
+            (WallView::Map, WallView::Panels)
+        );
     }
 
     #[test]

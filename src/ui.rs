@@ -1528,6 +1528,158 @@ mod tests {
         assert!(!rendered.contains("Asia/Tokyo"), "got:\n{rendered}");
     }
 
+    fn favorites_app(cities: &[(&str, &str, &str)]) -> App {
+        App::with_config(config::Config {
+            favorites: cities
+                .iter()
+                .map(|&(city, admin1, cc)| config::FavoriteEntry::City {
+                    city: city.to_string(),
+                    admin1: admin1.to_string(),
+                    cc: cc.to_string(),
+                })
+                .collect(),
+            ..config::Config::default()
+        })
+    }
+
+    /// Every map dot as (column, row, colour), in reading order.
+    fn map_dots(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, u16, Color)> {
+        (0..buffer.area.height)
+            .flat_map(|y| (0..buffer.area.width).map(move |x| (x, y)))
+            .filter(|&pos| buffer[pos].symbol() == "\u{25cf}")
+            .map(|(x, y)| (x, y, buffer[(x, y)].fg))
+            .collect()
+    }
+
+    fn buffer_text(buffer: &ratatui::buffer::Buffer) -> String {
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+                    + "\n"
+            })
+            .collect()
+    }
+
+    /// The map view puts a dot where each favourite is, and lists every
+    /// favourite with its time.
+    ///
+    /// Given: London (selected), Tokyo, Sydney and the UTC-5 fixed
+    /// offset, at noon UTC on 21 June, in the map view.
+    /// When: the frame is drawn.
+    /// Then: there is no panel, there are three dots, Tokyo's is east of
+    /// London's and north of Sydney's, London's carries the marker
+    /// colour, and the legend gives every favourite's local time.
+    ///
+    /// Why it matters: a dot in the wrong place, or a favourite missing
+    /// from the legend, shows the user a world that is not theirs. A
+    /// fixed offset has no place, so it has no dot, but it still has a
+    /// time.
+    #[test]
+    fn the_map_view_puts_each_placed_favourite_where_it_is() {
+        // Given:
+        let mut app = favorites_app(&[
+            ("London", "England", "GB"),
+            ("Tokyo", "Tokyo", "JP"),
+            ("Sydney", "New South Wales", "AU"),
+            ("UTC-5", "", ""),
+        ]);
+        app.toggle_map();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 100, 40, midsummer_noon_utc());
+
+        // Then:
+        let text = buffer_text(&buffer);
+        assert!(
+            !text.contains('\u{250c}'),
+            "a panel in the map view:\n{text}"
+        );
+        let dots = map_dots(&buffer);
+        assert_eq!(dots.len(), 3, "dots: {dots:?}\n{text}");
+        let star = app.theme.colors().star;
+        let london: Vec<_> = dots.iter().filter(|d| d.2 == star).collect();
+        let rest: Vec<_> = dots.iter().filter(|d| d.2 != star).collect();
+        assert_eq!(london.len(), 1, "one marked dot: {dots:?}");
+        let (tokyo, sydney) = (rest[0], rest[1]);
+        assert!(
+            london[0].0 < tokyo.0 && tokyo.1 < sydney.1 && london[0].1 < sydney.1,
+            "London {:?}, Tokyo {tokyo:?}, Sydney {sydney:?}",
+            london[0]
+        );
+        for entry in ["London 13:00", "Tokyo 21:00", "Sydney 22:00", "UTC-5 07:00"] {
+            assert!(text.contains(entry), "no {entry:?} in:\n{text}");
+        }
+    }
+
+    /// A favourite south of the map's crop stays on the map.
+    ///
+    /// Given: Casey, an Antarctic base at 66°S, in the map view.
+    /// When: the frame is drawn.
+    /// Then: its dot is on the map's bottom row.
+    ///
+    /// Why it matters: the map stops at 58°S to keep Antarctica from
+    /// filling a quarter of it, and every Antarctic zone is in the
+    /// catalogue, so a dot outside the crop would vanish.
+    #[test]
+    fn an_antarctic_favourite_is_pinned_to_the_maps_edge() {
+        // Given:
+        let mut app = favorites_app(&[("Casey", "", "AQ"), ("London", "England", "GB")]);
+        app.toggle_map();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 100, 40, midsummer_noon_utc());
+
+        // Then:
+        let dots = map_dots(&buffer);
+        assert_eq!(dots.len(), 2, "dots: {dots:?}\n{}", buffer_text(&buffer));
+        let lowest = dots.iter().map(|d| d.1).max().unwrap();
+        let map_bottom = (0..buffer.area.height)
+            .filter(|&y| {
+                (0..buffer.area.width).any(|x| {
+                    ('\u{2801}'..='\u{28ff}')
+                        .contains(&buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
+                })
+            })
+            .max()
+            .unwrap();
+        assert_eq!(lowest, map_bottom, "Casey is not on the bottom row");
+    }
+
+    /// On a narrow terminal the legend wraps, so every favourite stays
+    /// on screen.
+    ///
+    /// Given: six favourites in the map view on a 60-column terminal.
+    /// When: the frame is drawn.
+    /// Then: every city name appears.
+    ///
+    /// Why it matters: `h` and `l` move the selection along the legend,
+    /// and a selected favourite cut off the right edge could not be seen.
+    #[test]
+    fn the_map_legend_wraps_so_every_favourite_stays_on_screen() {
+        // Given:
+        let cities = [
+            ("London", "England", "GB"),
+            ("Tokyo", "Tokyo", "JP"),
+            ("Sydney", "New South Wales", "AU"),
+            ("Paris", "Île-de-France", "FR"),
+            ("Denver", "Colorado", "US"),
+            ("Nairobi", "Nairobi County", "KE"),
+        ];
+        let mut app = favorites_app(&cities);
+        app.toggle_map();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 60, 30, midsummer_noon_utc());
+
+        // Then:
+        let text = buffer_text(&buffer);
+        for (city, _, _) in cities {
+            assert!(text.contains(city), "no {city} in:\n{text}");
+        }
+    }
+
     #[test]
     fn a_tall_panel_shows_the_zone_and_the_sun_window() {
         let mut app = wall_app(&["tokyo"]);
