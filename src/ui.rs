@@ -713,7 +713,7 @@ fn draw_map(
             Some((place.longitude, latitude, pos == app.selected_panel))
         })
         .collect();
-    // The selected dot is printed last, so it stays on top of a
+    // The selected dot is written last, so it stays on top of a
     // neighbour in the same cell.
     dots.sort_by_key(|&(_, _, selected)| selected);
     let night = night_stipple(utc_now, map_width, map_rows);
@@ -734,22 +734,37 @@ fn draw_map(
                 resolution: MapResolution::High,
                 color: tc.muted,
             });
-            for &(longitude, latitude, selected) in &dots {
-                let colour = if selected { tc.star } else { tc.accent };
-                ctx.print(
-                    longitude,
-                    latitude,
-                    Span::styled("\u{25cf}", Style::default().fg(colour)),
-                );
-            }
         });
     frame.render_widget(map, map_area);
+    if !map_area.is_empty() {
+        for &(longitude, latitude, selected) in &dots {
+            let colour = if selected { tc.star } else { tc.accent };
+            if let Some(cell) = frame
+                .buffer_mut()
+                .cell_mut(map_dot_cell(map_area, longitude, latitude))
+            {
+                cell.set_symbol("\u{25cf}").set_fg(colour);
+            }
+        }
+    }
     frame.render_widget(
         Paragraph::new(legend)
             .alignment(Alignment::Center)
             .style(Style::default().bg(tc.bg)),
         legend_area,
     );
+}
+
+/// The cell of `map_area` that holds the Braille dot the canvas paints
+/// for (longitude, latitude), so a favourite's dot sits on the same
+/// coastline cell as its place. The canvas's own `print` places text by
+/// cells and truncates, which drifts it up to a cell north-west.
+fn map_dot_cell(map_area: Rect, longitude: f64, latitude: f64) -> (u16, u16) {
+    let dots_across = f64::from(map_area.width) * 2.0;
+    let dots_down = f64::from(map_area.height) * 4.0;
+    let dot_x = ((longitude + 180.0) * (dots_across - 1.0) / 360.0).round();
+    let dot_y = ((MAP_NORTH - latitude) * (dots_down - 1.0) / (MAP_NORTH - MAP_SOUTH)).round();
+    (map_area.x + dot_x as u16 / 2, map_area.y + dot_y as u16 / 4)
 }
 
 /// The night side of a map `columns` cells wide and `rows` tall, as
@@ -1901,6 +1916,66 @@ mod tests {
             night.iter().any(|&(_, latitude)| latitude < -40.0),
             "no night in the far south: {night:?}"
         );
+    }
+
+    /// A favourite's dot sits in the cell where the canvas draws its
+    /// place.
+    ///
+    /// Given: cities spread over the map, north and south, east and
+    /// west, at three map sizes, and the cell where ratatui's canvas
+    /// paints a Braille dot for each city's coordinates.
+    /// When: the map dot's cell is computed for the same coordinates.
+    /// Then: it is that same cell.
+    ///
+    /// Why it matters: the coastline is drawn in Braille dots, so a
+    /// city's dot must follow the same placement. A text label placed
+    /// by cells drifted up to a cell north-west of its coast, which
+    /// put Sydney off Australia.
+    #[test]
+    fn a_favourites_dot_sits_where_the_canvas_draws_its_place() {
+        use ratatui::widgets::canvas::Points;
+        let places = [
+            ("London", -0.13, 51.51),
+            ("Sydney", 151.21, -33.87),
+            ("Tokyo", 139.69, 35.69),
+            ("Buenos Aires", -58.38, -34.60),
+            ("Nairobi", 36.82, -1.29),
+            ("Tabwakea Village", -157.49, 2.02),
+        ];
+        for (columns, rows) in [(95_u16, 19_u16), (60, 12), (40, 8)] {
+            let area = Rect::new(0, 0, columns, rows);
+            for (name, longitude, latitude) in places {
+                // Given:
+                let mut terminal = Terminal::new(TestBackend::new(columns, rows)).unwrap();
+                terminal
+                    .draw(|frame| {
+                        let canvas = Canvas::default()
+                            .marker(Marker::Braille)
+                            .x_bounds([-180.0, 180.0])
+                            .y_bounds([MAP_SOUTH, MAP_NORTH])
+                            .paint(|ctx| {
+                                ctx.draw(&Points {
+                                    coords: &[(longitude, latitude)],
+                                    color: Color::White,
+                                });
+                            });
+                        frame.render_widget(canvas, area);
+                    })
+                    .unwrap();
+                let buffer = terminal.backend().buffer();
+                let painted: Vec<(u16, u16)> = (0..rows)
+                    .flat_map(|y| (0..columns).map(move |x| (x, y)))
+                    .filter(|&pos| buffer[pos].symbol() != " ")
+                    .collect();
+                assert_eq!(painted.len(), 1, "{name}: {painted:?}");
+
+                // When:
+                let dot = map_dot_cell(area, longitude, latitude);
+
+                // Then:
+                assert_eq!(dot, painted[0], "{name} on a {columns}x{rows} map");
+            }
+        }
     }
 
     #[test]
