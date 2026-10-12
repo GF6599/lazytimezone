@@ -393,6 +393,75 @@ mod tests {
         );
     }
 
+    /// Sun times centre on each city's solar noon, not on 12:00.
+    ///
+    /// Given: London, Madrid and Tokyo on 21 June 2026, with their
+    /// almanac sunrise and sunset on the local clock.
+    /// When: the sun times are computed from each city's coordinates.
+    /// Then: each falls within 15 minutes of the almanac.
+    ///
+    /// Why it matters: daylight saving moves the clock an hour from the
+    /// sun, and Madrid sits far west of its zone's meridian. A window
+    /// centred on 12:00 put London's sunrise at 03:47 against a real
+    /// 04:43, a whole cell out of place in the day strip.
+    #[test]
+    fn sun_times_centre_on_each_citys_solar_noon() {
+        // Given:
+        let cases = [
+            (Tz::Europe__London, 51.51, -0.13, (4, 43), (21, 21)),
+            (Tz::Europe__Madrid, 40.42, -3.70, (6, 44), (21, 48)),
+            (Tz::Asia__Tokyo, 35.69, 139.69, (4, 25), (19, 0)),
+        ];
+        for (tz, latitude, longitude, rise, set) in cases {
+            let midsummer = tz.with_ymd_and_hms(2026, 6, 21, 12, 0, 0).unwrap();
+            let place = Coordinates {
+                latitude,
+                longitude,
+            };
+
+            // When:
+            let (sunrise, sunset) = sun_times(place, &midsummer);
+
+            // Then:
+            let hours = |(h, m): (u32, u32)| f64::from(h) + f64::from(m) / 60.0;
+            assert!(
+                approx(sunrise, hours(rise), 0.25) && approx(sunset, hours(set), 0.25),
+                "{tz}: got rise {sunrise:.2}, set {sunset:.2}, almanac {rise:?} {set:?}"
+            );
+        }
+    }
+
+    /// A place whose solar noon wraps past midnight is still day at
+    /// midday.
+    ///
+    /// Given: Tabwakea Village on Kiritimati, at 157°W but on UTC+14.
+    /// When: its daylight is checked at local noon and local midnight.
+    /// Then: noon is day and midnight is night.
+    ///
+    /// Why it matters: 12 + 157.49 / 15 + 14 puts solar noon at 36.5 on
+    /// the local clock, so a window that does not wrap at 24 never
+    /// contains the island's midday.
+    #[test]
+    fn a_solar_noon_past_midnight_still_makes_midday_day() {
+        // Given:
+        let place = Coordinates {
+            latitude: 2.02,
+            longitude: -157.49,
+        };
+        let tz = Tz::Pacific__Kiritimati;
+        let at = |hour| tz.with_ymd_and_hms(2026, 6, 21, hour, 0, 0).unwrap();
+
+        // When:
+        let (noon, midnight) = (
+            is_daytime_at_coordinates(place, &at(12)),
+            is_daytime_at_coordinates(place, &at(0)),
+        );
+
+        // Then:
+        assert!(noon, "local noon reads as night");
+        assert!(!midnight, "local midnight reads as day");
+    }
+
     #[test]
     fn equator_equinox_is_twelve_hour_day() {
         // Day 80 ≈ March 21 (vernal equinox)
