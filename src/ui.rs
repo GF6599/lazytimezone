@@ -28,7 +28,7 @@
 //! modal over the wall while search mode is active.
 
 use chrono::offset::Offset;
-use chrono::{DateTime, Datelike, Utc};
+use chrono::{DateTime, Datelike, TimeDelta, Timelike, Utc};
 use chrono_tz::Tz;
 
 use ratatui::{
@@ -50,12 +50,15 @@ use crate::timezone::{format_utc_offset, is_daytime_at, is_daytime_at_latitude, 
 
 /// Top-level render entry point — splits the frame into five vertical
 /// zones and delegates to specialised draw functions.
-///
-/// `Utc::now()` is sampled once at the start of the frame and threaded
-/// through to all child draws so every part of the UI agrees on "now".
 pub fn draw(frame: &mut Frame, app: &mut App) {
+    draw_at(frame, app, Utc::now());
+}
+
+/// Draws the frame as it looks at `now`. Every child draw takes this one
+/// instant, so every part of the UI agrees on "now", and a test can pick
+/// the instant.
+fn draw_at(frame: &mut Frame, app: &mut App, now: DateTime<Utc>) {
     let tc = app.theme.colors();
-    let now = Utc::now();
 
     let (hero, hero_height) = hero_variant(frame.area());
     let outer = Layout::default()
@@ -364,9 +367,14 @@ fn draw_hero_clock(
     frame.render_widget(meta_line, chunks[3]);
 }
 
-const PANEL_MIN_WIDTH: u16 = 26;
+/// One gutter column and two border columns leave 24 cells inside, one
+/// for each hour of the day strip.
+const PANEL_MIN_WIDTH: u16 = 27;
 const PANEL_MIN_HEIGHT: u16 = 4;
-const PANEL_MAX_HEIGHT: u16 = 6;
+/// Tall enough for every panel line: time, offset, zone, sun times and
+/// the day strip.
+const PANEL_MAX_HEIGHT: u16 = 7;
+const STRIP_HOURS: u16 = 24;
 
 /// Renders the favorite wall: one framed panel per favorite, in the
 /// user's order, wrapped into as many columns as the width allows.
@@ -514,24 +522,26 @@ fn draw_favorite_panel(
             ),
         ]),
     ];
-    if inner.height >= 3 {
-        body.push(Line::from(vec![
-            Span::styled(format_utc_offset(offset_secs), Style::default().fg(tc.info)),
-            Span::styled(
-                if entry.is_fixed_offset() {
-                    " \u{00b7} Fixed offset".to_string()
-                } else {
-                    format!(" \u{00b7} {}", entry.tz.name())
-                },
-                Style::default().fg(tc.muted),
-            ),
-        ]));
-    }
-    if inner.height >= 4
-        && let Some(lat) = entry.latitude
-    {
+    body.push(Line::from(vec![
+        Span::styled(format_utc_offset(offset_secs), Style::default().fg(tc.info)),
+        Span::styled(
+            if entry.is_fixed_offset() {
+                " \u{00b7} Fixed offset".to_string()
+            } else {
+                format!(" \u{00b7} {}", entry.tz.name())
+            },
+            Style::default().fg(tc.muted),
+        ),
+    ]));
+    if let Some(lat) = entry.latitude {
         body.push(sun_line(lat, &local, tc));
     }
+    // The strip outranks the zone and sun lines, which repeat what it
+    // shows, so it takes the last row once the time and offset fit.
+    let strip = (inner.width >= STRIP_HOURS && inner.height >= 3)
+        .then(|| day_strip(entry.latitude, entry.tz, app.selection.tz, utc_now, tc));
+    body.truncate(usize::from(inner.height) - usize::from(strip.is_some()));
+    body.extend(strip);
     frame.render_widget(
         Paragraph::new(body).style(Style::default().bg(tc.bg)),
         inner,
@@ -552,6 +562,45 @@ fn draw_favorite_panel(
             cell.set_style(mark);
         }
     }
+}
+
+/// One cell for each hour of the main clock's day, coloured by whether
+/// the sun is up at `latitude` halfway through that hour. Every panel
+/// samples the same instants, so one column is one moment on the whole
+/// wall. The current hour carries the marker colour, in a heavier glyph
+/// so that a night or no-daylight cell still shows it.
+fn day_strip(
+    latitude: Option<f64>,
+    tz: Tz,
+    hero_tz: Tz,
+    utc_now: &DateTime<Utc>,
+    tc: &ThemeColors,
+) -> Line<'static> {
+    let hero_now = utc_now.with_timezone(&hero_tz);
+    let hero_hour = hero_now.hour();
+    let hour_start = *utc_now
+        - TimeDelta::minutes(i64::from(hero_now.minute()))
+        - TimeDelta::seconds(i64::from(hero_now.second()));
+    let cells: Vec<Span<'static>> = (0..u32::from(STRIP_HOURS))
+        .map(|hour| {
+            let midpoint = hour_start
+                + TimeDelta::hours(i64::from(hour) - i64::from(hero_hour))
+                + TimeDelta::minutes(30);
+            let ((glyph, now_glyph), colour) = match latitude {
+                None => (("\u{b7}", "\u{2022}"), tc.fg),
+                Some(lat) if is_daytime_at_latitude(lat, &midpoint.with_timezone(&tz)) => {
+                    (("\u{2588}", "\u{2588}"), tc.good)
+                }
+                Some(_) => (("\u{2591}", "\u{2593}"), tc.muted),
+            };
+            if hour == hero_hour {
+                Span::styled(now_glyph, Style::default().fg(tc.star))
+            } else {
+                Span::styled(glyph, Style::default().fg(colour))
+            }
+        })
+        .collect();
+    Line::from(cells)
 }
 
 const PICKER_WIDTH: u16 = 56;
@@ -881,8 +930,17 @@ mod tests {
     use crate::config;
 
     fn render_buffer(app: &mut App, width: u16, height: u16) -> ratatui::buffer::Buffer {
+        render_buffer_at(app, width, height, Utc::now())
+    }
+
+    fn render_buffer_at(
+        app: &mut App,
+        width: u16,
+        height: u16,
+        now: DateTime<Utc>,
+    ) -> ratatui::buffer::Buffer {
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
-        terminal.draw(|frame| draw(frame, app)).unwrap();
+        terminal.draw(|frame| draw_at(frame, app, now)).unwrap();
         terminal.backend().buffer().clone()
     }
 
@@ -899,18 +957,20 @@ mod tests {
     }
 
     /// Whether `c` is a block or octant glyph, the characters the hero
-    /// art is drawn in. No text, border or panel uses them.
+    /// art is drawn in. No text or border uses them, but a panel's day
+    /// strip draws its day cells as full blocks.
     fn is_art_glyph(c: char) -> bool {
         c != ' ' && ratatui::symbols::pixel::OCTANTS.contains(&c)
     }
 
     /// Measures the hero art as (rows with art glyphs, widest ink span
-    /// in cells), so a test can tell one art scale from another.
+    /// in cells), so a test can tell one art scale from another. Rows
+    /// with a panel border are skipped, so a day strip is not art.
     fn hero_ink(rows: &[String]) -> (usize, usize) {
         let mut ink_rows = 0;
         let mut min_col = usize::MAX;
         let mut max_col = 0;
-        for row in rows {
+        for row in rows.iter().filter(|row| !row.contains('\u{2502}')) {
             let mut inked = false;
             for (col, c) in row.chars().enumerate() {
                 if is_art_glyph(c) {
@@ -1017,16 +1077,15 @@ mod tests {
 
         let buffer = render_buffer(&mut app, 80, 24);
 
-        // 80x24 gives a full-art hero (11 rows under the title), one
-        // 6-row panel row centered in the 11-row wall (2 rows of pad),
-        // and a 27-cell first column (79 cells split 3 ways, 1 spare).
-        let panel_top_left = buffer[(1, 14)].clone();
-        assert_eq!(panel_top_left.symbol(), "\u{250c}");
-        assert_eq!(panel_top_left.fg, star);
+        let corners: Vec<&ratatui::buffer::Cell> = (0..buffer.area.height)
+            .flat_map(|y| (0..buffer.area.width).map(move |x| (x, y)))
+            .map(|pos| &buffer[pos])
+            .filter(|cell| cell.symbol() == "\u{250c}")
+            .collect();
+        assert_eq!(corners.len(), 2, "one top-left corner per panel");
+        assert_eq!(corners[0].fg, star);
         // The unselected panel keeps the plain border.
-        let neighbour_top_left = buffer[(28, 14)].clone();
-        assert_eq!(neighbour_top_left.symbol(), "\u{250c}");
-        assert_eq!(neighbour_top_left.fg, border);
+        assert_eq!(corners[1].fg, border);
     }
 
     #[test]
@@ -1212,10 +1271,12 @@ mod tests {
     fn the_hero_clock_drops_the_art_on_a_short_terminal() {
         let mut app = wall_app(&["tokyo"]);
 
-        let rendered = render_app(&mut app, 80, 12).join("\n");
+        let rows = render_app(&mut app, 80, 12);
 
-        assert!(
-            !rendered.chars().any(is_art_glyph),
+        let rendered = rows.join("\n");
+        assert_eq!(
+            hero_ink(&rows).0,
+            0,
             "block art on a 12-row terminal:\n{rendered}"
         );
         assert!(rendered.contains("UTC"), "got:\n{rendered}");
@@ -1327,6 +1388,142 @@ mod tests {
         // cell in from the frame edge, mirroring the left margin.
         let found = (0..buffer.area.height).any(|y| buffer[(78, y)].symbol() == "\u{2510}");
         assert!(found, "no panel corner lands beside the right edge");
+    }
+
+    fn is_day_cell(c: char) -> bool {
+        c == '\u{2588}'
+    }
+
+    fn is_night_cell(c: char) -> bool {
+        matches!(c, '\u{2591}' | '\u{2593}')
+    }
+
+    /// Finds each panel's day strip as (row, first column, cells), in
+    /// reading order. A strip is 24 day, night or no-daylight cells
+    /// right after a panel's left border.
+    fn day_strips(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, u16, Vec<char>)> {
+        let is_cell =
+            |c: char| is_day_cell(c) || is_night_cell(c) || matches!(c, '\u{b7}' | '\u{2022}');
+        let mut strips = Vec::new();
+        for y in 0..buffer.area.height {
+            let row: Vec<char> = (0..buffer.area.width)
+                .map(|x| buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
+                .collect();
+            for x in 0..row.len().saturating_sub(24) {
+                if row[x] == '\u{2502}' && row[x + 1..x + 25].iter().all(|&c| is_cell(c)) {
+                    strips.push((y, x as u16 + 1, row[x + 1..x + 25].to_vec()));
+                }
+            }
+        }
+        strips
+    }
+
+    fn midsummer_noon_utc() -> DateTime<Utc> {
+        use chrono::TimeZone;
+        Utc.with_ymd_and_hms(2026, 6, 21, 12, 0, 0).unwrap()
+    }
+
+    /// Each panel shows its city's daylight on the main clock's hours.
+    ///
+    /// Given: London and Tokyo on the wall, Tokyo on the main clock, at
+    /// noon UTC on 21 June, which is 21:00 in Tokyo and 13:00 in London.
+    /// When: the wall is drawn with room for the strips.
+    /// Then: column 21 (13:30 in London) is day in London and night in
+    /// Tokyo, column 8 (00:30 in London) is night in London and day in
+    /// Tokyo, and column 21 carries the marker colour in both strips.
+    ///
+    /// Why it matters: the strip answers when everyone is awake, which
+    /// only works if one column is one instant in every panel and the
+    /// columns read in the time the user is thinking in.
+    #[test]
+    fn each_panel_shows_its_daylight_on_the_main_clocks_hours() {
+        // Given:
+        let mut app = wall_app(&["london", "tokyo"]);
+        assert_eq!(app.selection.city_name, "Tokyo");
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 80, 40, midsummer_noon_utc());
+
+        // Then:
+        let strips = day_strips(&buffer);
+        assert_eq!(strips.len(), 2, "strips: {strips:?}");
+        let (_, _, london) = &strips[0];
+        let (_, _, tokyo) = &strips[1];
+        assert!(
+            is_day_cell(london[21]) && is_night_cell(london[8]),
+            "London: {london:?}"
+        );
+        assert!(
+            is_night_cell(tokyo[21]) && is_day_cell(tokyo[8]),
+            "Tokyo: {tokyo:?}"
+        );
+        let marker = app.theme.colors().star;
+        for (y, x, _) in &strips {
+            assert_eq!(buffer[(x + 21, *y)].fg, marker, "now cell at row {y}");
+        }
+    }
+
+    /// A fixed-offset strip shows no day and no night.
+    ///
+    /// Given: the UTC-5 fixed offset on the wall.
+    /// When: the wall is drawn with room for the strip.
+    /// Then: its strip has no day cell and no night cell.
+    ///
+    /// Why it matters: a fixed offset has no place, so it has no
+    /// sunrise, and a day colour would show daylight that does not
+    /// exist.
+    #[test]
+    fn a_fixed_offset_strip_shows_no_day_and_no_night() {
+        // Given:
+        let mut app = fixed_offset_app("UTC-5");
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 80, 40, midsummer_noon_utc());
+
+        // Then:
+        let strips = day_strips(&buffer);
+        assert_eq!(strips.len(), 1, "strips: {strips:?}");
+        assert!(
+            !strips[0]
+                .2
+                .iter()
+                .any(|&c| is_day_cell(c) || is_night_cell(c)),
+            "cells: {:?}",
+            strips[0].2
+        );
+    }
+
+    /// A short panel keeps its strip and drops the zone name first.
+    ///
+    /// Given: four favourites on a terminal that leaves each panel
+    /// three lines inside.
+    /// When: the wall is drawn.
+    /// Then: every panel shows a strip, and no panel shows its zone
+    /// name.
+    ///
+    /// Why it matters: the zone name and the sun times repeat what the
+    /// strip shows, so the strip is the line worth keeping when a panel
+    /// cannot hold them all.
+    #[test]
+    fn a_short_panel_keeps_its_strip_and_drops_the_zone_name() {
+        // Given:
+        let mut app = wall_app(&["tokyo", "london", "paris", "denver"]);
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 80, 23, midsummer_noon_utc());
+
+        // Then:
+        let strips = day_strips(&buffer);
+        let rendered: String = (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+                    + "\n"
+            })
+            .collect();
+        assert_eq!(strips.len(), 4, "got:\n{rendered}");
+        assert!(!rendered.contains("Asia/Tokyo"), "got:\n{rendered}");
     }
 
     #[test]
