@@ -126,8 +126,9 @@ fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
 }
 
 /// Wall bindings: `h/j/k/l` move between the favorite panels, Enter
-/// promotes one to the hero clock, `f` removes it, `J/K` reorder,
-/// and `/` opens the add-city picker.
+/// promotes one to the hero clock, `f` removes it, `J/K` reorder, `m`
+/// switches to the world map and back, and `/` opens the add-city
+/// picker.
 fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
     match key.code {
         KeyCode::Char('q') => {
@@ -145,6 +146,7 @@ fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Char('J') => app.move_panel_later(),
         KeyCode::Char('K') => app.move_panel_earlier(),
         KeyCode::Char('t') => app.cycle_theme(),
+        KeyCode::Char('m') => app.toggle_map(),
         KeyCode::Char('c') if !key.modifiers.contains(KeyModifiers::CONTROL) => app.copy_time(),
         KeyCode::Char('?') => app.toggle_help(),
         _ => {}
@@ -211,6 +213,7 @@ mod tests {
     use crossterm::event::{KeyEvent, KeyEventState};
 
     use super::*;
+    use crate::app::WallView;
     use crate::config;
 
     /// `poll` reports readiness without blocking, which is what a burst
@@ -256,6 +259,31 @@ mod tests {
         let mut app = App::with_config(config::Config::default());
         app.enter_search();
         app
+    }
+
+    /// `m` switches the wall to the world map and back.
+    ///
+    /// Given: the app on the panel wall.
+    /// When: `m` is pressed, then pressed again.
+    /// Then: the first press shows the map and the second the panels.
+    ///
+    /// Why it matters: the map has no other way in, so a key that is in
+    /// the help but not wired would hide the whole view.
+    #[test]
+    fn m_switches_the_wall_to_the_map_and_back() {
+        // Given:
+        let mut app = App::with_config(config::Config::default());
+
+        // When:
+        dispatch_event(&mut app, key('m'));
+        let after_one_press = app.wall_view;
+        dispatch_event(&mut app, key('m'));
+
+        // Then:
+        assert_eq!(
+            (after_one_press, app.wall_view),
+            (WallView::Map, WallView::Panels)
+        );
     }
 
     #[test]

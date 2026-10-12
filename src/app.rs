@@ -325,6 +325,14 @@ impl FilteredView {
     }
 }
 
+/// What the area under the clock shows: a panel for each favourite, or
+/// the world map with a dot for each one. The app opens on the panels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WallView {
+    Panels,
+    Map,
+}
+
 /// Whether the app is accepting navigation keys or search text input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputMode {
@@ -430,6 +438,7 @@ pub struct App {
     /// When true, the UI renders a help popup over the main view.
     /// Toggled by `?`, scrolled with the arrows, dismissed by any other key.
     pub(crate) show_help: bool,
+    pub(crate) wall_view: WallView,
     /// First visible line of the help popup.
     ///
     /// The overlay carries more lines than an 80x24 terminal can show, so
@@ -513,6 +522,7 @@ impl App {
             favorites,
             copy_flash: None,
             show_help: false,
+            wall_view: WallView::Panels,
             help_scroll: 0,
             startup_messages,
             config_load_failed,
@@ -531,6 +541,13 @@ impl App {
         if !self.startup_messages.is_empty() {
             self.startup_messages.clear();
         }
+    }
+
+    pub(crate) fn toggle_map(&mut self) {
+        self.wall_view = match self.wall_view {
+            WallView::Panels => WallView::Map,
+            WallView::Map => WallView::Panels,
+        };
     }
 
     pub(crate) fn toggle_help(&mut self) {

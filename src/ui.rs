@@ -36,18 +36,21 @@ use ratatui::{
     layout::Alignment,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
+    symbols::Marker,
     text::{Line, Span},
+    widgets::canvas::{Canvas, Map, MapResolution},
     widgets::{Block, Borders, Clear, Paragraph},
 };
 use std::borrow::Cow;
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::app::{App, CopyStatus, InputMode};
+use crate::app::{App, CopyStatus, InputMode, WallView};
 use crate::digits;
 use crate::theme::ThemeColors;
 use crate::timezone::{
-    Coordinates, format_utc_offset, is_daytime_at, is_daytime_at_coordinates, sun_times,
+    Coordinates, TimezoneEntry, format_utc_offset, is_daytime_at, is_daytime_at_coordinates,
+    sun_times,
 };
 
 /// Top-level render entry point — splits the frame into five vertical
@@ -75,7 +78,10 @@ fn draw_at(frame: &mut Frame, app: &mut App, now: DateTime<Utc>) {
 
     draw_title_bar(frame, app, outer[0], &tc);
     draw_hero_clock(frame, app, &now, outer[1], hero, &tc);
-    draw_wall(frame, app, &now, outer[2], &tc);
+    match app.wall_view {
+        WallView::Panels => draw_wall(frame, app, &now, outer[2], &tc),
+        WallView::Map => draw_map(frame, app, &now, outer[2], &tc),
+    }
     draw_status_bar(frame, app, outer[3], &tc);
 
     if app.input_mode == InputMode::Search {
@@ -103,6 +109,7 @@ const NORMAL_MODE_HELP: &[(&str, &str)] = &[
     ("f", "Remove the selected panel"),
     ("J / K", "Move the panel later / earlier in the order"),
     ("t", "Cycle theme"),
+    ("m", "Switch the wall between panels and the world map"),
     ("c", "Copy the big clock's time to clipboard"),
     ("?", "Toggle this help"),
     ("q / Ctrl-c", "Quit"),
@@ -470,9 +477,6 @@ fn draw_favorite_panel(
     };
     let selected = panel_pos == app.selected_panel;
     let local = utc_now.with_timezone(&entry.tz);
-    let is_day = entry
-        .coordinates
-        .map(|place| is_daytime_at_coordinates(place, &local));
 
     let border_color = if selected { tc.accent } else { tc.border };
     let title_style = if selected {
@@ -493,13 +497,7 @@ fn draw_favorite_panel(
     let inner = block.inner(rect);
     frame.render_widget(block, rect);
 
-    let time_style = match is_day {
-        Some(true) => Style::default().fg(tc.good).add_modifier(Modifier::BOLD),
-        Some(false) => Style::default().fg(tc.muted).add_modifier(Modifier::BOLD),
-        // A fixed offset has no daylight, so neither the day nor the
-        // night colour would be true of it.
-        None => Style::default().fg(tc.fg).add_modifier(Modifier::BOLD),
-    };
+    let time_style = local_time_style(entry, &local, tc);
     let hero_offset = utc_now
         .with_timezone(&app.selection.tz)
         .offset()
@@ -603,6 +601,151 @@ fn day_strip(
         })
         .collect();
     Line::from(cells)
+}
+
+/// Bold, in the day colour while the sun is up there and the muted
+/// colour while it is down.
+fn local_time_style(entry: &TimezoneEntry, local: &DateTime<Tz>, tc: &ThemeColors) -> Style {
+    let colour = match entry.coordinates {
+        Some(place) if is_daytime_at_coordinates(place, local) => tc.good,
+        Some(_) => tc.muted,
+        // A fixed offset has no daylight, so neither the day nor the
+        // night colour would be true of it.
+        None => tc.fg,
+    };
+    Style::default().fg(colour).add_modifier(Modifier::BOLD)
+}
+
+/// The map is about 5 cells wide for each row: 360° by 142° drawn in
+/// 2 by 4 Braille dots a cell, with a cell twice as tall as it is wide.
+const MAP_COLUMNS_PER_ROW: u16 = 5;
+/// The map stops at 58°S and 84°N. South of that is Antarctica, which
+/// would take a quarter of the height and holds no city, so a favourite
+/// beyond either edge is pinned to it.
+const MAP_SOUTH: f64 = -58.0;
+const MAP_NORTH: f64 = 84.0;
+
+/// Renders the world map view: the coastline, a dot for each favourite
+/// with a place, the selected one in the marker colour, and a legend
+/// of every favourite's local time under it.
+///
+/// The legend is the strip `h` and `l` walk, so the wall reports one
+/// column per favourite and `j`/`k` stay put.
+fn draw_map(
+    frame: &mut Frame,
+    app: &mut App,
+    utc_now: &DateTime<Utc>,
+    area: Rect,
+    tc: &ThemeColors,
+) {
+    app.set_wall_columns(app.favorites.len());
+    let legend = map_legend(app, utc_now, area.width.saturating_sub(2), tc);
+    let legend_rows = u16::try_from(legend.len()).unwrap_or(u16::MAX);
+
+    let map_rows = area
+        .height
+        .saturating_sub(legend_rows.saturating_add(1))
+        .min(area.width.saturating_sub(2) / MAP_COLUMNS_PER_ROW);
+    let map_width = map_rows * MAP_COLUMNS_PER_ROW;
+    let top = area.y
+        + area
+            .height
+            .saturating_sub(map_rows.saturating_add(1).saturating_add(legend_rows))
+            / 2;
+    let map_area = Rect {
+        x: area.x + area.width.saturating_sub(map_width) / 2,
+        y: top,
+        width: map_width,
+        height: map_rows,
+    };
+    let legend_area = Rect {
+        x: area.x + 1,
+        y: top.saturating_add(map_rows).saturating_add(1),
+        width: area.width.saturating_sub(2),
+        height: legend_rows,
+    }
+    .intersection(area);
+
+    let mut dots: Vec<(f64, f64, bool)> = (0..app.favorites.len())
+        .filter_map(|pos| {
+            let entry = app.catalogue.get(app.favorites.at(pos)?)?;
+            let place = entry.coordinates?;
+            let latitude = place.latitude.clamp(MAP_SOUTH, MAP_NORTH);
+            Some((place.longitude, latitude, pos == app.selected_panel))
+        })
+        .collect();
+    // The selected dot is printed last, so it stays on top of a
+    // neighbour in the same cell.
+    dots.sort_by_key(|&(_, _, selected)| selected);
+    let map = Canvas::default()
+        .marker(Marker::Braille)
+        .x_bounds([-180.0, 180.0])
+        .y_bounds([MAP_SOUTH, MAP_NORTH])
+        .background_color(tc.bg)
+        .paint(|ctx| {
+            ctx.draw(&Map {
+                resolution: MapResolution::High,
+                color: tc.border,
+            });
+            for &(longitude, latitude, selected) in &dots {
+                let colour = if selected { tc.star } else { tc.accent };
+                ctx.print(
+                    longitude,
+                    latitude,
+                    Span::styled("\u{25cf}", Style::default().fg(colour)),
+                );
+            }
+        });
+    frame.render_widget(map, map_area);
+    frame.render_widget(
+        Paragraph::new(legend)
+            .alignment(Alignment::Center)
+            .style(Style::default().bg(tc.bg)),
+        legend_area,
+    );
+}
+
+/// Every favourite as `City HH:MM`, wrapped onto as many lines as
+/// `width` needs, so none falls off the edge. The selected city carries
+/// the marker colour.
+fn map_legend(
+    app: &App,
+    utc_now: &DateTime<Utc>,
+    width: u16,
+    tc: &ThemeColors,
+) -> Vec<Line<'static>> {
+    const SEPARATOR: &str = " \u{b7} ";
+    let mut lines: Vec<Vec<Span<'static>>> = Vec::new();
+    let mut used = 0;
+    for pos in 0..app.favorites.len() {
+        let Some(entry) = app.favorites.at(pos).and_then(|idx| app.catalogue.get(idx)) else {
+            continue;
+        };
+        let local = utc_now.with_timezone(&entry.tz);
+        let time = local.format("%H:%M").to_string();
+        let item_width = entry.city.width() + 1 + time.width();
+        if lines.is_empty() || used + SEPARATOR.width() + item_width > usize::from(width) {
+            lines.push(Vec::new());
+            used = 0;
+        }
+        let Some(line) = lines.last_mut() else {
+            continue;
+        };
+        if used > 0 {
+            line.push(Span::styled(SEPARATOR, Style::default().fg(tc.muted)));
+            used += SEPARATOR.width();
+        }
+        let city_style = if pos == app.selected_panel {
+            Style::default().fg(tc.star).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(tc.fg)
+        };
+        line.push(Span::styled(entry.city.to_string(), city_style));
+        line.push(Span::raw(" "));
+        line.push(Span::styled(time, local_time_style(entry, &local, tc)));
+        used += item_width;
+    }
+    lines.into_iter().map(Line::from).collect()
 }
 
 const PICKER_WIDTH: u16 = 56;
@@ -790,7 +933,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
     //     narrow screens — the bindings stay visible when space is tight.
     //   * Stays under ~100 chars so it survives terminal widths down to ~80.
     let hints = match app.input_mode {
-        InputMode::Normal => " q:quit  /:add  f:remove  J/K:reorder  t:theme  ?:help",
+        InputMode::Normal => " q:quit  /:add  f:remove  J/K:reorder  t:theme  m:map  ?:help",
         InputMode::Search => {
             " Enter:add  Esc:close  Ctrl-u:clear  hint: city \u{00b7} +5:30 \u{00b7} asia"
         }
@@ -1526,6 +1669,158 @@ mod tests {
             .collect();
         assert_eq!(strips.len(), 4, "got:\n{rendered}");
         assert!(!rendered.contains("Asia/Tokyo"), "got:\n{rendered}");
+    }
+
+    fn favorites_app(cities: &[(&str, &str, &str)]) -> App {
+        App::with_config(config::Config {
+            favorites: cities
+                .iter()
+                .map(|&(city, admin1, cc)| config::FavoriteEntry::City {
+                    city: city.to_string(),
+                    admin1: admin1.to_string(),
+                    cc: cc.to_string(),
+                })
+                .collect(),
+            ..config::Config::default()
+        })
+    }
+
+    /// Every map dot as (column, row, colour), in reading order.
+    fn map_dots(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, u16, Color)> {
+        (0..buffer.area.height)
+            .flat_map(|y| (0..buffer.area.width).map(move |x| (x, y)))
+            .filter(|&pos| buffer[pos].symbol() == "\u{25cf}")
+            .map(|(x, y)| (x, y, buffer[(x, y)].fg))
+            .collect()
+    }
+
+    fn buffer_text(buffer: &ratatui::buffer::Buffer) -> String {
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+                    + "\n"
+            })
+            .collect()
+    }
+
+    /// The map view puts a dot where each favourite is, and lists every
+    /// favourite with its time.
+    ///
+    /// Given: London (selected), Tokyo, Sydney and the UTC-5 fixed
+    /// offset, at noon UTC on 21 June, in the map view.
+    /// When: the frame is drawn.
+    /// Then: there is no panel, there are three dots, Tokyo's is east of
+    /// London's and north of Sydney's, London's carries the marker
+    /// colour, and the legend gives every favourite's local time.
+    ///
+    /// Why it matters: a dot in the wrong place, or a favourite missing
+    /// from the legend, shows the user a world that is not theirs. A
+    /// fixed offset has no place, so it has no dot, but it still has a
+    /// time.
+    #[test]
+    fn the_map_view_puts_each_placed_favourite_where_it_is() {
+        // Given:
+        let mut app = favorites_app(&[
+            ("London", "England", "GB"),
+            ("Tokyo", "Tokyo", "JP"),
+            ("Sydney", "New South Wales", "AU"),
+            ("UTC-5", "", ""),
+        ]);
+        app.toggle_map();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 100, 40, midsummer_noon_utc());
+
+        // Then:
+        let text = buffer_text(&buffer);
+        assert!(
+            !text.contains('\u{250c}'),
+            "a panel in the map view:\n{text}"
+        );
+        let dots = map_dots(&buffer);
+        assert_eq!(dots.len(), 3, "dots: {dots:?}\n{text}");
+        let star = app.theme.colors().star;
+        let london: Vec<_> = dots.iter().filter(|d| d.2 == star).collect();
+        let rest: Vec<_> = dots.iter().filter(|d| d.2 != star).collect();
+        assert_eq!(london.len(), 1, "one marked dot: {dots:?}");
+        let (tokyo, sydney) = (rest[0], rest[1]);
+        assert!(
+            london[0].0 < tokyo.0 && tokyo.1 < sydney.1 && london[0].1 < sydney.1,
+            "London {:?}, Tokyo {tokyo:?}, Sydney {sydney:?}",
+            london[0]
+        );
+        for entry in ["London 13:00", "Tokyo 21:00", "Sydney 22:00", "UTC-5 07:00"] {
+            assert!(text.contains(entry), "no {entry:?} in:\n{text}");
+        }
+    }
+
+    /// A favourite south of the map's crop stays on the map.
+    ///
+    /// Given: Casey, an Antarctic base at 66°S, in the map view.
+    /// When: the frame is drawn.
+    /// Then: its dot is on the map's bottom row.
+    ///
+    /// Why it matters: the map stops at 58°S to keep Antarctica from
+    /// filling a quarter of it, and every Antarctic zone is in the
+    /// catalogue, so a dot outside the crop would vanish.
+    #[test]
+    fn an_antarctic_favourite_is_pinned_to_the_maps_edge() {
+        // Given:
+        let mut app = favorites_app(&[("Casey", "", "AQ"), ("London", "England", "GB")]);
+        app.toggle_map();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 100, 40, midsummer_noon_utc());
+
+        // Then:
+        let dots = map_dots(&buffer);
+        assert_eq!(dots.len(), 2, "dots: {dots:?}\n{}", buffer_text(&buffer));
+        let lowest = dots.iter().map(|d| d.1).max().unwrap();
+        let map_bottom = (0..buffer.area.height)
+            .filter(|&y| {
+                (0..buffer.area.width).any(|x| {
+                    ('\u{2801}'..='\u{28ff}')
+                        .contains(&buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
+                })
+            })
+            .max()
+            .unwrap();
+        assert_eq!(lowest, map_bottom, "Casey is not on the bottom row");
+    }
+
+    /// On a narrow terminal the legend wraps, so every favourite stays
+    /// on screen.
+    ///
+    /// Given: six favourites in the map view on a 60-column terminal.
+    /// When: the frame is drawn.
+    /// Then: every city name appears.
+    ///
+    /// Why it matters: `h` and `l` move the selection along the legend,
+    /// and a selected favourite cut off the right edge could not be seen.
+    #[test]
+    fn the_map_legend_wraps_so_every_favourite_stays_on_screen() {
+        // Given:
+        let cities = [
+            ("London", "England", "GB"),
+            ("Tokyo", "Tokyo", "JP"),
+            ("Sydney", "New South Wales", "AU"),
+            ("Paris", "Île-de-France", "FR"),
+            ("Denver", "Colorado", "US"),
+            ("Nairobi", "Nairobi County", "KE"),
+        ];
+        let mut app = favorites_app(&cities);
+        app.toggle_map();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 60, 30, midsummer_noon_utc());
+
+        // Then:
+        let text = buffer_text(&buffer);
+        for (city, _, _) in cities {
+            assert!(text.contains(city), "no {city} in:\n{text}");
+        }
     }
 
     #[test]

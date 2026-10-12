@@ -57,6 +57,7 @@ Press `?` in the app for the same key list, plus the search syntax.
 | `J` | Move the panel later in the order |
 | `K` | Move the panel earlier in the order |
 | `t` | Cycle the theme |
+| `m` | Switch the wall between panels and the world map |
 | `c` | Copy the big clock's time to the clipboard |
 | `?` | Toggle the help overlay. `Up` and `Down` scroll it |
 | `q` / `Ctrl-c` | Quit |
