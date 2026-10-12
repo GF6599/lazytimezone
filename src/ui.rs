@@ -50,12 +50,15 @@ use crate::timezone::{format_utc_offset, is_daytime_at, is_daytime_at_latitude, 
 
 /// Top-level render entry point — splits the frame into five vertical
 /// zones and delegates to specialised draw functions.
-///
-/// `Utc::now()` is sampled once at the start of the frame and threaded
-/// through to all child draws so every part of the UI agrees on "now".
 pub fn draw(frame: &mut Frame, app: &mut App) {
+    draw_at(frame, app, Utc::now());
+}
+
+/// Draws the frame as it looks at `now`. Every child draw takes this one
+/// instant, so every part of the UI agrees on "now", and a test can pick
+/// the instant.
+fn draw_at(frame: &mut Frame, app: &mut App, now: DateTime<Utc>) {
     let tc = app.theme.colors();
-    let now = Utc::now();
 
     let (hero, hero_height) = hero_variant(frame.area());
     let outer = Layout::default()
@@ -881,8 +884,17 @@ mod tests {
     use crate::config;
 
     fn render_buffer(app: &mut App, width: u16, height: u16) -> ratatui::buffer::Buffer {
+        render_buffer_at(app, width, height, Utc::now())
+    }
+
+    fn render_buffer_at(
+        app: &mut App,
+        width: u16,
+        height: u16,
+        now: DateTime<Utc>,
+    ) -> ratatui::buffer::Buffer {
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
-        terminal.draw(|frame| draw(frame, app)).unwrap();
+        terminal.draw(|frame| draw_at(frame, app, now)).unwrap();
         terminal.backend().buffer().clone()
     }
 
