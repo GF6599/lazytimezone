@@ -28,6 +28,7 @@ mod config;
 mod digits;
 mod events;
 mod search;
+mod sky;
 mod theme;
 mod timezone;
 mod ui;

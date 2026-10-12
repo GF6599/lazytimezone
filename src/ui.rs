@@ -47,6 +47,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, CopyStatus, InputMode, WallView};
 use crate::digits;
+use crate::sky;
 use crate::theme::ThemeColors;
 use crate::timezone::{
     Coordinates, TimezoneEntry, format_utc_offset, is_daytime_at, is_daytime_at_coordinates,
@@ -432,6 +433,16 @@ fn draw_wall(
     } else {
         0
     };
+    // One empty row stays between the sky and the panels.
+    if top_pad >= 2 {
+        let band = Rect {
+            x: area.x + 1,
+            y: area.y,
+            width: available,
+            height: top_pad - 1,
+        };
+        draw_sky(frame, app, utc_now, band, tc);
+    }
 
     let base_width = available / columns as u16;
     let wide_columns = (available % columns as u16) as usize;
@@ -459,6 +470,34 @@ fn draw_wall(
         }
         draw_favorite_panel(frame, app, utc_now, panel_pos, rect, tc);
     }
+}
+
+/// Fills `band` with the ambient sky for the main clock's daylight, in
+/// the dim border colour, with a twinkling star at its peak one step
+/// brighter.
+fn draw_sky(frame: &mut Frame, app: &App, utc_now: &DateTime<Utc>, band: Rect, tc: &ThemeColors) {
+    let is_day = is_daytime_at(app.selection.tz, &utc_now.with_timezone(&app.selection.tz));
+    let rows = sky::render(band.width, band.height, utc_now.timestamp(), is_day);
+    let lines: Vec<Line> = rows
+        .into_iter()
+        .map(|row| {
+            Line::from(
+                row.into_iter()
+                    .map(|cell| match cell {
+                        Some(cell) => Span::styled(
+                            cell.glyph.to_string(),
+                            Style::default().fg(if cell.bright { tc.muted } else { tc.border }),
+                        ),
+                        None => Span::raw(" "),
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect();
+    frame.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(tc.bg)),
+        band,
+    );
 }
 
 fn draw_favorite_panel(
