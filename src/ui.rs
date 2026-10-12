@@ -473,8 +473,8 @@ fn draw_wall(
 }
 
 /// Fills `band` with the ambient sky for the main clock's daylight, in
-/// the dim border colour, with a twinkling star at its peak one step
-/// brighter.
+/// the subtle colour, with a twinkling star at its peak in the text
+/// colour.
 fn draw_sky(frame: &mut Frame, app: &App, utc_now: &DateTime<Utc>, band: Rect, tc: &ThemeColors) {
     let is_day = is_daytime_at(app.selection.tz, &utc_now.with_timezone(&app.selection.tz));
     let rows = sky::render(band.width, band.height, utc_now.timestamp(), is_day);
@@ -486,7 +486,7 @@ fn draw_sky(frame: &mut Frame, app: &App, utc_now: &DateTime<Utc>, band: Rect, t
                     .map(|cell| match cell {
                         Some(cell) => Span::styled(
                             cell.glyph.to_string(),
-                            Style::default().fg(if cell.bright { tc.muted } else { tc.border }),
+                            Style::default().fg(if cell.bright { tc.fg } else { tc.subtle }),
                         ),
                         None => Span::raw(" "),
                     })
