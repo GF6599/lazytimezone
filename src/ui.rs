@@ -28,7 +28,7 @@
 //! modal over the wall while search mode is active.
 
 use chrono::offset::Offset;
-use chrono::{DateTime, Datelike, TimeDelta, Timelike, Utc};
+use chrono::{DateTime, TimeDelta, Timelike, Utc};
 use chrono_tz::Tz;
 
 use ratatui::{
@@ -46,7 +46,9 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::{App, CopyStatus, InputMode};
 use crate::digits;
 use crate::theme::ThemeColors;
-use crate::timezone::{format_utc_offset, is_daytime_at, is_daytime_at_latitude, sun_window};
+use crate::timezone::{
+    Coordinates, format_utc_offset, is_daytime_at, is_daytime_at_coordinates, sun_times,
+};
 
 /// Top-level render entry point — splits the frame into five vertical
 /// zones and delegates to specialised draw functions.
@@ -469,8 +471,8 @@ fn draw_favorite_panel(
     let selected = panel_pos == app.selected_panel;
     let local = utc_now.with_timezone(&entry.tz);
     let is_day = entry
-        .latitude
-        .map(|lat| is_daytime_at_latitude(lat, &local));
+        .coordinates
+        .map(|place| is_daytime_at_coordinates(place, &local));
 
     let border_color = if selected { tc.accent } else { tc.border };
     let title_style = if selected {
@@ -533,13 +535,13 @@ fn draw_favorite_panel(
             Style::default().fg(tc.muted),
         ),
     ]));
-    if let Some(lat) = entry.latitude {
-        body.push(sun_line(lat, &local, tc));
+    if let Some(place) = entry.coordinates {
+        body.push(sun_line(place, &local, tc));
     }
     // The strip outranks the zone and sun lines, which repeat what it
     // shows, so it takes the last row once the time and offset fit.
     let strip = (inner.width >= STRIP_HOURS && inner.height >= 3)
-        .then(|| day_strip(entry.latitude, entry.tz, app.selection.tz, utc_now, tc));
+        .then(|| day_strip(entry.coordinates, entry.tz, app.selection.tz, utc_now, tc));
     body.truncate(usize::from(inner.height) - usize::from(strip.is_some()));
     body.extend(strip);
     frame.render_widget(
@@ -565,12 +567,12 @@ fn draw_favorite_panel(
 }
 
 /// One cell for each hour of the main clock's day, coloured by whether
-/// the sun is up at `latitude` halfway through that hour. Every panel
+/// the sun is up at `place` halfway through that hour. Every panel
 /// samples the same instants, so one column is one moment on the whole
 /// wall. The current hour carries the marker colour, in a heavier glyph
 /// so that a night or no-daylight cell still shows it.
 fn day_strip(
-    latitude: Option<f64>,
+    place: Option<Coordinates>,
     tz: Tz,
     hero_tz: Tz,
     utc_now: &DateTime<Utc>,
@@ -586,9 +588,9 @@ fn day_strip(
             let midpoint = hour_start
                 + TimeDelta::hours(i64::from(hour) - i64::from(hero_hour))
                 + TimeDelta::minutes(30);
-            let ((glyph, now_glyph), colour) = match latitude {
+            let ((glyph, now_glyph), colour) = match place {
                 None => (("\u{b7}", "\u{2022}"), tc.fg),
-                Some(lat) if is_daytime_at_latitude(lat, &midpoint.with_timezone(&tz)) => {
+                Some(place) if is_daytime_at_coordinates(place, &midpoint.with_timezone(&tz)) => {
                     (("\u{2588}", "\u{2588}"), tc.good)
                 }
                 Some(_) => (("\u{2591}", "\u{2593}"), tc.muted),
@@ -872,8 +874,8 @@ fn format_diff(offset_secs: i32, selected_offset_secs: i32) -> Cow<'static, str>
 
 /// One muted line naming the panel's sun window, with the polar cases
 /// spelled out instead of the degenerate clock times they produce.
-fn sun_line(latitude: f64, local: &DateTime<Tz>, tc: &ThemeColors) -> Line<'static> {
-    let (sunrise, sunset) = sun_window(latitude, local.ordinal());
+fn sun_line(place: Coordinates, local: &DateTime<Tz>, tc: &ThemeColors) -> Line<'static> {
+    let (sunrise, sunset) = sun_times(place, local);
     let text: Cow<'static, str> = if sunset - sunrise >= 24.0 {
         Cow::Borrowed("sun up all day")
     } else if sunset <= sunrise {
@@ -881,8 +883,8 @@ fn sun_line(latitude: f64, local: &DateTime<Tz>, tc: &ThemeColors) -> Line<'stat
     } else {
         Cow::Owned(format!(
             "rise {} \u{00b7} set {}",
-            format_sun_time(sunrise),
-            format_sun_time(sunset)
+            format_sun_time(sunrise.rem_euclid(24.0)),
+            format_sun_time(sunset.rem_euclid(24.0))
         ))
     };
     Line::from(Span::styled(text, Style::default().fg(tc.muted)))

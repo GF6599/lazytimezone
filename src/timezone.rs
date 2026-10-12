@@ -3,7 +3,7 @@
 //! The city catalogue is generated data: `data/cities.tsv` derives
 //! from GeoNames through the `gen_cities` binary (the `gen-cities`
 //! recipe) and is embedded at compile time. One row is one city with
-//! its state, country, latitude, population, and IANA timezone. The
+//! its state, country, coordinates, population, and IANA timezone. The
 //! file is sorted by population, so the catalogue's index order is
 //! already a relevance order.
 //!
@@ -17,6 +17,7 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
+use chrono::offset::Offset;
 use chrono::{DateTime, Datelike, Timelike};
 use chrono_tz::Tz;
 
@@ -40,12 +41,11 @@ pub struct TimezoneEntry {
     pub cc: &'static str,
     /// IANA timezone identifier from [`chrono_tz`].
     pub tz: Tz,
-    /// Latitude in degrees (positive = north). Drives the day/night
-    /// colouring via [`is_daytime_at_latitude`]: for high-latitude
-    /// cities the daylight window varies dramatically by season.
-    /// `None` for a fixed offset, which is not a place and so has no
-    /// sunrise.
-    pub latitude: Option<f64>,
+    /// Where the city is. Drives the day/night colouring via
+    /// [`is_daytime_at_coordinates`]: for high-latitude cities the
+    /// daylight window varies dramatically by season. `None` for a
+    /// fixed offset, which is not a place and so has no sunrise.
+    pub coordinates: Option<Coordinates>,
     /// GeoNames population: the ranking signal for search and for
     /// the one-representative-per-zone lookups.
     pub population: u64,
@@ -55,8 +55,16 @@ impl TimezoneEntry {
     /// True for a UTC offset with no place behind it. Such a row has no
     /// sunrise, and it never observes daylight saving.
     pub fn is_fixed_offset(&self) -> bool {
-        self.latitude.is_none()
+        self.coordinates.is_none()
     }
+}
+
+/// A position in degrees: latitude positive north, longitude positive
+/// east.
+#[derive(Debug, Clone, Copy)]
+pub struct Coordinates {
+    pub latitude: f64,
+    pub longitude: f64,
 }
 
 /// The full city catalogue, parsed from the embedded TSV once.
@@ -80,7 +88,7 @@ fn data_rows(tsv: &'static str) -> impl Iterator<Item = &'static str> {
     tsv.lines().filter(|l| !l.starts_with('#') && !l.is_empty())
 }
 
-/// Parses one `name  ascii  admin1  country  cc  lat  pop  tz` row.
+/// Parses one `name  ascii  admin1  country  cc  lat  lon  pop  tz` row.
 fn parse_city_row(line: &'static str) -> Option<TimezoneEntry> {
     let mut cols = line.split('\t');
     let city = cols.next()?;
@@ -89,7 +97,11 @@ fn parse_city_row(line: &'static str) -> Option<TimezoneEntry> {
     let country = cols.next()?;
     let cc = cols.next()?;
     let latitude: f64 = cols.next()?.parse().ok()?;
-    let latitude = Some(latitude);
+    let longitude: f64 = cols.next()?.parse().ok()?;
+    let coordinates = Some(Coordinates {
+        latitude,
+        longitude,
+    });
     let population: u64 = cols.next()?.parse().ok()?;
     let tz: Tz = cols.next()?.parse().ok()?;
     Some(TimezoneEntry {
@@ -99,7 +111,7 @@ fn parse_city_row(line: &'static str) -> Option<TimezoneEntry> {
         country,
         cc,
         tz,
-        latitude,
+        coordinates,
         population,
     })
 }
@@ -229,7 +241,7 @@ fn fixed_offset_entries() -> impl Iterator<Item = TimezoneEntry> {
         country: "",
         cc: "",
         tz,
-        latitude: None,
+        coordinates: None,
         population: 0,
     })
 }
@@ -260,27 +272,22 @@ pub(crate) fn region_of(tz: Tz) -> &'static str {
 }
 
 /// Linear over the catalogue. A caller that already holds the
-/// [`TimezoneEntry`] should read `entry.latitude` and call
-/// [`is_daytime_at_latitude`] instead of paying for the search.
-pub(crate) fn latitude_for(tz: Tz) -> Option<f64> {
+/// [`TimezoneEntry`] should read `entry.coordinates` instead of paying
+/// for the search.
+pub(crate) fn coordinates_for(tz: Tz) -> Option<Coordinates> {
     all_timezones()
         .iter()
         .find(|e| e.tz == tz)
-        .and_then(|e| e.latitude)
+        .and_then(|e| e.coordinates)
 }
 
-/// Returns `(sunrise, sunset)` as fractional hours of local clock
-/// time using a simplified solar-position model.
+/// Returns `(sunrise, sunset)` as fractional hours of solar time, a
+/// window centred on solar noon at 12:00, using a simplified
+/// solar-position model. [`sun_times`] moves it onto a local clock.
 ///
 /// Inputs:
 /// - `latitude_deg` — positive = north, negative = south
 /// - `day_of_year` — 1..=366 (e.g. from `chrono::Datelike::ordinal`)
-///
-/// The model assumes solar noon at 12:00 local time, which is off by
-/// the equation of time (±15 min through the year) and the city's
-/// longitude position within its timezone. For a "is it daytime?"
-/// boolean the error is negligible except within minutes of sunrise
-/// or sunset, where the question itself is ambiguous.
 ///
 /// Polar regions:
 /// - Polar day → returns `(0.0, 24.0)` (sun never sets)
@@ -295,32 +302,68 @@ pub(crate) fn sun_window(latitude_deg: f64, day_of_year: u32) -> (f64, f64) {
     let declination =
         (-23.44_f64).to_radians() * (2.0 * PI / 365.0 * (day_of_year as f64 + 10.0)).cos();
 
-    // Hour angle of sunrise/sunset, clamped for polar day/night.
-    // The `.clamp(-1.0, 1.0)` is load-bearing, not defensive: above the
-    // Arctic / below the Antarctic circle the argument to `acos` exceeds
-    // [-1, 1] and clamping is what produces the polar day (-> 0) or
-    // polar night (-> π) hour angle.
-    let cos_omega = (-lat.tan() * declination.tan()).clamp(-1.0, 1.0);
+    // Hour angle of sunrise/sunset, with the sun's centre 0.833° below
+    // the horizon: refraction lifts its image by about 0.567°, and its
+    // upper edge sits 0.266° above its centre. Clamped for polar
+    // day/night. The `.clamp(-1.0, 1.0)` is load-bearing, not
+    // defensive: above the Arctic / below the Antarctic circle the
+    // argument to `acos` exceeds [-1, 1] and clamping is what produces
+    // the polar day (-> 0) or polar night (-> π) hour angle.
+    let horizon = (-0.833_f64).to_radians();
+    let cos_omega = ((horizon.sin() - lat.sin() * declination.sin())
+        / (lat.cos() * declination.cos()))
+    .clamp(-1.0, 1.0);
     let omega = cos_omega.acos();
     let half_day_hours = omega * 12.0 / PI;
 
     (12.0 - half_day_hours, 12.0 + half_day_hours)
 }
 
+/// Solar noon on `local`'s clock, in hours after midnight: 12, plus 4
+/// minutes for each degree west, less the equation of time, plus the
+/// zone's UTC offset on that date. It can fall past 24, as on
+/// Kiritimati at 36.5.
+fn solar_noon(longitude: f64, local: &DateTime<Tz>) -> f64 {
+    let offset_hours = f64::from(local.offset().fix().local_minus_utc()) / 3600.0;
+    12.0 - longitude / 15.0 - equation_of_time_minutes(local.ordinal()) / 60.0 + offset_hours
+}
+
+/// How far the sun runs ahead of a uniform clock, in minutes, from
+/// about −14 in February to about +16 in November. The usual
+/// three-term approximation, good to within a minute.
+fn equation_of_time_minutes(day_of_year: u32) -> f64 {
+    let b = (360.0 / 365.0 * (f64::from(day_of_year) - 81.0)).to_radians();
+    9.87 * (2.0 * b).sin() - 7.53 * b.cos() - 1.5 * b.sin()
+}
+
+/// Returns `(sunrise, sunset)` at `place` on `local`'s date, in hours
+/// of `local`'s clock. Either can fall below 0 or past 24 when the
+/// place's solar noon sits far from 12:00 on its clock.
+pub(crate) fn sun_times(place: Coordinates, local: &DateTime<Tz>) -> (f64, f64) {
+    let (sunrise, sunset) = sun_window(place.latitude, local.ordinal());
+    let shift = solar_noon(place.longitude, local) - 12.0;
+    (sunrise + shift, sunset + shift)
+}
+
 /// Returns true when `local` falls inside the daytime window for the
 /// given timezone. Falls back to a 6..18 window when no curated
-/// latitude exists for `tz`.
+/// coordinates exist for `tz`.
 pub fn is_daytime_at(tz: Tz, local: &DateTime<Tz>) -> bool {
-    match latitude_for(tz) {
-        Some(lat) => is_daytime_at_latitude(lat, local),
+    match coordinates_for(tz) {
+        Some(place) => is_daytime_at_coordinates(place, local),
         None => (6..18).contains(&local.hour()),
     }
 }
 
-pub fn is_daytime_at_latitude(latitude_deg: f64, local: &DateTime<Tz>) -> bool {
-    let (sunrise, sunset) = sun_window(latitude_deg, local.ordinal());
+/// Measures the time from solar noon around the 24-hour clock, so a
+/// solar noon that wraps past midnight still holds midday inside the
+/// window.
+pub fn is_daytime_at_coordinates(place: Coordinates, local: &DateTime<Tz>) -> bool {
+    let (sunrise, sunset) = sun_window(place.latitude, local.ordinal());
+    let half_day = (sunset - sunrise) / 2.0;
     let hour = local.hour() as f64 + local.minute() as f64 / 60.0;
-    hour >= sunrise && hour < sunset
+    let from_noon = (hour - solar_noon(place.longitude, local) + 12.0).rem_euclid(24.0) - 12.0;
+    -half_day <= from_noon && from_noon < half_day
 }
 
 /// Formats a UTC offset in seconds to a human-readable string like
@@ -372,13 +415,94 @@ mod tests {
     }
 
     #[test]
-    fn every_latitude_is_in_range() {
+    fn every_coordinate_is_in_range() {
         assert!(
             all_timezones()
                 .iter()
-                .filter_map(|e| e.latitude)
-                .all(|lat| (-90.0..=90.0).contains(&lat))
+                .filter_map(|e| e.coordinates)
+                .all(|c| (-90.0..=90.0).contains(&c.latitude)
+                    && (-180.0..=180.0).contains(&c.longitude))
         );
+    }
+
+    /// Sun times match the almanac within minutes.
+    ///
+    /// Given: London, Madrid and Tokyo at midsummer 2026, and London in
+    /// October and at midwinter, with their almanac sunrise and sunset
+    /// on the local clock.
+    /// When: the sun times are computed from each city's coordinates.
+    /// Then: each falls within 6 minutes of the almanac.
+    ///
+    /// Why it matters: daylight saving moves the clock an hour from the
+    /// sun, and Madrid sits far west of its zone's meridian. A window
+    /// centred on 12:00 put London's sunrise at 03:47 against a real
+    /// 04:43, a whole cell out of place in the day strip. In October
+    /// solar noon also runs about 14 minutes early.
+    #[test]
+    fn sun_times_match_the_almanac_within_minutes() {
+        // Given:
+        let cases = [
+            (Tz::Europe__London, 51.51, -0.13, (6, 21), (4, 43), (21, 21)),
+            (
+                Tz::Europe__London,
+                51.51,
+                -0.13,
+                (10, 12),
+                (7, 22),
+                (18, 12),
+            ),
+            (Tz::Europe__London, 51.51, -0.13, (12, 21), (8, 4), (15, 54)),
+            (Tz::Europe__Madrid, 40.42, -3.70, (6, 21), (6, 44), (21, 48)),
+            (Tz::Asia__Tokyo, 35.69, 139.69, (6, 21), (4, 25), (19, 0)),
+        ];
+        for (tz, latitude, longitude, (month, day), rise, set) in cases {
+            let date = tz.with_ymd_and_hms(2026, month, day, 12, 0, 0).unwrap();
+            let place = Coordinates {
+                latitude,
+                longitude,
+            };
+
+            // When:
+            let (sunrise, sunset) = sun_times(place, &date);
+
+            // Then:
+            let hours = |(h, m): (u32, u32)| f64::from(h) + f64::from(m) / 60.0;
+            assert!(
+                approx(sunrise, hours(rise), 0.1) && approx(sunset, hours(set), 0.1),
+                "{tz} {month}-{day}: got rise {sunrise:.2}, set {sunset:.2}, almanac {rise:?} {set:?}"
+            );
+        }
+    }
+
+    /// A place whose solar noon wraps past midnight is still day at
+    /// midday.
+    ///
+    /// Given: Tabwakea Village on Kiritimati, at 157°W but on UTC+14.
+    /// When: its daylight is checked at local noon and local midnight.
+    /// Then: noon is day and midnight is night.
+    ///
+    /// Why it matters: 12 + 157.49 / 15 + 14 puts solar noon at 36.5 on
+    /// the local clock, so a window that does not wrap at 24 never
+    /// contains the island's midday.
+    #[test]
+    fn a_solar_noon_past_midnight_still_makes_midday_day() {
+        // Given:
+        let place = Coordinates {
+            latitude: 2.02,
+            longitude: -157.49,
+        };
+        let tz = Tz::Pacific__Kiritimati;
+        let at = |hour| tz.with_ymd_and_hms(2026, 6, 21, hour, 0, 0).unwrap();
+
+        // When:
+        let (noon, midnight) = (
+            is_daytime_at_coordinates(place, &at(12)),
+            is_daytime_at_coordinates(place, &at(0)),
+        );
+
+        // Then:
+        assert!(noon, "local noon reads as night");
+        assert!(!midnight, "local midnight reads as day");
     }
 
     #[test]
@@ -431,14 +555,14 @@ mod tests {
             if !seen.insert(entry.tz) {
                 continue;
             }
-            let Some(latitude) = entry.latitude else {
+            let Some(coordinates) = entry.coordinates else {
                 continue;
             };
             for instant in [midyear, midwinter] {
                 let local = instant.with_timezone(&entry.tz);
                 assert_eq!(
                     is_daytime_at(entry.tz, &local),
-                    is_daytime_at_latitude(latitude, &local),
+                    is_daytime_at_coordinates(coordinates, &local),
                     "{} disagrees at {local}",
                     entry.city
                 );
@@ -454,48 +578,39 @@ mod tests {
         assert_eq!(sunset, 12.0);
     }
 
+    /// Spot-checks for well-known city coordinates. These are deliberately
+    /// tight (±0.05°) so they catch any misalignment between catalogue
+    /// entries and their coordinates, and the cases cover every sign of
+    /// both axes. Casey comes from zone.tab rather than GeoNames.
     #[test]
-    fn major_cities_have_curated_latitudes() {
-        for tz in [
-            Tz::Europe__London,
-            Tz::Asia__Tokyo,
-            Tz::America__New_York,
-            Tz::Australia__Sydney,
-            Tz::Atlantic__Reykjavik,
-        ] {
-            assert!(latitude_for(tz).is_some(), "missing latitude for {tz:?}");
-        }
-    }
-
-    /// Spot-checks for well-known city latitudes. These are deliberately tight
-    /// (±0.05°) so they catch any misalignment between catalogue entries and
-    /// their latitude data. If you add a new city, please add a row here.
-    #[test]
-    fn known_city_latitudes_within_tolerance() {
+    fn known_city_coordinates_within_tolerance() {
         use chrono_tz::Tz;
-        let cases: &[(Tz, f64, &str)] = &[
-            (Tz::Europe__London, 51.51, "London"),
-            (Tz::Asia__Tokyo, 35.69, "Tokyo"),
-            (Tz::America__New_York, 40.71, "New York"),
-            (Tz::Australia__Sydney, -33.87, "Sydney"),
-            (Tz::Atlantic__Reykjavik, 64.13, "Reykjavík"),
-            (Tz::America__Argentina__Buenos_Aires, -34.60, "Buenos Aires"),
-            (Tz::Asia__Singapore, 1.29, "Singapore"),
-            (Tz::Africa__Cairo, 30.04, "Cairo"),
-            (Tz::Pacific__Auckland, -36.85, "Auckland"),
-            (Tz::America__Los_Angeles, 34.05, "Los Angeles"),
-            (Tz::America__Resolute, 74.70, "Resolute"),
-            (Tz::Antarctica__Casey, -66.28, "Casey"),
+        let cases: &[(Tz, f64, f64, &str)] = &[
+            (Tz::Europe__London, 51.51, -0.13, "London"),
+            (Tz::Asia__Tokyo, 35.69, 139.69, "Tokyo"),
+            (Tz::America__New_York, 40.71, -74.01, "New York"),
+            (Tz::Australia__Sydney, -33.87, 151.21, "Sydney"),
+            (Tz::Atlantic__Reykjavik, 64.13, -21.90, "Reykjavík"),
+            (
+                Tz::America__Argentina__Buenos_Aires,
+                -34.60,
+                -58.38,
+                "Buenos Aires",
+            ),
+            (Tz::Asia__Singapore, 1.29, 103.85, "Singapore"),
+            (Tz::Africa__Cairo, 30.04, 31.25, "Cairo"),
+            (Tz::Pacific__Auckland, -36.85, 174.76, "Auckland"),
+            (Tz::America__Los_Angeles, 34.05, -118.24, "Los Angeles"),
+            (Tz::America__Resolute, 74.70, -94.83, "Resolute"),
+            (Tz::Antarctica__Casey, -66.28, 110.52, "Casey"),
         ];
-        for (tz, expected, name) in cases {
+        for &(tz, latitude, longitude, name) in cases {
             let actual =
-                latitude_for(*tz).unwrap_or_else(|| panic!("no latitude for {} ({:?})", name, tz));
+                coordinates_for(tz).unwrap_or_else(|| panic!("no coordinates for {name} ({tz:?})"));
             assert!(
-                (actual - expected).abs() < 0.05,
-                "{} latitude mismatch: expected ~{}, got {}",
-                name,
-                expected,
-                actual
+                (actual.latitude - latitude).abs() < 0.05
+                    && (actual.longitude - longitude).abs() < 0.05,
+                "{name}: expected ~({latitude}, {longitude}), got {actual:?}"
             );
         }
     }
