@@ -3,15 +3,16 @@
 
 Output doc/demo.gif
 
-# The recording must not read or write the real user config.
-Env XDG_CONFIG_HOME "/tmp/lazytimezone-demo-config"
-
 Set FontSize 14
 Set Width 1400
 Set Height 800
 Set Theme "Rose Pine"
 Set Framerate 30
 Set TypingSpeed 50ms
+
+# The recording must not read or write the real user config. Env comes
+# after every Set, because vhs ignores a Set that follows any command.
+Env XDG_CONFIG_HOME "/tmp/lazytimezone-demo-config"
 
 Type "./target/release/lazytimezone"
 Enter
