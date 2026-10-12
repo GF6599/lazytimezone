@@ -1922,6 +1922,120 @@ mod tests {
         }
     }
 
+    /// The rows of a frame that hold the sky: any row with a Braille
+    /// glyph, since in the panel view nothing else draws in Braille.
+    fn sky_rows(buffer: &ratatui::buffer::Buffer) -> Vec<String> {
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
+                    .collect::<String>()
+            })
+            .filter(|row| row.chars().any(|c| ('\u{2801}'..='\u{28ff}').contains(&c)))
+            .collect()
+    }
+
+    /// A night sky fills the band between the clock and the panels.
+    ///
+    /// Given: Tokyo on the main clock at noon UTC on 21 June, which is
+    /// 21:00 in Tokyo, on a terminal that leaves a band above the panels.
+    /// When: the panel view is drawn.
+    /// Then: the band has stars and no cloud.
+    ///
+    /// Why it matters: the sky follows the main clock's daylight, so a
+    /// cloud at night would contradict the clock above it.
+    #[test]
+    fn a_night_sky_fills_the_band_above_the_panels() {
+        // Given:
+        let mut app = wall_app(&["tokyo"]);
+
+        // When:
+        let rows = sky_rows(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
+
+        // Then:
+        assert!(!rows.is_empty(), "no sky");
+        assert!(
+            rows.iter().all(|row| !row.contains('\u{28e4}')),
+            "a cloud at night:\n{}",
+            rows.join("\n")
+        );
+    }
+
+    /// Clouds drift one cell to the right every four seconds.
+    ///
+    /// Given: London on the main clock at noon UTC on 21 June, 13:00
+    /// in London.
+    /// When: the panel view is drawn, then drawn again four seconds
+    /// later.
+    /// Then: the band has clouds, and the later band is the earlier one
+    /// moved one cell right, wrapping at the edge.
+    ///
+    /// Why it matters: the drift is the sky's only motion by day, and
+    /// it must be the same clouds moving, not new ones each frame.
+    #[test]
+    fn day_clouds_drift_one_cell_every_four_seconds() {
+        // Given:
+        let mut app = wall_app(&["london"]);
+        let noon = midsummer_noon_utc();
+
+        // When:
+        let before = sky_rows(&render_buffer_at(&mut app, 100, 48, noon));
+        let after = sky_rows(&render_buffer_at(
+            &mut app,
+            100,
+            48,
+            noon + TimeDelta::seconds(4),
+        ));
+
+        // Then:
+        assert!(
+            before.iter().any(|row| row.contains('\u{28e4}')),
+            "no cloud by day:\n{}",
+            before.join("\n")
+        );
+        assert_eq!(before.len(), after.len());
+        for (earlier, later) in before.iter().zip(&after) {
+            // Column 0 is the wall's margin, outside the sky.
+            let sky: Vec<char> = earlier.chars().skip(1).collect();
+            let mut moved = sky.clone();
+            moved.rotate_right(1);
+            let later: Vec<char> = later.chars().skip(1).collect();
+            assert_eq!(later, moved, "not a one-cell drift");
+        }
+    }
+
+    /// Stars twinkle on a two-second beat.
+    ///
+    /// Given: Tokyo on the main clock at night.
+    /// When: the panel view is drawn at one second, the next, and the
+    /// one after.
+    /// Then: the sky changes after one second and returns after two.
+    ///
+    /// Why it matters: the sky moves only on the one-second tick the
+    /// app already has, so it costs no extra frames, and a star that
+    /// returned at random would read as noise.
+    #[test]
+    fn stars_twinkle_on_a_two_second_beat() {
+        // Given:
+        let mut app = wall_app(&["tokyo"]);
+        let night = midsummer_noon_utc();
+
+        // When:
+        let mut at = |seconds| {
+            sky_rows(&render_buffer_at(
+                &mut app,
+                100,
+                48,
+                night + TimeDelta::seconds(seconds),
+            ))
+        };
+        let (first, second, third) = (at(0), at(1), at(2));
+
+        // Then:
+        assert_ne!(first, second, "no twinkle after one second");
+        assert_eq!(first, third, "the sky did not return after two seconds");
+    }
+
     #[test]
     fn a_tall_panel_shows_the_zone_and_the_sun_window() {
         let mut app = wall_app(&["tokyo"]);
