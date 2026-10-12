@@ -302,12 +302,17 @@ pub(crate) fn sun_window(latitude_deg: f64, day_of_year: u32) -> (f64, f64) {
     let declination =
         (-23.44_f64).to_radians() * (2.0 * PI / 365.0 * (day_of_year as f64 + 10.0)).cos();
 
-    // Hour angle of sunrise/sunset, clamped for polar day/night.
-    // The `.clamp(-1.0, 1.0)` is load-bearing, not defensive: above the
-    // Arctic / below the Antarctic circle the argument to `acos` exceeds
-    // [-1, 1] and clamping is what produces the polar day (-> 0) or
-    // polar night (-> π) hour angle.
-    let cos_omega = (-lat.tan() * declination.tan()).clamp(-1.0, 1.0);
+    // Hour angle of sunrise/sunset, with the sun's centre 0.833° below
+    // the horizon: refraction lifts its image by about 0.567°, and its
+    // upper edge sits 0.266° above its centre. Clamped for polar
+    // day/night. The `.clamp(-1.0, 1.0)` is load-bearing, not
+    // defensive: above the Arctic / below the Antarctic circle the
+    // argument to `acos` exceeds [-1, 1] and clamping is what produces
+    // the polar day (-> 0) or polar night (-> π) hour angle.
+    let horizon = (-0.833_f64).to_radians();
+    let cos_omega = ((horizon.sin() - lat.sin() * declination.sin())
+        / (lat.cos() * declination.cos()))
+    .clamp(-1.0, 1.0);
     let omega = cos_omega.acos();
     let half_day_hours = omega * 12.0 / PI;
 
@@ -315,13 +320,20 @@ pub(crate) fn sun_window(latitude_deg: f64, day_of_year: u32) -> (f64, f64) {
 }
 
 /// Solar noon on `local`'s clock, in hours after midnight: 12, plus 4
-/// minutes for each degree west, plus the zone's UTC offset on that
-/// date. It can fall past 24, as on Kiritimati at 36.5. It leaves out
-/// the equation of time, which moves solar noon by up to 16 minutes
-/// through the year.
+/// minutes for each degree west, less the equation of time, plus the
+/// zone's UTC offset on that date. It can fall past 24, as on
+/// Kiritimati at 36.5.
 fn solar_noon(longitude: f64, local: &DateTime<Tz>) -> f64 {
     let offset_hours = f64::from(local.offset().fix().local_minus_utc()) / 3600.0;
-    12.0 - longitude / 15.0 + offset_hours
+    12.0 - longitude / 15.0 - equation_of_time_minutes(local.ordinal()) / 60.0 + offset_hours
+}
+
+/// How far the sun runs ahead of a uniform clock, in minutes, from
+/// about −14 in February to about +16 in November. The usual
+/// three-term approximation, good to within a minute.
+fn equation_of_time_minutes(day_of_year: u32) -> f64 {
+    let b = (360.0 / 365.0 * (f64::from(day_of_year) - 81.0)).to_radians();
+    9.87 * (2.0 * b).sin() - 7.53 * b.cos() - 1.5 * b.sin()
 }
 
 /// Returns `(sunrise, sunset)` at `place` on `local`'s date, in hours
