@@ -33,13 +33,14 @@ use chrono_tz::Tz;
 
 use ratatui::{
     Frame,
+    buffer::Buffer,
     layout::Alignment,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Position, Rect},
     style::{Color, Modifier, Style},
     symbols::Marker,
     text::{Line, Span},
     widgets::canvas::{Canvas, Map, MapResolution, Points},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 use std::borrow::Cow;
 
@@ -664,8 +665,9 @@ const MAP_COLUMNS_PER_ROW: u16 = 5;
 const MAP_SOUTH: f64 = -58.0;
 const MAP_NORTH: f64 = 84.0;
 
-/// Renders the world map view: the coastline, a dot for each favourite
-/// with a place, the selected one in the marker colour, and a legend
+/// Renders the world map view: the night side, the coastline in the day
+/// or the night colour, a dot for each favourite with a place, the
+/// selected one in the marker colour, and a legend
 /// of every favourite's local time under it.
 ///
 /// The legend is the strip `h` and `l` walk, so the wall reports one
@@ -717,7 +719,7 @@ fn draw_map(
     // neighbour in the same cell.
     dots.sort_by_key(|&(_, _, selected)| selected);
     let night = night_stipple(utc_now, map_width, map_rows);
-    let map = Canvas::default()
+    let night_side = Canvas::default()
         .marker(Marker::Braille)
         .x_bounds([-180.0, 180.0])
         .y_bounds([MAP_SOUTH, MAP_NORTH])
@@ -727,18 +729,12 @@ fn draw_map(
                 coords: &night,
                 color: tc.border,
             });
-            // A later layer replaces a cell an earlier one drew, so the
-            // coastline stays whole where it crosses the night side.
-            ctx.layer();
-            ctx.draw(&Map {
-                resolution: MapResolution::High,
-                color: tc.muted,
-            });
         });
-    frame.render_widget(map, map_area);
+    frame.render_widget(night_side, map_area);
+    draw_land(frame.buffer_mut(), map_area, utc_now, tc);
     if !map_area.is_empty() {
         for &(longitude, latitude, selected) in &dots {
-            let colour = if selected { tc.star } else { tc.accent };
+            let colour = if selected { tc.star } else { tc.fg };
             if let Some(cell) = frame
                 .buffer_mut()
                 .cell_mut(map_dot_cell(map_area, longitude, latitude))
@@ -753,6 +749,47 @@ fn draw_map(
             .style(Style::default().bg(tc.bg)),
         legend_area,
     );
+}
+
+/// A canvas paints a shape in one colour, so the land is painted apart
+/// and each cell then takes the day or the night colour.
+fn draw_land(buffer: &mut Buffer, map_area: Rect, utc_now: &DateTime<Utc>, tc: &ThemeColors) {
+    let mut land = Buffer::empty(map_area);
+    Canvas::default()
+        .marker(Marker::Braille)
+        .x_bounds([-180.0, 180.0])
+        .y_bounds([MAP_SOUTH, MAP_NORTH])
+        .paint(|ctx| {
+            ctx.draw(&Map {
+                resolution: MapResolution::High,
+                color: tc.good,
+            });
+        })
+        .render(map_area, &mut land);
+    let utc = utc_now.with_timezone(&Tz::UTC);
+    for pos in map_area.positions() {
+        let symbol = land[pos].symbol();
+        if symbol == " " {
+            continue;
+        }
+        let colour = if is_daytime_at_coordinates(map_cell_place(map_area, pos), &utc) {
+            tc.good
+        } else {
+            tc.accent_secondary
+        };
+        if let Some(cell) = buffer.cell_mut(pos) {
+            cell.set_symbol(symbol).set_fg(colour);
+        }
+    }
+}
+
+fn map_cell_place(map_area: Rect, pos: Position) -> Coordinates {
+    let across = f64::from(pos.x - map_area.x) + 0.5;
+    let down = f64::from(pos.y - map_area.y) + 0.5;
+    Coordinates {
+        latitude: MAP_NORTH - down * (MAP_NORTH - MAP_SOUTH) / f64::from(map_area.height),
+        longitude: -180.0 + across * 360.0 / f64::from(map_area.width),
+    }
 }
 
 /// The cell of `map_area` that holds the Braille dot the canvas paints
