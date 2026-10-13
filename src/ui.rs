@@ -433,7 +433,7 @@ fn draw_wall(
     let panel_height = (area.height / grid_rows as u16).clamp(PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT);
     let visible_rows = (area.height / panel_height).max(1) as usize;
     let top_pad = if grid_rows <= visible_rows {
-        (area.height - grid_rows as u16 * panel_height) / 2
+        area.height.saturating_sub(grid_rows as u16 * panel_height) / 2
     } else {
         0
     };
