@@ -656,10 +656,17 @@ mod tests {
         }
     }
 
+    /// The loader skips a row it cannot read, so a short row or a bad
+    /// display flag would drop a phrase from search with no error.
     #[test]
-    fn every_zone_name_targets_a_catalogue_zone() {
+    fn every_zone_name_row_reads_and_targets_a_catalogue_zone() {
         for line in data_rows(ZONE_NAMES_TSV) {
-            let zone = line.split('\t').next().unwrap_or("");
+            let mut cols = line.split('\t');
+            let (Some(zone), Some(_), Some("0" | "1"), None) =
+                (cols.next(), cols.next(), cols.next(), cols.next())
+            else {
+                panic!("zone_names.tsv needs three columns and a 0 or 1 flag: {line:?}");
+            };
             let tz: Tz = zone
                 .parse()
                 .unwrap_or_else(|_| panic!("zone_names.tsv has a bad zone {zone:?}"));
