@@ -34,9 +34,9 @@
 //!    whole-query phrase match.
 //!
 //! The sum then gains a log-scale population bonus
-//! ([`population_score`]), which is what ranks New York City above
-//! York for "york"-shaped queries, and a small
-//! [`FAVORITE_TIEBREAKER_BONUS`] so equal scores favour favourites.
+//! ([`population_score`]), so the bigger city comes first among matches
+//! of similar strength, and a small [`FAVORITE_TIEBREAKER_BONUS`] so
+//! equal scores favour favourites.
 //! Ties break by population, then name.
 
 use std::collections::HashMap;
@@ -141,9 +141,7 @@ impl SearchIndex {
                         return None;
                     }
                     // Halved so a single strong per-term hit cannot
-                    // outrank a whole-query phrase match: "york" alone
-                    // in "america/new_york" must not lift York past
-                    // New York City.
+                    // outrank a whole-query phrase match.
                     score += term_score / 2;
                 }
                 score += self.entries[i].pop_score;
@@ -254,9 +252,9 @@ impl TimezoneSearchData {
     }
 }
 
-/// Log-scale population bonus, so a metropolis with a prefix match
-/// can outrank a town with an exact one: typing "york" without "new"
-/// still means New York City to most people. 15k people score 18,
+/// Log-scale population bonus, so the bigger city comes first among
+/// matches of similar strength. It does not outweigh an exact city
+/// name: `york` ranks York above New York City. 15k people score 18,
 /// one million 54, and the scale caps at 84.
 fn population_score(population: u64) -> u32 {
     (6 * population.max(1).ilog2().saturating_sub(10)).min(84)
