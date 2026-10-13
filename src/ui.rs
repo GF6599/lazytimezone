@@ -290,7 +290,10 @@ fn hero_variant(area: Rect) -> (HeroVariant, u16) {
 }
 
 fn clock_colour(app: &App, utc_now: &DateTime<Utc>, tc: &ThemeColors) -> Color {
-    if is_daytime_at(app.selection.tz, &utc_now.with_timezone(&app.selection.tz)) {
+    if is_daytime_at(
+        app.main_clock_place(),
+        &utc_now.with_timezone(&app.selection.tz),
+    ) {
         tc.accent
     } else {
         tc.accent_secondary
@@ -301,13 +304,10 @@ fn clock_colour(app: &App, utc_now: &DateTime<Utc>, tc: &ThemeColors) -> Color {
 ///
 /// ## Day/night colouring
 ///
-/// Daytime uses `accent` (bright), nighttime uses `accent_secondary`
-/// (dim). The day/night decision delegates to
-/// [`is_daytime_at`](crate::timezone::is_daytime_at), which computes
-/// sunrise/sunset from the city's catalogue latitude — so
-/// high-latitude cities like Reykjavík correctly stay "night"
-/// through a winter noon-twilight, and "day" through a polar summer
-/// night.
+/// [`clock_colour`] takes `accent` by day and `accent_secondary` by
+/// night, from the sun at the main clock's own city. So a city such as
+/// Reykjavík stays night through a winter noon twilight, and day
+/// through a polar summer night.
 fn draw_hero_clock(
     frame: &mut Frame,
     app: &App,
@@ -480,7 +480,10 @@ fn draw_wall(
 /// the subtle colour, with a twinkling star at its peak in the text
 /// colour.
 fn draw_sky(frame: &mut Frame, app: &App, utc_now: &DateTime<Utc>, band: Rect, tc: &ThemeColors) {
-    let is_day = is_daytime_at(app.selection.tz, &utc_now.with_timezone(&app.selection.tz));
+    let is_day = is_daytime_at(
+        app.main_clock_place(),
+        &utc_now.with_timezone(&app.selection.tz),
+    );
     let rows = sky::render(band.width, band.height, utc_now.timestamp(), is_day);
     let lines: Vec<Line> = rows
         .into_iter()
@@ -2170,6 +2173,49 @@ mod tests {
             "a cloud at night:\n{}",
             rows.join("\n")
         );
+    }
+
+    /// The main clock takes its daylight from its own city, not from the
+    /// largest city of its zone.
+    ///
+    /// Given: Lhasa on the main clock at noon UTC on 21 June, 20:00 on
+    /// the Asia/Shanghai clock. The sun has set in Shanghai, far to the
+    /// east, and not yet in Lhasa.
+    /// When: the panel view is drawn, then the map.
+    /// Then: the sky has clouds, and the main clock's ring on the map
+    /// is in the day colour.
+    ///
+    /// Why it matters: a panel for Lhasa shows day, so a night sky and a
+    /// night clock above it would contradict the wall.
+    #[test]
+    fn the_main_clock_takes_daylight_from_its_own_city() {
+        // Given:
+        let mut app = favorites_app(&[("London", "England", "GB")]);
+        app.enter_search();
+        for c in "lhasa".chars() {
+            app.search_input(c);
+        }
+        app.select_timezone();
+        app.exit_search();
+        assert_eq!(app.selection.city_name, "Lhasa");
+        let tc = app.theme.colors();
+
+        // When:
+        let sky = sky_rows(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
+        app.toggle_map();
+        let map = render_buffer_at(&mut app, 100, 40, midsummer_noon_utc());
+
+        // Then:
+        assert!(
+            sky.iter().any(|row| row.contains('\u{28e4}')),
+            "no cloud by day:\n{}",
+            sky.join("\n")
+        );
+        let ring_colours: Vec<Color> = map_marks(&map, MAIN_CLOCK_RING)
+            .into_iter()
+            .map(|(.., colour)| colour)
+            .collect();
+        assert_eq!(ring_colours, vec![tc.accent]);
     }
 
     /// Clouds drift one cell to the right every four seconds.

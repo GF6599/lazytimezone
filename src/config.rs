@@ -141,7 +141,8 @@ pub fn try_load(path: &Path) -> io::Result<(Config, Vec<LoadWarning>)> {
 /// Atomically persist `config` to `path`.
 ///
 /// Writes to a sibling `<name>.tmp` file, flushes it, then `fs::rename`s
-/// it into place. On POSIX `rename` is atomic; on Windows it's atomic
+/// it into place. When `path` is a symlink, the sibling and the rename
+/// are at the file it names, so the link stays. On POSIX `rename` is atomic; on Windows it's atomic
 /// for the same-volume case that applies here. A crash mid-write leaves
 /// the previous good file intact rather than a zero-byte stub.
 ///
@@ -151,6 +152,7 @@ pub fn try_load(path: &Path) -> io::Result<(Config, Vec<LoadWarning>)> {
 /// If anything fails after the temp file is created, we try to remove
 /// it so successive runs don't accumulate stale `*.tmp` siblings.
 pub fn try_save(path: &Path, config: &Config) -> io::Result<()> {
+    let path = &save_target(path);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -186,6 +188,22 @@ pub fn try_save(path: &Path, config: &Config) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+/// The file a save replaces: `path`, or the file its symlink names, so
+/// the rename lands on the target and the link stays a link.
+fn save_target(path: &Path) -> PathBuf {
+    if let Ok(real) = fs::canonicalize(path) {
+        return real;
+    }
+    // A link to a file that does not exist yet has no canonical form.
+    match fs::read_link(path) {
+        Ok(target) => match path.parent() {
+            Some(dir) => dir.join(target),
+            None => target,
+        },
+        Err(_) => path.to_path_buf(),
+    }
 }
 
 fn write_and_sync(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -292,6 +310,49 @@ mod tests {
         assert!(warnings.is_empty());
         assert_eq!(fs::read_to_string(&theme).unwrap(), "Nord\n");
         assert_eq!(fs::read_to_string(&favorites).unwrap(), "Asia/Tokyo\n");
+    }
+
+    /// A save through a symlink writes the file the link names and
+    /// keeps the link.
+    ///
+    /// Given: the config path is a symlink to a file in another folder,
+    /// and a second path is a symlink to a file that does not exist yet.
+    /// When: a config is saved to each path.
+    /// Then: both paths are still symlinks, and each target holds the
+    /// saved config.
+    ///
+    /// Why it matters: dotfile managers such as stow link the config
+    /// into place, and a save that replaces the link splits it from the
+    /// file the user keeps.
+    #[cfg(unix)]
+    #[test]
+    fn a_save_through_a_symlink_keeps_the_link() {
+        // Given:
+        let tmp = TempConfig::new();
+        let dotfiles = tmp.root.join("dotfiles");
+        fs::create_dir_all(&dotfiles).unwrap();
+        let existing = dotfiles.join("config.toml");
+        fs::write(&existing, "theme = \"Nord\"\n").unwrap();
+        std::os::unix::fs::symlink(&existing, tmp.config_path()).unwrap();
+        let dangling = tmp.app_dir().join("second.toml");
+        std::os::unix::fs::symlink("../dotfiles/second.toml", &dangling).unwrap();
+        let cfg = Config {
+            theme: "Gruvbox".to_string(),
+            ..Config::default()
+        };
+
+        for (link, target) in [
+            (tmp.config_path(), existing),
+            (dangling, dotfiles.join("second.toml")),
+        ] {
+            // When:
+            try_save(&link, &cfg).unwrap();
+
+            // Then:
+            let kind = fs::symlink_metadata(&link).unwrap().file_type();
+            assert!(kind.is_symlink(), "{} is no longer a link", link.display());
+            assert_eq!(try_load(&target).unwrap().0.theme, "Gruvbox");
+        }
     }
 
     #[test]

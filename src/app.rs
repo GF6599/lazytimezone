@@ -27,7 +27,12 @@ use crate::clipboard;
 use crate::config;
 use crate::search::SearchIndex;
 use crate::theme::Theme;
-use crate::timezone::{self, TimezoneEntry};
+use crate::timezone::{self, Coordinates, TimezoneEntry};
+
+/// Status message prefixes. A newer message of one kind replaces the
+/// older one, so the bar shows the latest state.
+const SAVE_FAILED: &str = "Config save failed:";
+const SAVE_REFUSED: &str = "Not saved:";
 
 /// Immutable, derived-index-bearing timezone catalogue.
 ///
@@ -638,6 +643,13 @@ impl App {
             .min(self.favorites.len().saturating_sub(1));
     }
 
+    /// Where the main clock's city is, for its daylight. The startup UTC
+    /// clock has no city.
+    pub(crate) fn main_clock_place(&self) -> Option<Coordinates> {
+        let idx = self.selection.catalogue_index?;
+        self.catalogue.get(idx)?.coordinates
+    }
+
     /// Removes the selected panel from the favorites.
     pub(crate) fn unfavorite_selected_panel(&mut self) {
         if let Some(idx) = self.favorites.at(self.selected_panel) {
@@ -996,11 +1008,13 @@ impl App {
     }
 
     fn save_config(&mut self) {
-        // Refuse to save while the on-disk config is known to be broken
-        // — overwriting it would destroy the user's only copy of the
-        // file they need to fix. They'll see the parse error in the
-        // status bar at startup and can correct it manually.
+        // Saving now would overwrite the file the user must fix, and the
+        // startup notice about it is gone after the first key.
         if self.config_load_failed {
+            self.show_status(
+                SAVE_REFUSED,
+                format!("{SAVE_REFUSED} fix the config file, then restart"),
+            );
             return;
         }
         let Some(path) = &self.config_path else {
@@ -1010,23 +1024,19 @@ impl App {
             theme: self.theme.label().to_string(),
             favorites: self.favorites.to_config(self.catalogue.entries()),
         };
-        // Route through `try_save` (not `save`) so we can surface the
-        // failure to the user. The original `config::save` eprintln!s on
-        // error — invisible inside the alternate screen — so we forward
-        // the message through `startup_messages` to the status bar
-        // instead. Don't block subsequent saves; only the most recent
-        // failure is retained.
+        // The alternate screen hides stderr, so the status bar is the
+        // only place a failure can show.
         if let Err(e) = config::try_save(path, &cfg) {
-            let msg = format!("Config save failed: {e}");
-            // Replace any prior save-error so the status bar shows the
-            // most recent failure rather than stale text.
-            self.startup_messages
-                .retain(|m| !m.starts_with("Config save failed:"));
-            self.startup_messages.push(msg);
-            // Reset the timer so the new save error is visible for the
-            // full 10-second window, even if startup was minutes ago.
-            self.started_at = Instant::now();
+            self.show_status(SAVE_FAILED, format!("{SAVE_FAILED} {e}"));
         }
+    }
+
+    /// Shows `message` for the full status window, in place of an
+    /// earlier message of the same `kind`.
+    fn show_status(&mut self, kind: &str, message: String) {
+        self.startup_messages.retain(|m| !m.starts_with(kind));
+        self.startup_messages.push(message);
+        self.started_at = Instant::now();
     }
 
     /// Copies the selected timezone's current time to the system
@@ -1222,6 +1232,34 @@ mod tests {
         assert_eq!(first_city(&app), "Shanghai");
         let mut seen = std::collections::HashSet::new();
         assert!((0..len).all(|n| seen.insert(nth_tz(&app, n))));
+    }
+
+    /// A change made while the config file has an error says that it
+    /// was not saved.
+    ///
+    /// Given: a config file with a syntax error, and the startup notice
+    /// dismissed by a key.
+    /// When: the theme changes.
+    /// Then: the status bar shows a message, and the file is unchanged.
+    ///
+    /// Why it matters: the startup notice is gone after the first key,
+    /// so without a message a whole session of changes is lost in
+    /// silence.
+    #[test]
+    fn a_change_while_the_config_is_broken_says_it_was_not_saved() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let broken = "theme = \"Nord\"\nfavorites = [ oops";
+        fs::write(tmp.path(), broken).unwrap();
+        let mut app = App::new(Some(tmp.path()));
+        app.dismiss_startup_messages();
+
+        // When:
+        app.cycle_theme();
+
+        // Then:
+        assert!(!app.startup_messages.is_empty());
+        assert_eq!(fs::read_to_string(tmp.path()).unwrap(), broken);
     }
 
     /// A query with no letters or digits shows the browse list.
