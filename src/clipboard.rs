@@ -175,4 +175,53 @@ mod tests {
             "got: {err}"
         );
     }
+
+    /// A tool that fails hands the copy to the next one.
+    ///
+    /// Given: a tool that exits with an error, then one that works.
+    /// When: the text is copied.
+    /// Then: the copy succeeds.
+    ///
+    /// Why it matters: on Linux `wl-copy` fails outside Wayland, and
+    /// `xclip` must still get the copy.
+    #[test]
+    fn a_failed_tool_hands_the_copy_to_the_next() {
+        let result = copy_with(&[("false", &[]), ("cat", &[])], "text");
+
+        assert_eq!(result, Ok(()));
+    }
+
+    /// When every tool fails, the message names each of them.
+    ///
+    /// Given: a tool that is not installed, then one that exits with an
+    /// error.
+    /// When: the text is copied.
+    /// Then: the message names both tools.
+    ///
+    /// Why it matters: the user fixes the clipboard by installing a
+    /// tool, so the message must say which one is missing.
+    #[test]
+    fn when_every_tool_fails_the_message_names_each_of_them() {
+        let missing = "lazytimezone-no-such-binary";
+
+        let err = copy_with(&[(missing, &[]), ("false", &[])], "text").unwrap_err();
+
+        assert!(err.contains(missing) && err.contains("false"), "got: {err}");
+    }
+
+    /// A failure message says each fact once.
+    ///
+    /// Given: a tool that exits with an error.
+    /// When: the text is copied.
+    /// Then: the message names the tool once and the exit status once.
+    ///
+    /// Why it matters: the status bar is one line, and a repeated word
+    /// pushes the useful part past its edge.
+    #[test]
+    fn a_failure_message_says_each_fact_once() {
+        let err = copy_with(&[("false", &[])], "text").unwrap_err();
+
+        assert_eq!(err.matches("false").count(), 1, "got: {err}");
+        assert_eq!(err.matches("exit status").count(), 1, "got: {err}");
+    }
 }
