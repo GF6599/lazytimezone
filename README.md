@@ -113,7 +113,8 @@ The app writes the theme and the favorites to `~/.config/lazytimezone/config.tom
 
 ```sh
 just          # list every recipe
-just check    # the quality gate: clippy, then the tests, then a format check
+just tools    # install cargo-deny once, at the version CI uses
+just check    # the quality gate: clippy, the tests, cargo deny, then a format check
 ```
 
 `just check` is what CI runs, so run it before you push. To run the same checks on every commit, install the hooks once with `pre-commit install`.

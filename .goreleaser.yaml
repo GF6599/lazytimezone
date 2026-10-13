@@ -3,7 +3,7 @@ version: 2
 before:
   hooks:
     - rustup default stable
-    - cargo install --locked cargo-zigbuild
+    - cargo install --locked cargo-zigbuild@0.23.4
 
 builds:
   - builder: rust
@@ -12,6 +12,7 @@ builds:
     # city catalogue and has no place in a release archive.
     flags:
       - --release
+      - --locked
       - --bin=lazytimezone
     targets:
       - x86_64-apple-darwin
