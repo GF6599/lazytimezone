@@ -879,29 +879,29 @@ impl App {
     /// `GMT-08:00`, and `+0530`. Exact and prefix matches rank above
     /// plain substrings.
     pub(crate) fn apply_filter(&mut self) {
-        let base_indices: Vec<usize> = (0..self.catalogue.len()).collect();
-
-        if self.search_query.is_empty() {
-            let browse = self.browse_indices();
-            self.set_sorted_results(browse);
+        let scored = if self.search_query.is_empty() {
+            None
         } else {
-            let now = Utc::now();
-            match self.catalogue.search_index().search(
+            let base_indices: Vec<usize> = (0..self.catalogue.len()).collect();
+            self.catalogue.search_index().search(
                 &self.search_query,
                 self.catalogue.entries(),
                 &base_indices,
-                &now,
+                &Utc::now(),
                 self.favorites.position_map(),
-            ) {
-                // The query normalized to no usable terms (e.g. pure
-                // punctuation) — fall back to the unfiltered, sorted
-                // view as if the box were empty.
-                None => self.set_sorted_results(base_indices),
-                Some(scored) => self.filtered_view.set_from_scored(
-                    scored
-                        .into_iter()
-                        .map(|(idx, display_name, _)| (idx, display_name)),
-                ),
+            )
+        };
+        match scored {
+            Some(scored) => self.filtered_view.set_from_scored(
+                scored
+                    .into_iter()
+                    .map(|(idx, display_name, _)| (idx, display_name)),
+            ),
+            // An empty query, or one that normalises to no terms such as a
+            // space, browses.
+            None => {
+                let browse = self.browse_indices();
+                self.set_sorted_results(browse);
             }
         }
         self.clamp_selected_row();
