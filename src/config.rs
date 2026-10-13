@@ -97,14 +97,10 @@ fn config_dir_from(xdg_config_home: Option<String>, home: Option<String>) -> Opt
         })
 }
 
-fn config_path() -> Option<PathBuf> {
-    config_dir().map(|d| d.join("lazytimezone").join("config.toml"))
-}
-
 /// Canonical on-disk config path, or `None` if neither `$XDG_CONFIG_HOME`
 /// nor `$HOME` is set.
 pub fn default_path() -> Option<PathBuf> {
-    config_path()
+    config_dir().map(|d| d.join("lazytimezone").join("config.toml"))
 }
 
 /// Path-aware loader that distinguishes the three states a caller cares

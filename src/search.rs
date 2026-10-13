@@ -137,10 +137,9 @@ impl SearchIndex {
                     .entry(offset_secs)
                     .or_insert_with(|| offset_search_terms(offset_secs));
                 let mut score =
-                    score_phrase_match(&query, &self.entries[i], offset_terms.as_slice());
+                    score_against_haystack(&query.normalized, &self.entries[i], offset_terms);
                 for term in &query.terms {
-                    let term_score =
-                        score_search_term(term, &self.entries[i], offset_terms.as_slice());
+                    let term_score = score_against_haystack(term, &self.entries[i], offset_terms);
                     if term_score == 0 {
                         return None;
                     }
@@ -320,9 +319,8 @@ impl FieldWeights {
 
 /// Which field of an entry is being scored.
 ///
-/// One table drives the phrase pass, the per-term pass, and nothing
-/// else. The order of the entries doubles as the human-readable
-/// priority order: city outranks aliases outranks state, and so on.
+/// One table, [`FIELD_WEIGHTS`], weights each field for both the
+/// phrase pass and the per-term pass.
 #[derive(Copy, Clone, Debug)]
 enum Field {
     City,
@@ -413,24 +411,9 @@ const FIELD_WEIGHTS: [(Field, FieldWeights); 9] = [
 
 // ── Scoring ─────────────────────────────────────────────────────────
 
-fn score_phrase_match(
-    query: &SearchQuery,
-    search: &TimezoneSearchData,
-    offset_terms: &[String],
-) -> u32 {
-    if query.normalized.is_empty() {
-        return 0;
-    }
-    score_against_haystack(&query.normalized, search, offset_terms, &FIELD_WEIGHTS)
-}
-
-fn score_search_term(term: &str, search: &TimezoneSearchData, offset_terms: &[String]) -> u32 {
-    score_against_haystack(term, search, offset_terms, &FIELD_WEIGHTS)
-}
-
-/// Walks every field in `weights` (in declaration order, which is the
-/// human-readable priority order), scores `query` against that field's
-/// candidate strings, and returns the single best score.
+/// Scores `query` against every field in [`FIELD_WEIGHTS`] and returns
+/// the single best score. The weights rank the fields, so the order of
+/// the table does not matter.
 ///
 /// Multi-candidate fields (aliases, keywords, country_aliases, offset)
 /// expand to "best score across their candidates"; single-string fields
@@ -440,10 +423,9 @@ fn score_against_haystack(
     query: &str,
     search: &TimezoneSearchData,
     offset_terms: &[String],
-    weights: &[(Field, FieldWeights); 9],
 ) -> u32 {
     let mut best = 0;
-    for (field, w) in weights {
+    for (field, w) in &FIELD_WEIGHTS {
         let candidate_best = match field {
             Field::City => score_field(&search.city.normalized, query, *w),
             Field::Aliases => best_score(

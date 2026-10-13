@@ -78,12 +78,6 @@ impl Catalogue {
     }
 }
 
-impl Default for Catalogue {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Ordered list of favourite timezones with O(1) membership lookup.
 ///
 /// Internally stores parsed [`Tz`] values (not strings) so search,
@@ -511,7 +505,7 @@ impl App {
         }
 
         let mut indices = Self::browse_indices_for(&favorites);
-        Self::sort_indices(&mut indices, catalogue.entries(), favorites.position_map());
+        Self::sort_indices(&mut indices, favorites.position_map());
         let mut filtered_view = FilteredView::default();
         filtered_view.set_from_indices(indices, &catalogue);
 
@@ -550,9 +544,7 @@ impl App {
     /// the app — the 10-second auto-timeout in the renderer is the
     /// fallback when the user simply watches the screen.
     pub(crate) fn dismiss_startup_messages(&mut self) {
-        if !self.startup_messages.is_empty() {
-            self.startup_messages.clear();
-        }
+        self.startup_messages.clear();
     }
 
     pub(crate) fn toggle_map(&mut self) {
@@ -965,11 +957,7 @@ impl App {
     }
 
     fn set_sorted_results(&mut self, mut indices: Vec<usize>) {
-        Self::sort_indices(
-            &mut indices,
-            self.catalogue.entries(),
-            self.favorites.position_map(),
-        );
+        Self::sort_indices(&mut indices, self.favorites.position_map());
         self.filtered_view
             .set_from_indices(indices, &self.catalogue);
     }
@@ -988,11 +976,7 @@ impl App {
 
     /// Sorts indices so favourites appear first (in user-defined order),
     /// followed by non-favourites in catalogue (population) order.
-    fn sort_indices(
-        indices: &mut [usize],
-        _timezones: &[TimezoneEntry],
-        favorites_order: &HashMap<usize, usize>,
-    ) {
+    fn sort_indices(indices: &mut [usize], favorites_order: &HashMap<usize, usize>) {
         indices.sort_by(|&a, &b| {
             let a_pos = favorites_order.get(&a);
             let b_pos = favorites_order.get(&b);
