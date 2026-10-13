@@ -151,7 +151,11 @@ mod tests {
             let _ = pipe_to_command("false", &[], &payload);
         }
 
-        assert_eq!(unreaped_children(), before);
+        // A parallel test's child is a zombie for the moment between its
+        // exit and its wait, so an exact count can be off by a few. A leak
+        // here leaves all ten.
+        let after = unreaped_children();
+        assert!(after < before + 5, "{before} before, {after} after");
     }
 
     #[test]
