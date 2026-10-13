@@ -632,13 +632,17 @@ impl App {
         }
     }
 
+    fn clamp_selected_panel(&mut self) {
+        self.selected_panel = self
+            .selected_panel
+            .min(self.favorites.len().saturating_sub(1));
+    }
+
     /// Removes the selected panel from the favorites.
     pub(crate) fn unfavorite_selected_panel(&mut self) {
         if let Some(idx) = self.favorites.at(self.selected_panel) {
             self.favorites.toggle(idx);
-            self.selected_panel = self
-                .selected_panel
-                .min(self.favorites.len().saturating_sub(1));
+            self.clamp_selected_panel();
             self.save_config();
             self.apply_filter();
         }
@@ -911,6 +915,7 @@ impl App {
     pub(crate) fn toggle_favorite(&mut self) {
         if let Some((idx, _)) = self.current_result() {
             self.favorites.toggle(idx);
+            self.clamp_selected_panel();
             self.save_config();
             self.apply_filter();
         }
