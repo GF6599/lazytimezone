@@ -1885,26 +1885,6 @@ mod tests {
     }
 
     #[test]
-    fn clear_search_input_from_normal_mode_resets_filter_without_changing_mode() {
-        // Models the Ctrl-l Normal-mode binding: a user typed a query,
-        // pressed Esc (which leaves the filter in place), then hit Ctrl-l
-        // to drop the filter without re-entering search mode.
-        let mut app = test_app();
-        let baseline_view_len = app.filtered_view.len();
-
-        apply_query(&mut app, "tokyo");
-        assert_ne!(app.filtered_view.len(), baseline_view_len);
-        app.input_mode = InputMode::Normal;
-
-        app.clear_search_input();
-
-        assert_eq!(app.search_query, "");
-        assert_eq!(app.cursor_position, 0);
-        assert_eq!(app.input_mode, InputMode::Normal);
-        assert_eq!(app.filtered_view.len(), baseline_view_len);
-    }
-
-    #[test]
     fn re_entering_search_drops_the_previous_filter() {
         // Esc leaves the filter in place, so `/` has to drop it: the
         // search box the user is looking at is empty.

@@ -366,6 +366,35 @@ mod tests {
         assert_eq!(app.search_query, "T");
     }
 
+    /// Ctrl-u in the picker clears the query and brings back the browse
+    /// list.
+    ///
+    /// Given: the picker with `tokyo` typed.
+    /// When: Ctrl-u is pressed.
+    /// Then: the query is empty, the picker is still open, and the list
+    /// is the one an empty picker shows.
+    ///
+    /// Why it matters: Ctrl-u is the readline key for starting over, and
+    /// a stale filter after it would hide most cities.
+    #[test]
+    fn ctrl_u_in_the_picker_clears_the_query_and_the_filter() {
+        // Given:
+        let browse_rows = searching_app().filtered_view.len();
+        let mut app = searching_app();
+        for c in "tokyo".chars() {
+            dispatch_event(&mut app, key(c));
+        }
+        assert_ne!(app.filtered_view.len(), browse_rows);
+
+        // When:
+        dispatch_event(&mut app, chord('u', KeyModifiers::CONTROL));
+
+        // Then:
+        assert_eq!(app.search_query, "");
+        assert_eq!(app.input_mode, InputMode::Search);
+        assert_eq!(app.filtered_view.len(), browse_rows);
+    }
+
     #[test]
     fn a_paste_arriving_behind_a_keystroke_is_not_discarded() {
         let mut app = searching_app();
