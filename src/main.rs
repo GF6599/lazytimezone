@@ -1,4 +1,4 @@
-//! # lazytimezone — A terminal world-clock browser.
+//! # lazytimezone: a terminal world-clock browser.
 //!
 //! ## Architecture
 //!
@@ -53,7 +53,7 @@ fn main() {
 /// on exit.
 ///
 /// Uses crossterm's alternate screen so the user's scrollback buffer is
-/// preserved — the TUI disappears cleanly when the app quits.
+/// preserved, and the TUI disappears cleanly when the app quits.
 ///
 /// ## Errors
 ///
@@ -105,7 +105,7 @@ fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
 
             if last_tick.elapsed() >= tick_rate {
                 // Advance by exactly one tick_rate instead of snapping to
-                // Instant::now() — this preserves alignment to the real
+                // Instant::now(). This preserves alignment to the real
                 // second boundary even if poll wakeup added latency.
                 last_tick += tick_rate;
                 // Catch-up guard: if we fell more than one tick behind

@@ -391,7 +391,7 @@ fn render_tsv(rows: &[CityRow]) -> String {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the
+    // Tests panic on failure by design. See src/app.rs for the
     // rationale on why the panic lints are relaxed in test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 

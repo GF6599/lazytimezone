@@ -1,7 +1,7 @@
 //! # Keyboard event handling.
 //!
 //! Maps raw crossterm key events to [`App`] method calls. The module is
-//! intentionally thin — all business logic lives in [`App`]; this layer
+//! intentionally thin. All business logic lives in [`App`], and this layer
 //! only decides *which* method to call.
 //!
 //! Key bindings are split by [`InputMode`]:
@@ -47,7 +47,7 @@ const MAX_DRAINED_EVENTS: usize = 256;
 /// poll wakes at the next tick boundary, keeping clock updates tight
 /// (≤ tick) while drawing only once per tick when idle.
 ///
-/// Only `KeyEventKind::Press` is handled — release and repeat events
+/// Only `KeyEventKind::Press` is handled. Release and repeat events
 /// are ignored to prevent duplicate actions on platforms that emit them.
 pub fn handle_events(
     app: &mut App,
@@ -103,7 +103,7 @@ fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
     }
     // Any keypress dismisses the startup-message banner so it never
     // lingers past the user's first interaction. Done up here (not
-    // inside the per-mode handlers) so EVERY key flushes the banner —
+    // inside the per-mode handlers) so EVERY key flushes the banner,
     // including ones that would otherwise be no-ops. The keypress is
     // still allowed to flow through to its normal handler below.
     app.dismiss_startup_messages();
@@ -216,7 +216,7 @@ fn handle_search_mode(app: &mut App, key: crossterm::event::KeyEvent) {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the rationale
+    // Tests panic on failure by design. See src/app.rs for the rationale
     // on why the production panic lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 

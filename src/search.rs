@@ -2,7 +2,7 @@
 //!
 //! Builds a per-entry search index from the static timezone catalogue,
 //! scores user queries against it, and returns ranked results. There is
-//! no I/O, no [`App`] state, and no mutable global — the module exists
+//! no I/O, no [`App`] state, and no mutable global. The module exists
 //! purely so [`crate::app::App::apply_filter`] can be a thin glue
 //! function instead of a 60-line method that rebuilds normalized
 //! haystacks on every keystroke.
@@ -52,8 +52,8 @@ use chrono::offset::Offset;
 
 /// Minimum query length required for a contains-style (substring) match.
 ///
-/// Shorter terms only count if they exactly equal or prefix a candidate
-/// — otherwise a single letter would match almost every entry and the
+/// Shorter terms only count if they exactly equal or prefix a candidate.
+/// Otherwise a single letter would match almost every entry and the
 /// substring pass would dominate the ranking.
 const CONTAINS_MIN_CHARS: usize = 3;
 
@@ -95,7 +95,7 @@ impl SearchIndex {
     /// and city name. Favorites gain [`FAVORITE_TIEBREAKER_BONUS`], so
     /// they win a tie and only a tie.
     ///
-    /// `base_indices` is the candidate set — typically `0..entries.len()`
+    /// `base_indices` is the candidate set: typically `0..entries.len()`
     /// for the unfiltered catalogue, or just the favorites' indices when
     /// the favorites-only filter is active.
     ///
@@ -279,7 +279,7 @@ impl SearchQuery {
 /// Rewrites a lone bare `utc` or `gmt` term to `utc+0`.
 ///
 /// Without this rewrite, typing just `utc` would match every entry whose
-/// haystack contains the literal substring `utc` — which is almost every
+/// haystack contains the literal substring `utc`, which is almost every
 /// entry, because the cached offset aliases include UTC-prefixed forms.
 /// The rewrite only fires when the entire query is a single bare term,
 /// so compound queries like `utc tokyo` keep their literal `utc` term.
@@ -494,7 +494,7 @@ fn best_score<'a>(
 }
 
 /// Scores how well `term` matches `field`, returning the weight that
-/// corresponds to the strongest match kind ([`MatchKind`]) — or zero
+/// corresponds to the strongest match kind ([`MatchKind`]), or zero
 /// when neither exact, prefix, nor contains rules apply.
 fn score_field(field: &str, term: &str, weights: FieldWeights) -> u32 {
     MatchKind::classify(field, term)
@@ -507,7 +507,7 @@ fn score_field(field: &str, term: &str, weights: FieldWeights) -> u32 {
 ///
 /// Separating "what kind of match was it?" from "how much is that
 /// match worth?" means the rules can be unit-tested independently of
-/// the weight tables — and adding a fourth match kind (e.g. fuzzy)
+/// the weight tables, and adding a fourth match kind (e.g. fuzzy)
 /// later doesn't require touching every call site.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum MatchKind {
@@ -570,7 +570,7 @@ fn ends_a_number(term: &str, rest: &str) -> bool {
 /// or matches `term` after stripping a leading offset sign.
 ///
 /// The sign-strip exists so that bare digit queries (`5`) match offset
-/// tokens like `+5` and `-5` inside the cached offset haystacks — the
+/// tokens like `+5` and `-5` inside the cached offset haystacks: the
 /// user expects `gmt 5` to find UTC+5 cities without typing the plus.
 fn word_matches_term(word: &str, term: &str) -> bool {
     if starts_with_term(word, term) {
@@ -707,7 +707,7 @@ fn normalize_search_text(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the
+    // Tests panic on failure by design. See src/app.rs for the
     // rationale on why production lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
@@ -816,7 +816,7 @@ mod tests {
     /// Builds a real `SearchIndex` from the full catalogue. End-to-end
     /// tests need the live catalogue because `TimezoneEntry` has
     /// `&'static str` fields that the supplemental-search-term lookup
-    /// hashes against — hand-rolling synthetic entries would
+    /// hashes against, and hand-rolling synthetic entries would
     /// short-circuit half the index.
     fn fixture() -> (&'static [TimezoneEntry], SearchIndex) {
         let entries = crate::timezone::all_timezones();
@@ -965,7 +965,7 @@ mod tests {
     fn search_and_logic_rejects_entry_missing_any_term() {
         let (entries, index) = fixture();
         let favorites = HashMap::new();
-        // "tokyo paris" cannot match a single entry — Tokyo's haystack
+        // "tokyo paris" cannot match a single entry: Tokyo's haystack
         // has no "paris" and vice versa. AND logic across terms means
         // the result set must be empty.
         let results =
@@ -1070,7 +1070,7 @@ mod tests {
     fn search_returns_none_for_pure_punctuation() {
         let (entries, index) = fixture();
         let favorites = HashMap::new();
-        // Pure punctuation normalizes to an empty term list — the
+        // Pure punctuation normalizes to an empty term list, and the
         // public contract is to return None so the caller can fall
         // back to the unfiltered view.
         assert!(run_search(&index, entries, "...", &favorites).is_none());

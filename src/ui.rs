@@ -241,7 +241,7 @@ fn centered_rect(w: u16, h: u16, area: Rect) -> Rect {
 fn draw_title_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
     // Two-cell horizontal split: left flexes, right is exactly the
     // theme label plus a trailing space. ratatui handles truncation
-    // and padding — no manual width arithmetic required.
+    // and padding, with no manual width arithmetic required.
     let theme_text = format!("{} ", app.theme.label());
     let theme_text_width = theme_text.as_str().width() as u16;
     let chunks = Layout::default()
@@ -1132,7 +1132,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
     }
 
     // Surface startup load warnings / parse errors for the first 10s
-    // after launch (the user can also dismiss them with any keypress —
+    // after launch (the user can also dismiss them with any keypress,
     // see `App::dismiss_startup_messages`). Render them after the copy
     // flash so the most recent feedback wins the rightmost slot.
     if !app.startup_messages.is_empty()
@@ -1159,7 +1159,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
 /// Formats the hour difference between two UTC offsets.
 ///
 /// Returns `"0h"` when offsets are identical but timezones differ
-/// (e.g. London/Lisbon both at UTC+0 in winter — distinct DST rules,
+/// (e.g. London/Lisbon both at UTC+0 in winter: distinct DST rules,
 /// same current offset). The caller is responsible for substituting
 /// `"---"` when the row IS the selected timezone.
 fn format_diff(offset_secs: i32, selected_offset_secs: i32) -> Cow<'static, str> {
@@ -1227,7 +1227,7 @@ fn truncate_display(s: &str, max_cols: usize) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the rationale
+    // Tests panic on failure by design. See src/app.rs for the rationale
     // on why the production panic lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 

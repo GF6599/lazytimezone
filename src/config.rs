@@ -108,7 +108,7 @@ pub fn default_path() -> Option<PathBuf> {
 /// (config + any soft warnings), file present but unreadable / malformed
 /// (error).
 ///
-/// On a parse error the caller must NOT auto-save — that would clobber
+/// On a parse error the caller must NOT auto-save, because that would clobber
 /// the user's broken file before they have a chance to fix it.
 pub fn try_load(path: &Path) -> io::Result<(Config, Vec<LoadWarning>)> {
     if !path.exists() {
@@ -210,7 +210,7 @@ fn write_and_sync(path: &Path, bytes: &[u8]) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the rationale
+    // Tests panic on failure by design. See src/app.rs for the rationale
     // on why the production panic lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
     use super::*;

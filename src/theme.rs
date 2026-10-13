@@ -1,4 +1,4 @@
-//! # Theme system — seven colour palettes.
+//! # Theme system: seven colour palettes.
 //!
 //! Each theme is a flat [`ThemeColors`] struct with semantic colour
 //! slots (`accent`, `good`, `warning`, …) rather than component-
@@ -110,9 +110,9 @@ pub struct ThemeColors {
     pub subtle: Color,
     pub border: Color,
     pub title: Color,
-    /// Primary accent — daytime clock digits, search-active border.
+    /// Primary accent: daytime clock digits, search-active border.
     pub accent: Color,
-    /// Secondary accent — nighttime clock digits.
+    /// Secondary accent: nighttime clock digits.
     pub accent_secondary: Color,
     /// Positive semantic colour (daytime local times, "Copied!" flash).
     pub good: Color,

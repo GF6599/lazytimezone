@@ -254,7 +254,7 @@ impl Favorites {
 /// A single visible row of the picker list.
 ///
 /// `display_name` may differ from the entry's canonical `city` when
-/// the row matched on an alias — e.g. searching `boston` shows
+/// the row matched on an alias. For example, searching `boston` shows
 /// `Boston` instead of `New York`.
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct FilteredRow {
@@ -346,7 +346,7 @@ pub enum InputMode {
 /// would leave the big-clock label disagreeing with the actual
 /// time-zone being displayed).
 ///
-/// `city_name` may differ from the entry's canonical city — when the
+/// `city_name` may differ from the entry's canonical city when the
 /// user picks a row that matched on an alias (e.g. searching "boston"
 /// hits the New York entry), the alias label is what they expect to
 /// see, not "New York".
@@ -388,7 +388,7 @@ pub(crate) struct CopyFlash {
     pub(crate) started_at: Instant,
 }
 
-/// Central application state — owned exclusively by the event loop.
+/// Central application state, owned only by the event loop.
 ///
 /// ## Pattern: Index-Based Filtering
 ///
@@ -446,7 +446,7 @@ pub struct App {
     pub(crate) startup_messages: Vec<String>,
     /// `true` when the on-disk config could not be parsed.
     ///
-    /// While set, [`App::save_config`] is a no-op — saving would
+    /// While set, [`App::save_config`] is a no-op: saving would
     /// overwrite the user's broken file before they can fix it. Cleared
     /// only by a successful reload (currently: process restart).
     pub(crate) config_load_failed: bool,
@@ -529,7 +529,7 @@ impl App {
     ///
     /// Called from [`crate::events::dispatch_key`] on every keypress so
     /// the banner is gone the moment the user starts interacting with
-    /// the app — the 10-second auto-timeout in the renderer is the
+    /// the app. The 10-second auto-timeout in the renderer is the
     /// fallback when the user simply watches the screen.
     pub(crate) fn dismiss_startup_messages(&mut self) {
         self.startup_messages.clear();
@@ -692,7 +692,7 @@ impl App {
     /// Inserts a bulk pasted string at the cursor in one shot.
     ///
     /// Control characters (other than tab, which is converted to a
-    /// single space) are stripped — terminals frequently embed stray
+    /// single space) are stripped: terminals frequently embed stray
     /// `\r` or escape sequences in paste payloads. All other Unicode
     /// scalars are preserved so CJK, accented Latin, and copied IANA
     /// IDs paste verbatim.
@@ -725,7 +725,7 @@ impl App {
     /// Commits the currently highlighted search result, then exits
     /// search mode.
     ///
-    /// Enter in search mode is the "I want this one" path — it both
+    /// Enter in search mode is the "I want this one" path: it both
     /// picks the row and leaves the input box, so the user doesn't have
     /// to press Enter twice. Esc remains the "I changed my mind" path
     /// and only calls [`exit_search`](Self::exit_search).
@@ -750,7 +750,7 @@ impl App {
     /// word (readline `Ctrl-w` semantics).
     ///
     /// Walks past trailing whitespace first, then past the run of
-    /// non-whitespace before it — so `asia +9 ` followed by `Ctrl-w`
+    /// non-whitespace before it, so `asia +9 ` followed by `Ctrl-w`
     /// removes `+9 ` and leaves `asia `, matching the bash convention
     /// users expect.
     pub(crate) fn delete_word_before_cursor(&mut self) {
@@ -1011,7 +1011,7 @@ impl App {
     ///
     /// The format string `%Y%m%dT%H%M%z` produces a date+time stamp
     /// followed by the numeric UTC offset (`+0900`), not a tz
-    /// abbreviation — abbreviations like `CST` are ambiguous between
+    /// abbreviation: abbreviations like `CST` are ambiguous between
     /// Central US and China Standard Time, so we deliberately avoid
     /// `%Z`.
     ///
@@ -1020,7 +1020,7 @@ impl App {
     /// - Windows: `clip`
     /// - Linux: `wl-copy` (Wayland) with `xclip` fallback (X11)
     ///
-    /// Records the outcome in [`Self::copy_flash`] — success when any
+    /// Records the outcome in [`Self::copy_flash`]: success when any
     /// candidate succeeds, failure (carrying the last underlying error
     /// message) when every candidate failed. The platform with no
     /// configured clipboard tool reports a specific message rather than
@@ -1040,7 +1040,7 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — assertions, expect, and explicit
+    // Tests panic on failure by design: assertions, expect, and explicit
     // panic!("…") are how a failing test reports its failure to the runner.
     // Re-enabling the production lints here would force `if let Some(_) = …`
     // boilerplate that obscures the actual invariant under test.
@@ -1602,7 +1602,7 @@ mod tests {
         app.exit_search();
         app.apply_filter();
 
-        // Find Tokyo in the unfiltered list — shouldn't be first
+        // Find Tokyo in the unfiltered list. It is not first
         let pos_before = app
             .filtered_view
             .rows()
@@ -1827,12 +1827,12 @@ mod tests {
     fn delete_word_before_cursor_at_zero_is_noop() {
         let mut app = test_app();
         app.enter_search();
-        // Empty query, cursor at zero — must not panic or mutate.
+        // Empty query, cursor at zero: must not panic or mutate.
         app.delete_word_before_cursor();
         assert_eq!(app.search_query, "");
         assert_eq!(app.cursor_position, 0);
 
-        // Non-empty query but cursor parked at 0 — same invariant.
+        // Non-empty query but cursor parked at 0: same invariant.
         for c in "asia".chars() {
             app.search_input(c);
         }
