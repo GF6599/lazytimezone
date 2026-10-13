@@ -20,8 +20,8 @@
 //! - [`try_load`] / [`try_save`] take an explicit path and surface
 //!   [`io::Result`] so a caller can choose to abort, warn, or fall back
 //!   to defaults without auto-clobbering a malformed user file.
-//! - [`default_path`] exposes the canonical path so a caller can format
-//!   diagnostics or feed the rich API.
+//! - [`default_path`] gives the canonical path, used when no `--config`
+//!   flag names another.
 
 use crate::theme::Theme;
 use serde::{Deserialize, Serialize};

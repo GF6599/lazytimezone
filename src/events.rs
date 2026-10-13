@@ -40,7 +40,8 @@ impl EventSource for TerminalEvents {
 /// so piped or held input stalls the redraw and the quit check.
 const MAX_DRAINED_EVENTS: usize = 256;
 
-/// Polls for a key event for at most `timeout`.
+/// Polls for terminal events (keys, pastes and resizes) for at most
+/// `timeout`.
 ///
 /// The caller (the event loop in `main`) computes `timeout` so the
 /// poll wakes at the next tick boundary, keeping clock updates tight
@@ -91,8 +92,7 @@ fn dispatch_event(app: &mut App, event: Event) {
 }
 
 /// Routes a single key event through the Ctrl-C, help-modal, and
-/// mode-specific handlers. Extracted so `handle_events` can also call it
-/// when draining a coalesced key-repeat burst.
+/// mode-specific handlers.
 fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
     if key.kind != KeyEventKind::Press {
         return;

@@ -86,17 +86,14 @@ impl SearchIndex {
     /// `entries`, computed at the wall-clock instant `now`.
     ///
     /// Returns `None` when the query normalizes to no terms (empty
-    /// string or pure punctuation) — the caller should treat this
-    /// identically to an empty search box and fall back to the
-    /// unfiltered, favourites-first sort. `Some(vec)` always reflects
-    /// an actually-issued query, even if zero candidates matched.
+    /// string or pure punctuation). The caller then treats the box as
+    /// empty. `Some(vec)` always reflects an issued query, even if no
+    /// candidate matched.
     ///
-    /// Each result is `(entry_index, display_name, score)` sorted by
-    /// score descending, with display-name and city-name ties broken
-    /// alphabetically. Favorites receive a
-    /// [`FAVORITE_TIEBREAKER_BONUS`] score nudge so that they outrank
-    /// otherwise-equivalent matches (sum-only tiebreaker, never a
-    /// rank override — see module-level docs).
+    /// Each result is `(entry_index, display_name, score)`, sorted by
+    /// score descending, then population descending, then display name
+    /// and city name. Favorites gain [`FAVORITE_TIEBREAKER_BONUS`], so
+    /// they win a tie and only a tie.
     ///
     /// `base_indices` is the candidate set — typically `0..entries.len()`
     /// for the unfiltered catalogue, or just the favorites' indices when
@@ -294,11 +291,8 @@ fn rewrite_bare_offset_aliases(terms: &mut Vec<String>) {
 
 // ── Scoring weights ─────────────────────────────────────────────────
 
-/// Per-field exact/prefix/contains weights.
-///
-/// Two separate weight tables ([`PHRASE_WEIGHTS`] and [`TERM_WEIGHTS`])
-/// hold the actual numbers; this struct just gives them names instead
-/// of leaving three magic integers at every call site.
+/// Per-field exact/prefix/contains weights. [`FIELD_WEIGHTS`] holds the
+/// numbers, and this struct names them.
 #[derive(Copy, Clone, Debug)]
 struct FieldWeights {
     exact: u32,

@@ -12,7 +12,8 @@
 //! | Selection | `selection` (`tz` + `city_name` + `catalogue_index`) | No |
 //! | Search | `input_mode`, `search_query`, `cursor_position` | No |
 //! | Theme | `theme` | Yes (`~/.config/lazytimezone/config.toml`) |
-//! | Favorites | `favorites`, `selected_panel` | Yes (`~/.config/lazytimezone/config.toml`) |
+//! | Favorites | `favorites` | Yes (`~/.config/lazytimezone/config.toml`) |
+//! | Wall | `selected_panel`, `wall_columns`, `wall_view` | No |
 //! | Feedback | `copy_flash`, `startup_messages` | No |
 
 use std::collections::HashMap;
@@ -85,9 +86,8 @@ impl Catalogue {
 /// only appear at the on-disk boundary via
 /// [`Favorites::from_config`] / [`Favorites::to_config`].
 ///
-/// The `position` map is always a correct projection of `ordered`:
-/// every mutator calls [`rebuild_positions`](Self::rebuild_positions)
-/// before returning, so external observers can never see a stale map.
+/// After every mutator, `position` maps each entry of `ordered` to its
+/// index, so a reader never sees a stale map.
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Favorites {
     ordered: Vec<usize>,
@@ -380,11 +380,8 @@ pub enum CopyStatus {
     Failure(String),
 }
 
-/// Transient feedback shown in the status bar after pressing `c`.
-///
-/// The UI auto-clears the flash after a short timeout based on
-/// `started_at`; the timeout used to be ~2 seconds for the success-only
-/// flow and is kept the same now that errors share the slot.
+/// Transient feedback shown in the status bar after pressing `c`, for
+/// the `COPY_FLASH_FOR` window in `ui` after `started_at`.
 #[derive(Debug, Clone)]
 pub(crate) struct CopyFlash {
     pub(crate) status: CopyStatus,
@@ -430,13 +427,9 @@ pub struct App {
     pub(crate) theme: Theme,
     /// Ordered favourites with O(1) membership lookup. See [`Favorites`].
     pub(crate) favorites: Favorites,
-    /// Most recent clipboard-copy result. The renderer in
-    /// [`crate::ui::draw_status_bar`] compares
-    /// `flash.started_at.elapsed()` against a 3-second window each
-    /// frame; once that window passes the flash is simply not drawn —
-    /// the field itself is overwritten on the next copy attempt rather
-    /// than being eagerly cleared by a state-mutation tick. Keeps
-    /// `App` allocation-free on the idle tick path.
+    /// Most recent clipboard-copy result. The status bar stops drawing
+    /// it once its window has passed, and the next copy overwrites it,
+    /// so no tick has to clear it.
     pub(crate) copy_flash: Option<CopyFlash>,
     /// When true, the UI renders a help popup over the main view.
     /// Toggled by `?`, scrolled with the arrows, dismissed by any other key.

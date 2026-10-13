@@ -116,7 +116,8 @@ pub struct ThemeColors {
     pub accent_secondary: Color,
     /// Positive semantic colour (daytime local times, "Copied!" flash).
     pub good: Color,
-    /// Informational colour (diff column, UTC offset).
+    /// Informational colour (a panel's offset and difference lines, the
+    /// help examples).
     pub info: Color,
     pub status_bg: Color,
     pub status_fg: Color,

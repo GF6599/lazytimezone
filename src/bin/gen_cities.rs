@@ -6,10 +6,11 @@
 //! and runs this binary.
 //!
 //! `cities15000.txt` holds every place above 15,000 people and every
-//! national capital, which leaves 62 timezones with no city at all.
-//! `cities1000.txt` reaches 36 of them, and the generator takes one
-//! row from it for each. The other 26 are research stations and small
-//! islands with no GeoNames city, so `zone.tab` places each one.
+//! national capital, which leaves some timezones with no city at all.
+//! `cities1000.txt` reaches most of them, and the generator takes one
+//! row from it for each. The rest are research stations and small
+//! islands with no GeoNames city, so `zone.tab` places each one. The
+//! generator prints both counts.
 //!
 //! The output is the city catalogue that the app embeds at compile
 //! time: one tab-separated row per city, sorted by population, so the
@@ -352,7 +353,7 @@ fn iso6709_angle(angle: &str, degree_digits: usize) -> Option<f64> {
     Some(sign * (part(0..d)? + part(d..d + 2)? / 60.0 + seconds / 3600.0))
 }
 
-/// Population descending, then name, then zone, then country code, so
+/// Population descending, then name, zone, country code and state, so
 /// the output is deterministic and the loader reads a relevance order.
 fn sort_rows(rows: &mut [CityRow]) {
     rows.sort_by(|a, b| {
