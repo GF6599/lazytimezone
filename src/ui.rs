@@ -290,7 +290,10 @@ fn hero_variant(area: Rect) -> (HeroVariant, u16) {
 }
 
 fn clock_colour(app: &App, utc_now: &DateTime<Utc>, tc: &ThemeColors) -> Color {
-    if is_daytime_at(app.selection.tz, &utc_now.with_timezone(&app.selection.tz)) {
+    if is_daytime_at(
+        app.main_clock_place(),
+        &utc_now.with_timezone(&app.selection.tz),
+    ) {
         tc.accent
     } else {
         tc.accent_secondary
@@ -301,13 +304,10 @@ fn clock_colour(app: &App, utc_now: &DateTime<Utc>, tc: &ThemeColors) -> Color {
 ///
 /// ## Day/night colouring
 ///
-/// Daytime uses `accent` (bright), nighttime uses `accent_secondary`
-/// (dim). The day/night decision delegates to
-/// [`is_daytime_at`](crate::timezone::is_daytime_at), which computes
-/// sunrise/sunset from the city's catalogue latitude — so
-/// high-latitude cities like Reykjavík correctly stay "night"
-/// through a winter noon-twilight, and "day" through a polar summer
-/// night.
+/// [`clock_colour`] takes `accent` by day and `accent_secondary` by
+/// night, from the sun at the main clock's own city. So a city such as
+/// Reykjavík stays night through a winter noon twilight, and day
+/// through a polar summer night.
 fn draw_hero_clock(
     frame: &mut Frame,
     app: &App,
@@ -480,7 +480,10 @@ fn draw_wall(
 /// the subtle colour, with a twinkling star at its peak in the text
 /// colour.
 fn draw_sky(frame: &mut Frame, app: &App, utc_now: &DateTime<Utc>, band: Rect, tc: &ThemeColors) {
-    let is_day = is_daytime_at(app.selection.tz, &utc_now.with_timezone(&app.selection.tz));
+    let is_day = is_daytime_at(
+        app.main_clock_place(),
+        &utc_now.with_timezone(&app.selection.tz),
+    );
     let rows = sky::render(band.width, band.height, utc_now.timestamp(), is_day);
     let lines: Vec<Line> = rows
         .into_iter()

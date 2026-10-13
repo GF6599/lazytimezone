@@ -27,7 +27,7 @@ use crate::clipboard;
 use crate::config;
 use crate::search::SearchIndex;
 use crate::theme::Theme;
-use crate::timezone::{self, TimezoneEntry};
+use crate::timezone::{self, Coordinates, TimezoneEntry};
 
 /// Immutable, derived-index-bearing timezone catalogue.
 ///
@@ -636,6 +636,13 @@ impl App {
         self.selected_panel = self
             .selected_panel
             .min(self.favorites.len().saturating_sub(1));
+    }
+
+    /// Where the main clock's city is, for its daylight. The startup UTC
+    /// clock has no city.
+    pub(crate) fn main_clock_place(&self) -> Option<Coordinates> {
+        let idx = self.selection.catalogue_index?;
+        self.catalogue.get(idx)?.coordinates
     }
 
     /// Removes the selected panel from the favorites.

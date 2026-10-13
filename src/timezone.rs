@@ -277,16 +277,6 @@ pub(crate) fn region_of(tz: Tz) -> &'static str {
     tz.name().split('/').next().unwrap_or("")
 }
 
-/// Linear over the catalogue. A caller that already holds the
-/// [`TimezoneEntry`] should read `entry.coordinates` instead of paying
-/// for the search.
-pub(crate) fn coordinates_for(tz: Tz) -> Option<Coordinates> {
-    all_timezones()
-        .iter()
-        .find(|e| e.tz == tz)
-        .and_then(|e| e.coordinates)
-}
-
 /// Returns `(sunrise, sunset)` as fractional hours of solar time, a
 /// window centred on solar noon at 12:00, using a simplified
 /// solar-position model. [`sun_times`] moves it onto a local clock.
@@ -351,11 +341,10 @@ pub(crate) fn sun_times(place: Coordinates, local: &DateTime<Tz>) -> (f64, f64) 
     (sunrise + shift, sunset + shift)
 }
 
-/// Returns true when `local` falls inside the daytime window for the
-/// given timezone. Falls back to a 6..18 window when no curated
-/// coordinates exist for `tz`.
-pub fn is_daytime_at(tz: Tz, local: &DateTime<Tz>) -> bool {
-    match coordinates_for(tz) {
+/// Returns true when `local` falls inside the daytime window at
+/// `place`. A fixed offset has no place, so it takes 6:00 to 18:00.
+pub fn is_daytime_at(place: Option<Coordinates>, local: &DateTime<Tz>) -> bool {
+    match place {
         Some(place) => is_daytime_at_coordinates(place, local),
         None => (6..18).contains(&local.hour()),
     }
@@ -542,41 +531,6 @@ mod tests {
     }
 
     #[test]
-    fn both_daytime_entry_points_agree_across_the_catalogue_and_the_year() {
-        // The clocks colour day/night through the zone lookup, which
-        // reads the zone's first (most populous) row. The table reads
-        // each row's own latitude. The shared row is where both paths
-        // must agree, or one frame colours it two ways.
-        let midyear = chrono::Utc
-            .with_ymd_and_hms(2026, 6, 21, 12, 0, 0)
-            .single()
-            .expect("valid instant");
-        let midwinter = chrono::Utc
-            .with_ymd_and_hms(2026, 12, 21, 12, 0, 0)
-            .single()
-            .expect("valid instant");
-
-        let mut seen = std::collections::HashSet::new();
-        for entry in all_timezones() {
-            if !seen.insert(entry.tz) {
-                continue;
-            }
-            let Some(coordinates) = entry.coordinates else {
-                continue;
-            };
-            for instant in [midyear, midwinter] {
-                let local = instant.with_timezone(&entry.tz);
-                assert_eq!(
-                    is_daytime_at(entry.tz, &local),
-                    is_daytime_at_coordinates(coordinates, &local),
-                    "{} disagrees at {local}",
-                    entry.city
-                );
-            }
-        }
-    }
-
-    #[test]
     fn polar_winter_is_polar_night() {
         // 80°N in mid-winter — sun never rises
         let (sunrise, sunset) = sun_window(80.0, 355);
@@ -611,8 +565,11 @@ mod tests {
             (Tz::Antarctica__Casey, -66.28, 110.52, "Casey"),
         ];
         for &(tz, latitude, longitude, name) in cases {
-            let actual =
-                coordinates_for(tz).unwrap_or_else(|| panic!("no coordinates for {name} ({tz:?})"));
+            let actual = all_timezones()
+                .iter()
+                .find(|e| e.tz == tz)
+                .and_then(|e| e.coordinates)
+                .unwrap_or_else(|| panic!("no coordinates for {name} ({tz:?})"));
             assert!(
                 (actual.latitude - latitude).abs() < 0.05
                     && (actual.longitude - longitude).abs() < 0.05,
