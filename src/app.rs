@@ -29,6 +29,11 @@ use crate::search::SearchIndex;
 use crate::theme::Theme;
 use crate::timezone::{self, Coordinates, TimezoneEntry};
 
+/// Status message prefixes. A newer message of one kind replaces the
+/// older one, so the bar shows the latest state.
+const SAVE_FAILED: &str = "Config save failed:";
+const SAVE_REFUSED: &str = "Not saved:";
+
 /// Immutable, derived-index-bearing timezone catalogue.
 ///
 /// Bundles the full [`TimezoneEntry`] list together with the search
@@ -1003,11 +1008,13 @@ impl App {
     }
 
     fn save_config(&mut self) {
-        // Refuse to save while the on-disk config is known to be broken
-        // — overwriting it would destroy the user's only copy of the
-        // file they need to fix. They'll see the parse error in the
-        // status bar at startup and can correct it manually.
+        // Saving now would overwrite the file the user must fix, and the
+        // startup notice about it is gone after the first key.
         if self.config_load_failed {
+            self.show_status(
+                SAVE_REFUSED,
+                format!("{SAVE_REFUSED} fix the config file, then restart"),
+            );
             return;
         }
         let Some(path) = &self.config_path else {
@@ -1017,23 +1024,19 @@ impl App {
             theme: self.theme.label().to_string(),
             favorites: self.favorites.to_config(self.catalogue.entries()),
         };
-        // Route through `try_save` (not `save`) so we can surface the
-        // failure to the user. The original `config::save` eprintln!s on
-        // error — invisible inside the alternate screen — so we forward
-        // the message through `startup_messages` to the status bar
-        // instead. Don't block subsequent saves; only the most recent
-        // failure is retained.
+        // The alternate screen hides stderr, so the status bar is the
+        // only place a failure can show.
         if let Err(e) = config::try_save(path, &cfg) {
-            let msg = format!("Config save failed: {e}");
-            // Replace any prior save-error so the status bar shows the
-            // most recent failure rather than stale text.
-            self.startup_messages
-                .retain(|m| !m.starts_with("Config save failed:"));
-            self.startup_messages.push(msg);
-            // Reset the timer so the new save error is visible for the
-            // full 10-second window, even if startup was minutes ago.
-            self.started_at = Instant::now();
+            self.show_status(SAVE_FAILED, format!("{SAVE_FAILED} {e}"));
         }
+    }
+
+    /// Shows `message` for the full status window, in place of an
+    /// earlier message of the same `kind`.
+    fn show_status(&mut self, kind: &str, message: String) {
+        self.startup_messages.retain(|m| !m.starts_with(kind));
+        self.startup_messages.push(message);
+        self.started_at = Instant::now();
     }
 
     /// Copies the selected timezone's current time to the system
