@@ -1647,39 +1647,28 @@ mod tests {
 
     // ── Theme ───────────────────────────────────────────────────────
 
+    /// `t` moves to the next theme and saves it.
+    ///
+    /// Given: the app on the Default theme with a config file.
+    /// When: the theme cycles once, and the app starts again on that file.
+    /// Then: both show the theme after Default.
+    ///
+    /// Why it matters: a theme the user picks must still be there on the
+    /// next start.
     #[test]
-    fn cycle_theme_wraps_around() {
-        let mut app = test_app();
+    fn cycling_the_theme_saves_the_next_one() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let mut app = App::new(Some(tmp.path()));
         assert_eq!(app.theme, Theme::Default);
 
-        let themes = [
-            Theme::Dracula,
-            Theme::Solarized,
-            Theme::Nord,
-            Theme::Monokai,
-            Theme::Gruvbox,
-            Theme::RosePine,
-            Theme::Default,
-        ];
-        for expected in themes {
-            app.theme = app.theme.next();
-            assert_eq!(app.theme, expected);
-        }
-    }
+        // When:
+        app.cycle_theme();
+        let restarted = App::new(Some(tmp.path()));
 
-    #[test]
-    fn theme_from_label_round_trips() {
-        for theme in [
-            Theme::Default,
-            Theme::Dracula,
-            Theme::Solarized,
-            Theme::Nord,
-            Theme::Monokai,
-            Theme::Gruvbox,
-            Theme::RosePine,
-        ] {
-            assert_eq!(Theme::from_label(theme.label()), theme);
-        }
+        // Then:
+        assert_eq!(app.theme, Theme::Default.next());
+        assert_eq!(restarted.theme, Theme::Default.next());
     }
 
     /// A config file that names Rose Pine opens the app in Rose Pine.
@@ -1709,12 +1698,6 @@ mod tests {
 
         // Then:
         assert_eq!(app.theme.label(), "Rose Pine");
-    }
-
-    #[test]
-    fn theme_from_label_unknown_defaults() {
-        assert_eq!(Theme::from_label("NonExistent"), Theme::Default);
-        assert_eq!(Theme::from_label(""), Theme::Default);
     }
 
     // ── Select timezone ─────────────────────────────────────────────

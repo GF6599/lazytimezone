@@ -298,4 +298,44 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn next_visits_every_theme_and_wraps_to_default() {
+        let mut theme = Theme::Default;
+
+        let themes = [
+            Theme::Dracula,
+            Theme::Solarized,
+            Theme::Nord,
+            Theme::Monokai,
+            Theme::Gruvbox,
+            Theme::RosePine,
+            Theme::Default,
+        ];
+        for expected in themes {
+            theme = theme.next();
+            assert_eq!(theme, expected);
+        }
+    }
+
+    #[test]
+    fn theme_from_label_round_trips() {
+        for theme in [
+            Theme::Default,
+            Theme::Dracula,
+            Theme::Solarized,
+            Theme::Nord,
+            Theme::Monokai,
+            Theme::Gruvbox,
+            Theme::RosePine,
+        ] {
+            assert_eq!(Theme::from_label(theme.label()), theme);
+        }
+    }
+
+    #[test]
+    fn theme_from_label_unknown_defaults() {
+        assert_eq!(Theme::from_label("NonExistent"), Theme::Default);
+        assert_eq!(Theme::from_label(""), Theme::Default);
+    }
 }
