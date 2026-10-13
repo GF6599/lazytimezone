@@ -570,13 +570,13 @@ impl App {
         self.help_scroll = self.help_scroll.min(max);
     }
 
-    pub(crate) fn move_up(&mut self) {
+    pub(crate) fn select_previous_result(&mut self) {
         if self.selected_row > 0 {
             self.selected_row -= 1;
         }
     }
 
-    pub(crate) fn move_down(&mut self) {
+    pub(crate) fn select_next_result(&mut self) {
         if !self.filtered_view.is_empty() && self.selected_row < self.filtered_view.len() - 1 {
             self.selected_row += 1;
         }
@@ -1493,19 +1493,19 @@ mod tests {
     // ── Navigation ──────────────────────────────────────────────────
 
     #[test]
-    fn move_up_at_top_stays_at_zero() {
+    fn select_previous_result_at_top_stays_at_zero() {
         let mut app = test_app();
         app.selected_row = 0;
-        app.move_up();
+        app.select_previous_result();
         assert_eq!(app.selected_row, 0);
     }
 
     #[test]
-    fn move_down_at_bottom_stays_at_last() {
+    fn select_next_result_at_bottom_stays_at_last() {
         let mut app = test_app();
         let last = app.filtered_view.len() - 1;
         app.selected_row = last;
-        app.move_down();
+        app.select_next_result();
         assert_eq!(app.selected_row, last);
     }
 
@@ -1515,8 +1515,8 @@ mod tests {
         apply_query(&mut app, "zzzzzznotaquery");
         assert!(app.filtered_view.is_empty());
 
-        app.move_up();
-        app.move_down();
+        app.select_previous_result();
+        app.select_next_result();
         assert_eq!(app.selected_row, 0);
     }
 
@@ -1889,8 +1889,8 @@ mod tests {
         let mut app = test_app();
 
         apply_query(&mut app, "asia");
-        app.move_down();
-        app.move_down();
+        app.select_next_result();
+        app.select_next_result();
         assert_eq!(app.selected_row, 2);
         app.exit_search();
 
