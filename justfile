@@ -33,12 +33,26 @@ fmt:
 test:
     cargo test --all-targets
 
+# CI installs the same version through `tools`, so the gate is one tool on
+# every machine.
+cargo_deny := "0.20.2"
+
+# Install the tools the gate needs beyond the Rust toolchain
+[group('dev')]
+tools:
+    cargo install --locked cargo-deny@{{ cargo_deny }}
+
+# Check advisories, licences, duplicate crates and sources against deny.toml
+[group('dev')]
+deny:
+    cargo deny --locked check
+
 # `cargo fmt --check` belongs to no other recipe: `fmt` rewrites files,
 # which is the opposite of what a gate should do.
 
 # Run the whole quality gate: what CI and the commit hooks both call
 [group('dev')]
-check: lint test
+check: lint test deny
     cargo fmt --all -- --check
 
 # Regenerate data/cities.tsv from the GeoNames dumps
