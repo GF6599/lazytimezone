@@ -1,17 +1,19 @@
-set dotenv-load
 set shell := ["bash", "-uc"]
 
 # Show available recipes
 default:
     @just --list
 
-# Run the TUI application
+# Run the TUI application. Each argument reaches the app whole, spaces and all
 [group('run')]
+[positional-arguments]
 run *args:
-    cargo run -- {{ args }}
+    cargo run -- "$@"
 
-# Record doc/demo.gif from demo.tape. The tape keeps its config under
-# /tmp/lazytimezone-demo-config, which a fresh recording must not inherit.
+# The tape keeps its config under /tmp/lazytimezone-demo-config, which a fresh
+# recording must not inherit.
+
+# Record doc/demo.gif from demo.tape
 [group('run')]
 demo:
     rm -rf /tmp/lazytimezone-demo-config
@@ -55,6 +57,10 @@ deny:
 check: lint test deny
     cargo fmt --all -- --check
 
+# The IANA release that supplies zone.tab. Its cache file carries the release
+# name, so a change here downloads the new table instead of reusing the old one.
+tzdata := "tzdata2025b"
+
 # Regenerate data/cities.tsv from the GeoNames dumps
 [group('dev')]
 gen-cities:
@@ -65,18 +71,17 @@ gen-cities:
     unzip -o -q target/geonames/cities1000.zip -d target/geonames
     test -f target/geonames/admin1CodesASCII.txt || curl -fsSL -o target/geonames/admin1CodesASCII.txt https://download.geonames.org/export/dump/admin1CodesASCII.txt
     test -f target/geonames/countryInfo.txt || curl -fsSL -o target/geonames/countryInfo.txt https://download.geonames.org/export/dump/countryInfo.txt
-    test -f target/geonames/zone.tab || curl -fsSL https://data.iana.org/time-zones/releases/tzdata2025b.tar.gz | tar -xz -C target/geonames zone.tab
+    test -f target/geonames/{{ tzdata }}-zone.tab || curl -fsSL https://data.iana.org/time-zones/releases/{{ tzdata }}.tar.gz | tar -xzO zone.tab > target/geonames/{{ tzdata }}-zone.tab.part && mv target/geonames/{{ tzdata }}-zone.tab.part target/geonames/{{ tzdata }}-zone.tab
+    cp target/geonames/{{ tzdata }}-zone.tab target/geonames/zone.tab
     cargo run --bin gen_cities -- target/geonames data/cities.tsv
 
-# Build release binaries and copy to dist/
+# Build the release binary, sign it ad hoc, and copy it to dist/
 [group('deploy')]
 build:
     cargo build --locked --release
-    cross build --release --target x86_64-unknown-linux-gnu
     mkdir -p dist
     cp target/release/lazytimezone dist/
     codesign --force --sign - dist/lazytimezone
-    cp target/x86_64-unknown-linux-gnu/release/lazytimezone dist/lazytimezone-linux-amd64
 
 # Install the dist binary to ~/self-made-bin/
 [group('deploy')]
