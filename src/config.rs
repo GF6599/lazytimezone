@@ -141,7 +141,8 @@ pub fn try_load(path: &Path) -> io::Result<(Config, Vec<LoadWarning>)> {
 /// Atomically persist `config` to `path`.
 ///
 /// Writes to a sibling `<name>.tmp` file, flushes it, then `fs::rename`s
-/// it into place. On POSIX `rename` is atomic; on Windows it's atomic
+/// it into place. When `path` is a symlink, the sibling and the rename
+/// are at the file it names, so the link stays. On POSIX `rename` is atomic; on Windows it's atomic
 /// for the same-volume case that applies here. A crash mid-write leaves
 /// the previous good file intact rather than a zero-byte stub.
 ///
@@ -151,6 +152,7 @@ pub fn try_load(path: &Path) -> io::Result<(Config, Vec<LoadWarning>)> {
 /// If anything fails after the temp file is created, we try to remove
 /// it so successive runs don't accumulate stale `*.tmp` siblings.
 pub fn try_save(path: &Path, config: &Config) -> io::Result<()> {
+    let path = &save_target(path);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -186,6 +188,22 @@ pub fn try_save(path: &Path, config: &Config) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+/// The file a save replaces: `path`, or the file its symlink names, so
+/// the rename lands on the target and the link stays a link.
+fn save_target(path: &Path) -> PathBuf {
+    if let Ok(real) = fs::canonicalize(path) {
+        return real;
+    }
+    // A link to a file that does not exist yet has no canonical form.
+    match fs::read_link(path) {
+        Ok(target) => match path.parent() {
+            Some(dir) => dir.join(target),
+            None => target,
+        },
+        Err(_) => path.to_path_buf(),
+    }
 }
 
 fn write_and_sync(path: &Path, bytes: &[u8]) -> io::Result<()> {
