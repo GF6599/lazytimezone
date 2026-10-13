@@ -30,13 +30,18 @@ use std::io::Write;
 /// status bar — it carries both the program name and the underlying OS
 /// error message.
 pub fn copy(text: &str) -> Result<(), String> {
-    let candidates = clipboard_commands();
+    copy_with(clipboard_commands(), text)
+}
+
+/// [`copy`] over an explicit list of `(command, args)` candidates, so a
+/// test can name commands that exist on every machine.
+fn copy_with(candidates: &[(&str, &[&str])], text: &str) -> Result<(), String> {
     if candidates.is_empty() {
         return Err("No clipboard tool configured for this platform".to_string());
     }
 
     let mut last_error: Option<String> = None;
-    for (cmd, args) in candidates {
+    for &(cmd, args) in candidates {
         match pipe_to_command(cmd, args, text) {
             Ok(()) => return Ok(()),
             Err(e) => last_error = Some(format!("{cmd}: {e}")),
