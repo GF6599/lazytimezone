@@ -1,12 +1,9 @@
+# One hook, so a commit passes the same gate that CI runs.
 repos:
-  - repo: https://github.com/doublify/pre-commit-rust
-    rev: v1.0
+  - repo: local
     hooks:
-      - id: fmt
-        args: ["--all", "--", "--check"]
-      - id: clippy
-        args:
-          - "--all-targets"
-          - "--"
-          - "-D"
-          - "warnings"
+      - id: just-check
+        name: just check
+        entry: just check
+        language: system
+        pass_filenames: false
