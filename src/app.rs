@@ -1758,6 +1758,41 @@ mod tests {
         assert_eq!(app.selected_row, 0);
     }
 
+    /// Backspace removes the whole character before the cursor, even a
+    /// wide one, and does nothing at the start.
+    ///
+    /// Given: the picker with `tokyos東` typed.
+    /// When: backspace is pressed twice, then the cursor goes home and
+    /// backspace is pressed again.
+    /// Then: the first press leaves `tokyos`, the second `tokyo` with
+    /// Tokyo as the first row, and the press at the start changes
+    /// nothing.
+    ///
+    /// Why it matters: `東` takes three bytes, so a backspace that steps
+    /// back one byte would split it and panic.
+    #[test]
+    fn backspace_removes_one_whole_character_before_the_cursor() {
+        // Given:
+        let mut app = test_app();
+        app.enter_search();
+        for c in "tokyos\u{6771}".chars() {
+            app.search_input(c);
+        }
+
+        // When:
+        app.search_backspace();
+        let after_one = app.search_query.clone();
+        app.search_backspace();
+        app.search_cursor_home();
+        app.search_backspace();
+
+        // Then:
+        assert_eq!(after_one, "tokyos");
+        assert_eq!(first_city(&app), "Tokyo");
+        assert_eq!(app.search_query, "tokyo");
+        assert_eq!(app.cursor_position, 0);
+    }
+
     /// A paste drops control characters, turns a tab into a space, and
     /// keeps text in any script.
     ///
