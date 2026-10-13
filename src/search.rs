@@ -550,18 +550,38 @@ impl MatchKind {
         if field == term {
             return Some(MatchKind::Exact);
         }
-        if field.starts_with(term)
+        if starts_with_term(field, term)
             || field
                 .split_whitespace()
                 .any(|word| word_matches_term(word, term))
         {
             return Some(MatchKind::Prefix);
         }
-        if term.len() >= CONTAINS_MIN_CHARS && field.contains(term) {
+        if term.len() >= CONTAINS_MIN_CHARS
+            && field
+                .match_indices(term)
+                .any(|(at, _)| ends_a_number(term, &field[at + term.len()..]))
+        {
             return Some(MatchKind::Contains);
         }
         None
     }
+}
+
+/// Whether `field` starts with `term` where the term's number, if it
+/// ends in one, ends too.
+fn starts_with_term(field: &str, term: &str) -> bool {
+    field
+        .strip_prefix(term)
+        .is_some_and(|rest| ends_a_number(term, rest))
+}
+
+/// False when `term` ends in a digit and `rest`, the text after it,
+/// carries the number on. So `1` matches the hour in `+1` and `+1 30`
+/// but not in `+10`, and `utc+0` does not match `utc+0800`.
+fn ends_a_number(term: &str, rest: &str) -> bool {
+    !(term.ends_with(|c: char| c.is_ascii_digit())
+        && rest.starts_with(|c: char| c.is_ascii_digit()))
 }
 
 /// Returns `true` when `word` is the same as `term`, starts with `term`,
@@ -571,11 +591,11 @@ impl MatchKind {
 /// tokens like `+5` and `-5` inside the cached offset haystacks — the
 /// user expects `gmt 5` to find UTC+5 cities without typing the plus.
 fn word_matches_term(word: &str, term: &str) -> bool {
-    if word == term || word.starts_with(term) {
+    if starts_with_term(word, term) {
         return true;
     }
     let stripped = word.trim_start_matches(['+', '-']);
-    stripped != word && (stripped == term || stripped.starts_with(term))
+    stripped != word && starts_with_term(stripped, term)
 }
 
 // ── Normalization & offset alias expansion ─────────────────────────
