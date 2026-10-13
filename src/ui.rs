@@ -433,7 +433,7 @@ fn draw_wall(
     let panel_height = (area.height / grid_rows as u16).clamp(PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT);
     let visible_rows = (area.height / panel_height).max(1) as usize;
     let top_pad = if grid_rows <= visible_rows {
-        (area.height - grid_rows as u16 * panel_height) / 2
+        area.height.saturating_sub(grid_rows as u16 * panel_height) / 2
     } else {
         0
     };
@@ -1587,6 +1587,28 @@ mod tests {
             "block art on a 12-row terminal:\n{rendered}"
         );
         assert!(rendered.contains("UTC"), "got:\n{rendered}");
+    }
+
+    /// A terminal too short for one panel still draws the clock.
+    ///
+    /// Given: one favourite, so the wall needs a single grid row.
+    /// When: the frame is 9 rows tall, which leaves the wall 3 rows,
+    /// one fewer than the shortest panel.
+    /// Then: the frame draws, and the clock line names the city.
+    ///
+    /// Why it matters: a split pane or a small window is a normal
+    /// place to keep a clock, and a short wall must not stop the frame.
+    #[test]
+    fn a_wall_shorter_than_one_panel_still_draws_the_clock() {
+        // Given:
+        let mut app = wall_app(&["tokyo"]);
+
+        // When:
+        let rows = render_app(&mut app, 80, 9);
+
+        // Then:
+        let rendered = rows.join("\n");
+        assert!(rendered.contains("Tokyo \u{b7} "), "got:\n{rendered}");
     }
 
     /// A narrow terminal gets a smaller clock, and only the narrowest

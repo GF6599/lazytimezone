@@ -1,4 +1,4 @@
-//! # Unified TOML configuration — load, save, and one-time migration.
+//! # Unified TOML configuration: load and save.
 //!
 //! All persistent state lives in `~/.config/lazytimezone/config.toml`:
 //!
@@ -13,10 +13,7 @@
 //!
 //! A favorite from the pre-city format, a bare IANA zone string such
 //! as `"Asia/Tokyo"`, still parses ([`FavoriteEntry::Zone`]) and is
-//! resolved to the zone's major city at load. On first launch after
-//! the migration, legacy plain-text files (`theme` and `favorites`)
-//! are imported automatically, and removed once the unified file is
-//! safely written.
+//! resolved to the zone's major city at load.
 //!
 //! ## API shape
 //!
@@ -117,32 +114,9 @@ pub fn default_path() -> Option<PathBuf> {
 ///
 /// On a parse error the caller must NOT auto-save — that would clobber
 /// the user's broken file before they have a chance to fix it.
-///
-/// When the path doesn't exist the legacy plain-text migration still
-/// runs so first-launch upgrades behave the same as before. `path` is
-/// the only place migration looks, including for the legacy files.
 pub fn try_load(path: &Path) -> io::Result<(Config, Vec<LoadWarning>)> {
     if !path.exists() {
-        let app_dir = path.parent().unwrap_or_else(|| Path::new("."));
-        let (cfg, legacy_files) = migrate_legacy(app_dir);
-        // Migration is a one-shot upgrade — persist the result so legacy
-        // files don't get re-read on the next launch. Errors here are
-        // surfaced as a LoadWarning so the TUI status bar can display
-        // them; stderr is invisible in alt-screen mode.
-        let mut warnings = Vec::new();
-        match try_save(path, &cfg) {
-            Ok(()) => {
-                for legacy in legacy_files {
-                    let _ = fs::remove_file(legacy);
-                }
-            }
-            // Until this write succeeds the legacy files are the user's
-            // only remaining copy of their settings.
-            Err(e) => {
-                warnings.push(LoadWarning(format!("Failed to write migrated config: {e}")));
-            }
-        }
-        return Ok((cfg, warnings));
+        return Ok((Config::default(), Vec::new()));
     }
 
     let contents = fs::read_to_string(path)?;
@@ -220,41 +194,6 @@ fn write_and_sync(path: &Path, bytes: &[u8]) -> io::Result<()> {
     file.sync_all()
 }
 
-/// Imports legacy plain-text `theme` and `favorites` files from `app_dir`.
-///
-/// The returned paths are the ones that existed and were read. Removing
-/// them belongs to the caller, once the migrated config is on disk.
-fn migrate_legacy(app_dir: &Path) -> (Config, Vec<PathBuf>) {
-    let theme_path = app_dir.join("theme");
-    let favorites_path = app_dir.join("favorites");
-    let mut read_files = Vec::new();
-
-    let theme = match fs::read_to_string(&theme_path) {
-        Ok(contents) => {
-            read_files.push(theme_path);
-            Some(contents.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .unwrap_or_else(default_theme)
-        }
-        Err(_) => default_theme(),
-    };
-
-    let favorites = match fs::read_to_string(&favorites_path) {
-        Ok(contents) => {
-            read_files.push(favorites_path);
-            contents
-                .lines()
-                .map(str::trim)
-                .filter(|l| !l.is_empty())
-                .map(|l| FavoriteEntry::Zone(l.to_string()))
-                .collect()
-        }
-        Err(_) => Vec::new(),
-    };
-
-    (Config { theme, favorites }, read_files)
-}
-
 #[cfg(test)]
 mod tests {
     // Tests panic on failure by design — see src/app.rs for the rationale
@@ -293,47 +232,12 @@ mod tests {
         fn config_path(&self) -> PathBuf {
             self.app_dir().join("config.toml")
         }
-
-        fn write_legacy(&self, theme: &str, favorites: &str) {
-            fs::write(self.app_dir().join("theme"), theme).unwrap();
-            fs::write(self.app_dir().join("favorites"), favorites).unwrap();
-        }
-
-        fn legacy_files_exist(&self) -> bool {
-            self.app_dir().join("theme").exists() || self.app_dir().join("favorites").exists()
-        }
-
-        /// Occupies the atomic-write temp path with a non-empty directory
-        /// so `try_save` cannot write it. Stands in for a read-only or
-        /// full config directory.
-        fn block_saving(&self) {
-            let blocker = self.app_dir().join("config.toml.tmp");
-            fs::create_dir_all(&blocker).unwrap();
-            fs::write(blocker.join("occupied"), b"x").unwrap();
-        }
     }
 
     impl Drop for TempConfig {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.root);
         }
-    }
-
-    #[test]
-    fn migration_reads_legacy_files_from_the_directory_it_was_given() {
-        let tmp = TempConfig::new();
-        tmp.write_legacy("Nord\n", "Asia/Tokyo\nEurope/London\n");
-
-        let (cfg, _) = try_load(&tmp.config_path()).unwrap();
-
-        assert_eq!(cfg.theme, "Nord");
-        assert_eq!(
-            cfg.favorites,
-            vec![
-                FavoriteEntry::Zone("Asia/Tokyo".to_string()),
-                FavoriteEntry::Zone("Europe/London".to_string()),
-            ]
-        );
     }
 
     #[test]
@@ -358,38 +262,36 @@ mod tests {
         assert_eq!(loaded.favorites, cfg.favorites);
     }
 
+    /// A config path that does not exist yet loads the defaults and
+    /// leaves the files beside it alone.
+    ///
+    /// Given: files named `theme` and `favorites` in the folder of a
+    /// config path that does not exist.
+    /// When: the config loads.
+    /// Then: it holds the defaults with no warning, and both files are
+    /// still there with their content.
+    ///
+    /// Why it matters: `--config` can name a file in any folder, such as
+    /// a project folder, and a load must never read or delete files the
+    /// app did not write.
     #[test]
-    fn legacy_files_survive_a_failed_save() {
+    fn a_missing_config_loads_defaults_and_leaves_its_folder_alone() {
+        // Given:
         let tmp = TempConfig::new();
-        tmp.write_legacy("Nord\n", "Asia/Tokyo\n");
-        tmp.block_saving();
+        let theme = tmp.app_dir().join("theme");
+        let favorites = tmp.app_dir().join("favorites");
+        fs::write(&theme, "Nord\n").unwrap();
+        fs::write(&favorites, "Asia/Tokyo\n").unwrap();
 
+        // When:
         let (cfg, warnings) = try_load(&tmp.config_path()).unwrap();
 
-        assert_eq!(cfg.theme, "Nord", "the legacy theme should still be read");
-        assert!(!warnings.is_empty(), "the failed save should be reported");
-        assert!(
-            tmp.legacy_files_exist(),
-            "legacy files must not be deleted when the migrated config was never written"
-        );
-    }
-
-    #[test]
-    fn legacy_files_are_removed_once_the_save_succeeds() {
-        let tmp = TempConfig::new();
-        tmp.write_legacy("Gruvbox\n", "Asia/Tokyo\n");
-
-        let (_, warnings) = try_load(&tmp.config_path()).unwrap();
-
-        assert!(warnings.is_empty(), "the save was expected to succeed");
-        assert!(
-            tmp.config_path().exists(),
-            "the migrated config should exist"
-        );
-        assert!(
-            !tmp.legacy_files_exist(),
-            "legacy files should be cleaned up after a successful migration"
-        );
+        // Then:
+        assert_eq!(cfg.theme, default_theme());
+        assert!(cfg.favorites.is_empty());
+        assert!(warnings.is_empty());
+        assert_eq!(fs::read_to_string(&theme).unwrap(), "Nord\n");
+        assert_eq!(fs::read_to_string(&favorites).unwrap(), "Asia/Tokyo\n");
     }
 
     #[test]
