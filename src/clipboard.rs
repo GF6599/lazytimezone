@@ -210,7 +210,8 @@ mod tests {
 
     /// A failure message says each fact once.
     ///
-    /// Given: a tool that exits with an error.
+    /// Given: a tool that reads all of its input, then exits with an
+    /// error.
     /// When: the text is copied.
     /// Then: the message names the tool once and the exit status once.
     ///
@@ -218,9 +219,10 @@ mod tests {
     /// pushes the useful part past its edge.
     #[test]
     fn a_failure_message_says_each_fact_once() {
-        let err = copy_with(&[("false", &[])], "text").unwrap_err();
+        // `false` can exit before the write, and the copy then fails on
+        // a broken pipe with no exit status, so this tool reads first.
+        let err = copy_with(&[("sh", &["-c", "cat >/dev/null; exit 1"])], "text").unwrap_err();
 
-        assert_eq!(err.matches("false").count(), 1, "got: {err}");
-        assert_eq!(err.matches("exit status").count(), 1, "got: {err}");
+        assert_eq!(err, "sh failed with exit status: 1");
     }
 }
