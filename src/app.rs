@@ -1228,10 +1228,17 @@ mod tests {
         apply_query(&mut app, "");
 
         let len = app.filtered_view.len();
-        assert!(len > 300 && len < 500, "got {len} rows");
         assert_eq!(first_city(&app), "Shanghai");
         let mut seen = std::collections::HashSet::new();
         assert!((0..len).all(|n| seen.insert(nth_tz(&app, n))));
+        let city_zones: std::collections::HashSet<chrono_tz::Tz> = app
+            .catalogue
+            .entries()
+            .iter()
+            .filter(|e| !e.is_fixed_offset())
+            .map(|e| e.tz)
+            .collect();
+        assert_eq!(seen, city_zones);
     }
 
     /// A change made while the config file has an error says that it

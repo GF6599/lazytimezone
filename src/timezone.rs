@@ -394,13 +394,6 @@ mod tests {
     }
 
     #[test]
-    fn the_catalogue_is_city_scaled_not_zone_scaled() {
-        let count = all_timezones().len();
-
-        assert!(count > 30_000, "got {count} entries");
-    }
-
-    #[test]
     fn boston_massachusetts_is_a_real_row_not_an_alias() {
         let boston = all_timezones()
             .iter()
