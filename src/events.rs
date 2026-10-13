@@ -125,11 +125,23 @@ fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
     }
 }
 
+/// A key held with Ctrl or Alt. Shift is not a chord, because it is
+/// how `G`, `J`, `K` and `?` arrive.
+fn is_chord(key: crossterm::event::KeyEvent) -> bool {
+    key.modifiers
+        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+}
+
 /// Wall bindings: `h/j/k/l` move between the favorite panels, Enter
 /// promotes one to the hero clock, `f` removes it, `J/K` reorder, `m`
 /// switches to the world map and back, and `/` opens the add-city
 /// picker.
 fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
+    // The picker binds Ctrl-f, and the same chord here must not remove
+    // a favourite.
+    if is_chord(key) {
+        return;
+    }
     match key.code {
         KeyCode::Char('q') => {
             app.should_quit = true;
@@ -147,7 +159,7 @@ fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Char('K') => app.move_panel_earlier(),
         KeyCode::Char('t') => app.cycle_theme(),
         KeyCode::Char('m') => app.toggle_map(),
-        KeyCode::Char('c') if !key.modifiers.contains(KeyModifiers::CONTROL) => app.copy_time(),
+        KeyCode::Char('c') => app.copy_time(),
         KeyCode::Char('?') => app.toggle_help(),
         _ => {}
     }
@@ -197,7 +209,7 @@ fn handle_search_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.toggle_favorite();
         }
-        KeyCode::Char(c) => app.search_input(c),
+        KeyCode::Char(c) if !is_chord(key) => app.search_input(c),
         _ => {}
     }
 }
@@ -255,6 +267,15 @@ mod tests {
         })
     }
 
+    fn chord(c: char, modifiers: KeyModifiers) -> Event {
+        Event::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        })
+    }
+
     fn searching_app() -> App {
         let mut app = App::with_config(config::Config::default());
         app.enter_search();
@@ -284,6 +305,65 @@ mod tests {
             (after_one_press, app.wall_view),
             (WallView::Map, WallView::Panels)
         );
+    }
+
+    /// A Ctrl or Alt chord on the wall runs no command.
+    ///
+    /// Given: one favourite on the wall.
+    /// When: Ctrl-f, Ctrl-t, Ctrl-q and Alt-f are pressed.
+    /// Then: the favourite, the theme and the app all stay.
+    ///
+    /// Why it matters: Ctrl-f favourites a row in the picker, so a
+    /// hand that repeats it on the wall must not remove a favourite and
+    /// save the config.
+    #[test]
+    fn a_ctrl_or_alt_chord_on_the_wall_runs_no_command() {
+        // Given:
+        let mut app = searching_app();
+        for c in "tokyo".chars() {
+            dispatch_event(&mut app, key(c));
+        }
+        app.commit_search_result_and_exit();
+        assert_eq!(app.favorites.len(), 1);
+        let theme = app.theme;
+
+        // When:
+        for (c, modifiers) in [
+            ('f', KeyModifiers::CONTROL),
+            ('t', KeyModifiers::CONTROL),
+            ('q', KeyModifiers::CONTROL),
+            ('f', KeyModifiers::ALT),
+        ] {
+            dispatch_event(&mut app, chord(c, modifiers));
+        }
+
+        // Then:
+        assert_eq!(app.favorites.len(), 1);
+        assert_eq!(app.theme, theme);
+        assert!(!app.should_quit);
+    }
+
+    /// An unbound Ctrl or Alt chord in the picker types nothing, and a
+    /// shifted letter still types.
+    ///
+    /// Given: the picker with an empty query.
+    /// When: Ctrl-p and Alt-n are pressed, then Shift-T.
+    /// Then: the query is `T`.
+    ///
+    /// Why it matters: Ctrl-p and Ctrl-n move through lists in other
+    /// tools, and typing their letter would refilter the list instead.
+    #[test]
+    fn an_unbound_chord_in_the_picker_types_nothing() {
+        // Given:
+        let mut app = searching_app();
+
+        // When:
+        dispatch_event(&mut app, chord('p', KeyModifiers::CONTROL));
+        dispatch_event(&mut app, chord('n', KeyModifiers::ALT));
+        dispatch_event(&mut app, chord('T', KeyModifiers::SHIFT));
+
+        // Then:
+        assert_eq!(app.search_query, "T");
     }
 
     #[test]

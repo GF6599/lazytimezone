@@ -632,13 +632,17 @@ impl App {
         }
     }
 
+    fn clamp_selected_panel(&mut self) {
+        self.selected_panel = self
+            .selected_panel
+            .min(self.favorites.len().saturating_sub(1));
+    }
+
     /// Removes the selected panel from the favorites.
     pub(crate) fn unfavorite_selected_panel(&mut self) {
         if let Some(idx) = self.favorites.at(self.selected_panel) {
             self.favorites.toggle(idx);
-            self.selected_panel = self
-                .selected_panel
-                .min(self.favorites.len().saturating_sub(1));
+            self.clamp_selected_panel();
             self.save_config();
             self.apply_filter();
         }
@@ -875,29 +879,29 @@ impl App {
     /// `GMT-08:00`, and `+0530`. Exact and prefix matches rank above
     /// plain substrings.
     pub(crate) fn apply_filter(&mut self) {
-        let base_indices: Vec<usize> = (0..self.catalogue.len()).collect();
-
-        if self.search_query.is_empty() {
-            let browse = self.browse_indices();
-            self.set_sorted_results(browse);
+        let scored = if self.search_query.is_empty() {
+            None
         } else {
-            let now = Utc::now();
-            match self.catalogue.search_index().search(
+            let base_indices: Vec<usize> = (0..self.catalogue.len()).collect();
+            self.catalogue.search_index().search(
                 &self.search_query,
                 self.catalogue.entries(),
                 &base_indices,
-                &now,
+                &Utc::now(),
                 self.favorites.position_map(),
-            ) {
-                // The query normalized to no usable terms (e.g. pure
-                // punctuation) — fall back to the unfiltered, sorted
-                // view as if the box were empty.
-                None => self.set_sorted_results(base_indices),
-                Some(scored) => self.filtered_view.set_from_scored(
-                    scored
-                        .into_iter()
-                        .map(|(idx, display_name, _)| (idx, display_name)),
-                ),
+            )
+        };
+        match scored {
+            Some(scored) => self.filtered_view.set_from_scored(
+                scored
+                    .into_iter()
+                    .map(|(idx, display_name, _)| (idx, display_name)),
+            ),
+            // An empty query, or one that normalises to no terms such as a
+            // space, browses.
+            None => {
+                let browse = self.browse_indices();
+                self.set_sorted_results(browse);
             }
         }
         self.clamp_selected_row();
@@ -911,6 +915,7 @@ impl App {
     pub(crate) fn toggle_favorite(&mut self) {
         if let Some((idx, _)) = self.current_result() {
             self.favorites.toggle(idx);
+            self.clamp_selected_panel();
             self.save_config();
             self.apply_filter();
         }
@@ -1217,6 +1222,77 @@ mod tests {
         assert_eq!(first_city(&app), "Shanghai");
         let mut seen = std::collections::HashSet::new();
         assert!((0..len).all(|n| seen.insert(nth_tz(&app, n))));
+    }
+
+    /// A query with no letters or digits shows the browse list.
+    ///
+    /// Given: the picker.
+    /// When: the query is a space, then three dots.
+    /// Then: each lists the same rows as an empty query.
+    ///
+    /// Why it matters: a stray space or a punctuation key must not
+    /// flood the picker with every city and fixed offset there is.
+    #[test]
+    fn a_query_with_no_letters_or_digits_shows_the_browse_list() {
+        // Given:
+        let mut app = test_app();
+        let rows = |app: &App| -> Vec<usize> {
+            app.filtered_view
+                .rows()
+                .iter()
+                .map(|row| row.catalogue_idx)
+                .collect()
+        };
+        apply_query(&mut app, "");
+        let browse = rows(&app);
+
+        for query in [" ", "..."] {
+            // When:
+            apply_query(&mut app, query);
+
+            // Then:
+            let listed = rows(&app);
+            assert!(
+                listed == browse,
+                "query {query:?} listed {} rows, the browse list {}",
+                listed.len(),
+                browse.len()
+            );
+        }
+    }
+
+    /// Removing a favourite from the picker keeps the wall selection on
+    /// a panel.
+    ///
+    /// Given: three favourites with the last panel selected.
+    /// When: the picker removes the first favourite with Ctrl-f.
+    /// Then: the selection moves to the panel that is now last.
+    ///
+    /// Why it matters: a selection past the last panel lights nothing,
+    /// and Enter, `f`, `J` and `K` then do nothing.
+    #[test]
+    fn removing_a_favourite_from_the_picker_keeps_the_selection_on_a_panel() {
+        // Given:
+        let mut app = test_app();
+        for query in ["tokyo", "london", "paris"] {
+            app.enter_search();
+            for c in query.chars() {
+                app.search_input(c);
+            }
+            app.toggle_favorite();
+            app.exit_search();
+        }
+        assert_eq!(app.favorites.len(), 3);
+        app.selected_panel = 2;
+
+        // When:
+        app.enter_search();
+        app.toggle_favorite();
+        app.exit_search();
+
+        // Then:
+        assert_eq!(app.favorites.len(), 2);
+        assert_eq!(app.selected_panel, 1);
     }
 
     #[test]
