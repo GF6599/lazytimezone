@@ -509,4 +509,85 @@ mod tests {
             "Boston\t\tMassachusetts\tUnited States\tUS\t42.36\t-71.06\t667137\tAmerica/New_York"
         );
     }
+
+    /// A `cities1000.txt` row with the columns the fallback pick reads.
+    fn fallback_line(name: &str, feature: &str, population: &str, tz: &str) -> String {
+        let mut cols = vec![""; 19];
+        cols[1] = name;
+        cols[7] = feature;
+        cols[14] = population;
+        cols[17] = tz;
+        cols.join("\t")
+    }
+
+    /// The fallback takes a zone's administrative seat over a larger
+    /// town, and skips a zone the main dump already covers.
+    ///
+    /// Given: in `Pacific/Chatham`, a seat of 140 people and a town of
+    /// 4,000 that GeoNames tags with the zone, and a row for a zone that
+    /// is already covered.
+    /// When: the fallback lines are picked.
+    /// Then: only the seat is picked.
+    ///
+    /// Why it matters: the larger town is an Auckland suburb, so a pick
+    /// by population puts the Chatham clock in the wrong place.
+    #[test]
+    fn the_fallback_picks_a_zones_seat_over_a_larger_town() {
+        // Given:
+        let seat = fallback_line("Waitangi", FIRST_ORDER_SEAT, "140", "Pacific/Chatham");
+        let town = fallback_line("Suburb", "PPL", "4000", "Pacific/Chatham");
+        let covered_zone = fallback_line("Elsewhere", "PPL", "9000", "America/New_York");
+        let text = [town, seat.clone(), covered_zone].join("\n");
+        let covered = HashSet::from(["America/New_York"]);
+
+        // When:
+        let picked = pick_fallback_lines(&text, &covered);
+
+        // Then:
+        assert_eq!(picked, vec![seat.as_str()]);
+    }
+
+    /// A `zone.tab` row takes its name from the zone, and from the
+    /// comment only when the comment spells the same letters.
+    ///
+    /// Given: Dumont-d'Urville, whose comment restores the hyphens, and
+    /// Kanton, whose comment is a description, Port_Moresby, and a
+    /// covered zone.
+    /// When: the rows are built.
+    /// Then: the names are `Dumont-d'Urville`, `Kanton` and `Port
+    /// Moresby`, and the covered zone has no row.
+    ///
+    /// Why it matters: "Phoenix Islands" is a region, not a place, and
+    /// it would replace the station's name in the picker.
+    #[test]
+    fn a_zone_tab_row_takes_the_comment_only_when_it_spells_the_zone() {
+        // Given:
+        let text = "# comment\n\
+            AQ\t-6640+14001\tAntarctica/DumontDUrville\tDumont-d'Urville\n\
+            KI\t-0247-17143\tPacific/Kanton\tPhoenix Islands\n\
+            PG\t-0930+14710\tPacific/Port_Moresby\tPapua New Guinea (most areas)\n\
+            US\t+404251-0740023\tAmerica/New_York\tEastern (most areas)\n";
+        let covered = HashSet::from(["America/New_York"]);
+        let countries = HashMap::from([
+            ("AQ".to_string(), "Antarctica".to_string()),
+            ("KI".to_string(), "Kiribati".to_string()),
+            ("PG".to_string(), "Papua New Guinea".to_string()),
+            ("US".to_string(), "United States".to_string()),
+        ]);
+
+        // When:
+        let rows = zone_table_rows(text, &covered, &countries).unwrap();
+
+        // Then:
+        let names: Vec<&str> = rows.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, vec!["Dumont-d'Urville", "Kanton", "Port Moresby"]);
+    }
+
+    #[test]
+    fn a_short_zone_tab_row_is_an_error() {
+        let err =
+            zone_table_rows("AQ\t-6640+14001\n", &HashSet::new(), &HashMap::new()).unwrap_err();
+
+        assert!(err.contains("short row"), "got: {err}");
+    }
 }
