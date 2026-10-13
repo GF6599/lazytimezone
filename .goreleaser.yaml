@@ -3,7 +3,7 @@ version: 2
 before:
   hooks:
     - rustup default stable
-    - cargo install --locked cargo-zigbuild
+    - cargo install --locked cargo-zigbuild@0.23.4
 
 builds:
   - builder: rust
