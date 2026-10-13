@@ -392,6 +392,38 @@ mod tests {
         );
     }
 
+    /// A config path that does not exist yet loads the defaults and
+    /// leaves the files beside it alone.
+    ///
+    /// Given: files named `theme` and `favorites` in the folder of a
+    /// config path that does not exist.
+    /// When: the config loads.
+    /// Then: it holds the defaults with no warning, and both files are
+    /// still there with their content.
+    ///
+    /// Why it matters: `--config` can name a file in any folder, such as
+    /// a project folder, and a load must never read or delete files the
+    /// app did not write.
+    #[test]
+    fn a_missing_config_loads_defaults_and_leaves_its_folder_alone() {
+        // Given:
+        let tmp = TempConfig::new();
+        let theme = tmp.app_dir().join("theme");
+        let favorites = tmp.app_dir().join("favorites");
+        fs::write(&theme, "Nord\n").unwrap();
+        fs::write(&favorites, "Asia/Tokyo\n").unwrap();
+
+        // When:
+        let (cfg, warnings) = try_load(&tmp.config_path()).unwrap();
+
+        // Then:
+        assert_eq!(cfg.theme, default_theme());
+        assert!(cfg.favorites.is_empty());
+        assert!(warnings.is_empty());
+        assert_eq!(fs::read_to_string(&theme).unwrap(), "Nord\n");
+        assert_eq!(fs::read_to_string(&favorites).unwrap(), "Asia/Tokyo\n");
+    }
+
     #[test]
     fn a_malformed_file_is_reported_and_left_untouched() {
         let tmp = TempConfig::new();
