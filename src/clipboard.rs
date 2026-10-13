@@ -1,8 +1,8 @@
 //! # System clipboard subprocess driver.
 //!
-//! Provides a single public entry point — [`copy`] — that pipes a string
-//! into the platform-appropriate clipboard tool (`pbcopy` / `clip` /
-//! `wl-copy` / `xclip`) via stdin and returns a structured result.
+//! Provides one public entry point, [`copy`], that pipes a string into
+//! the platform's clipboard tool (`pbcopy`, `clip`, `wl-copy` or
+//! `xclip`) through stdin.
 //!
 //! ## Why subprocesses instead of a clipboard crate?
 //!
@@ -13,11 +13,10 @@
 //!
 //! ## Error surfacing
 //!
-//! Every distinct failure mode — missing binary (spawn error), broken
-//! pipe (write error), wait error, non-zero exit — produces a
-//! descriptive `io::Error` that the caller can route to the status bar.
-//! The program name is embedded in every error so the user can see which
-//! candidate (e.g. `pbcopy` vs `xclip`) failed.
+//! Each failure (a missing binary, a broken pipe, a failed wait or a
+//! non-zero exit) names the program once. When every candidate fails,
+//! [`copy`] returns all of their failures in one line for the status
+//! bar, so the user can see which tool to install or fix.
 
 use std::io;
 use std::io::Write;
@@ -26,9 +25,8 @@ use std::io::Write;
 /// first successful candidate or `Err(msg)` if every candidate failed
 /// (or no candidate is configured for the current platform).
 ///
-/// The returned `Err` string is suitable for direct surfacing in the
-/// status bar — it carries both the program name and the underlying OS
-/// error message.
+/// The `Err` string goes to the status bar as it is. It names each
+/// program that failed and why.
 pub fn copy(text: &str) -> Result<(), String> {
     copy_with(clipboard_commands(), text)
 }
@@ -40,15 +38,14 @@ fn copy_with(candidates: &[(&str, &[&str])], text: &str) -> Result<(), String> {
         return Err("No clipboard tool configured for this platform".to_string());
     }
 
-    let mut last_error: Option<String> = None;
+    let mut failures = Vec::new();
     for &(cmd, args) in candidates {
         match pipe_to_command(cmd, args, text) {
             Ok(()) => return Ok(()),
-            Err(e) => last_error = Some(format!("{cmd}: {e}")),
+            Err(e) => failures.push(e.to_string()),
         }
     }
-
-    Err(last_error.unwrap_or_else(|| "clipboard copy failed".to_string()))
+    Err(failures.join(", "))
 }
 
 /// Pipes `text` into a command's stdin, returning a structured error if
@@ -78,9 +75,7 @@ fn pipe_to_command(cmd: &str, args: &[&str], text: &str) -> io::Result<()> {
     if status.success() {
         Ok(())
     } else {
-        Err(io::Error::other(format!(
-            "{cmd} exited with status {status}"
-        )))
+        Err(io::Error::other(format!("{cmd} failed with {status}")))
     }
 }
 
