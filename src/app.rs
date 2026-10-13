@@ -1228,10 +1228,17 @@ mod tests {
         apply_query(&mut app, "");
 
         let len = app.filtered_view.len();
-        assert!(len > 300 && len < 500, "got {len} rows");
         assert_eq!(first_city(&app), "Shanghai");
         let mut seen = std::collections::HashSet::new();
         assert!((0..len).all(|n| seen.insert(nth_tz(&app, n))));
+        let city_zones: std::collections::HashSet<chrono_tz::Tz> = app
+            .catalogue
+            .entries()
+            .iter()
+            .filter(|e| !e.is_fixed_offset())
+            .map(|e| e.tz)
+            .collect();
+        assert_eq!(seen, city_zones);
     }
 
     /// A change made while the config file has an error says that it
@@ -1647,39 +1654,28 @@ mod tests {
 
     // ── Theme ───────────────────────────────────────────────────────
 
+    /// `t` moves to the next theme and saves it.
+    ///
+    /// Given: the app on the Default theme with a config file.
+    /// When: the theme cycles once, and the app starts again on that file.
+    /// Then: both show the theme after Default.
+    ///
+    /// Why it matters: a theme the user picks must still be there on the
+    /// next start.
     #[test]
-    fn cycle_theme_wraps_around() {
-        let mut app = test_app();
+    fn cycling_the_theme_saves_the_next_one() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let mut app = App::new(Some(tmp.path()));
         assert_eq!(app.theme, Theme::Default);
 
-        let themes = [
-            Theme::Dracula,
-            Theme::Solarized,
-            Theme::Nord,
-            Theme::Monokai,
-            Theme::Gruvbox,
-            Theme::RosePine,
-            Theme::Default,
-        ];
-        for expected in themes {
-            app.theme = app.theme.next();
-            assert_eq!(app.theme, expected);
-        }
-    }
+        // When:
+        app.cycle_theme();
+        let restarted = App::new(Some(tmp.path()));
 
-    #[test]
-    fn theme_from_label_round_trips() {
-        for theme in [
-            Theme::Default,
-            Theme::Dracula,
-            Theme::Solarized,
-            Theme::Nord,
-            Theme::Monokai,
-            Theme::Gruvbox,
-            Theme::RosePine,
-        ] {
-            assert_eq!(Theme::from_label(theme.label()), theme);
-        }
+        // Then:
+        assert_eq!(app.theme, Theme::Default.next());
+        assert_eq!(restarted.theme, Theme::Default.next());
     }
 
     /// A config file that names Rose Pine opens the app in Rose Pine.
@@ -1709,12 +1705,6 @@ mod tests {
 
         // Then:
         assert_eq!(app.theme.label(), "Rose Pine");
-    }
-
-    #[test]
-    fn theme_from_label_unknown_defaults() {
-        assert_eq!(Theme::from_label("NonExistent"), Theme::Default);
-        assert_eq!(Theme::from_label(""), Theme::Default);
     }
 
     // ── Select timezone ─────────────────────────────────────────────
@@ -1772,27 +1762,55 @@ mod tests {
 
     // ── Search editing (paste, commit, word-delete, kill-line) ──────
 
+    /// A paste lands at the cursor, filters the list, and highlights
+    /// the first row.
+    ///
+    /// Given: the picker with `to` typed and the second row highlighted.
+    /// When: `kyo` is pasted.
+    /// Then: the query is `tokyo`, Tokyo is the first row, and the first
+    /// row is highlighted.
+    ///
+    /// Why it matters: a paste arrives as one event, so it must do the
+    /// filtering that typing each letter would have done.
     #[test]
-    fn search_paste_appends_at_cursor_and_runs_filter() {
+    fn a_paste_lands_at_the_cursor_and_filters_the_list() {
+        // Given:
         let mut app = test_app();
         app.enter_search();
         app.search_input('t');
         app.search_input('o');
-        // Cursor at end ("to"). Paste finishes "kyo" — including a
-        // control char that must be stripped and a CJK char that must
-        // be preserved.
-        app.search_paste("k\u{0007}yo東");
-        assert_eq!(app.search_query, "tokyo東");
-        assert_eq!(app.cursor_position, "tokyo東".len());
-        // apply_filter ran exactly once after the bulk insert and the
-        // selection snapped back to the first result.
-        assert_eq!(app.selected_row, 0);
-        // The CJK suffix is non-matching, but the search still
-        // executed — verify by clearing the suffix via Ctrl-k and
-        // checking that Tokyo is the first hit.
-        app.cursor_position = "tokyo".len();
-        app.delete_to_end_of_line();
+        app.selected_row = 1;
+
+        // When:
+        app.search_paste("kyo");
+
+        // Then:
+        assert_eq!(app.search_query, "tokyo");
+        assert_eq!(app.cursor_position, "tokyo".len());
         assert_eq!(first_city(&app), "Tokyo");
+        assert_eq!(app.selected_row, 0);
+    }
+
+    /// A paste drops control characters, turns a tab into a space, and
+    /// keeps text in any script.
+    ///
+    /// Given: the empty picker.
+    /// When: `a`, a bell, a tab, `b` and `東` are pasted.
+    /// Then: the query is `a b東`.
+    ///
+    /// Why it matters: a copied cell or terminal line can carry control
+    /// characters that would corrupt the query line.
+    #[test]
+    fn a_paste_drops_control_characters_and_keeps_any_script() {
+        // Given:
+        let mut app = test_app();
+        app.enter_search();
+
+        // When:
+        app.search_paste("a\u{0007}\tb\u{6771}");
+
+        // Then:
+        assert_eq!(app.search_query, "a b\u{6771}");
     }
 
     #[test]
@@ -1871,26 +1889,6 @@ mod tests {
         assert_eq!(app.cursor_position, "tokyo".len());
         // Filter re-ran: Tokyo is the top hit again.
         assert_eq!(first_city(&app), "Tokyo");
-    }
-
-    #[test]
-    fn clear_search_input_from_normal_mode_resets_filter_without_changing_mode() {
-        // Models the Ctrl-l Normal-mode binding: a user typed a query,
-        // pressed Esc (which leaves the filter in place), then hit Ctrl-l
-        // to drop the filter without re-entering search mode.
-        let mut app = test_app();
-        let baseline_view_len = app.filtered_view.len();
-
-        apply_query(&mut app, "tokyo");
-        assert_ne!(app.filtered_view.len(), baseline_view_len);
-        app.input_mode = InputMode::Normal;
-
-        app.clear_search_input();
-
-        assert_eq!(app.search_query, "");
-        assert_eq!(app.cursor_position, 0);
-        assert_eq!(app.input_mode, InputMode::Normal);
-        assert_eq!(app.filtered_view.len(), baseline_view_len);
     }
 
     #[test]

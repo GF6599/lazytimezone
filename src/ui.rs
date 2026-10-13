@@ -1373,8 +1373,10 @@ mod tests {
 
         let rendered = render_app(&mut app, 80, 24).join("\n");
 
-        assert!(rendered.contains(" Tokyo "), "got:\n{rendered}");
-        assert!(rendered.contains(" London "), "got:\n{rendered}");
+        // The border corner pins each name to its panel title: the
+        // clock line above also names the main clock's city.
+        assert!(rendered.contains("\u{250c} Tokyo "), "got:\n{rendered}");
+        assert!(rendered.contains("\u{250c} London "), "got:\n{rendered}");
         assert!(!rendered.contains("press / to add a city"));
     }
 
@@ -1589,7 +1591,8 @@ mod tests {
             0,
             "block art on a 12-row terminal:\n{rendered}"
         );
-        assert!(rendered.contains("UTC"), "got:\n{rendered}");
+        // Only the clock line draws a city name followed by a dot.
+        assert!(rendered.contains("Tokyo \u{b7} "), "got:\n{rendered}");
     }
 
     /// A terminal too short for one panel still draws the clock.

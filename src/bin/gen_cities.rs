@@ -48,9 +48,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("usage: gen_cities <geonames-dir> <output-tsv>".into());
     };
     let dir = PathBuf::from(input_dir);
-    let admin1 = parse_admin1(&std::fs::read_to_string(dir.join("admin1CodesASCII.txt"))?);
+    let admin1 = parse_admin1(&std::fs::read_to_string(dir.join("admin1CodesASCII.txt"))?)?;
     let countries = parse_countries(&std::fs::read_to_string(dir.join("countryInfo.txt"))?);
     let cities_txt = std::fs::read_to_string(dir.join("cities15000.txt"))?;
+    let unnamed_states = unnamed_admin1_rows(&cities_txt, &admin1);
 
     let mut rows = Vec::new();
     for (number, line) in cities_txt.lines().enumerate() {
@@ -84,20 +85,49 @@ fn main() -> Result<(), Box<dyn Error>> {
     eprintln!("wrote {} cities to {output}", rows.len());
     eprintln!("{fallback_count} of them cover a zone cities15000.txt misses");
     eprintln!("{zone_table_count} of them come from zone.tab alone");
+    eprintln!("{unnamed_states} cities15000.txt rows name a state code with no name");
     Ok(())
 }
 
 /// `admin1CodesASCII.txt`: `US.MA<TAB>Massachusetts<TAB>...`. Returns
 /// the `CC.CODE -> name` map.
-fn parse_admin1(text: &str) -> HashMap<String, String> {
-    text.lines()
+///
+/// A file with no rows is an error. The download step keeps a file it
+/// once fetched, so a cut-off transfer would otherwise strip every
+/// state name and still exit cleanly.
+fn parse_admin1(text: &str) -> Result<HashMap<String, String>, String> {
+    let names: HashMap<String, String> = text
+        .lines()
         .filter_map(|line| {
             let mut cols = line.split('\t');
             let key = cols.next()?;
             let name = cols.next()?;
             (!key.is_empty() && !name.is_empty()).then(|| (key.to_string(), name.to_string()))
         })
-        .collect()
+        .collect();
+    if names.is_empty() {
+        return Err("admin1CodesASCII.txt holds no state names".to_string());
+    }
+    Ok(names)
+}
+
+/// How many city rows carry a state code that `admin1` has no name
+/// for. Such a row keeps an empty state, so the count is the only sign
+/// of a stale or partial names file.
+fn unnamed_admin1_rows(cities: &str, admin1: &HashMap<String, String>) -> usize {
+    cities
+        .lines()
+        .filter(|line| {
+            let cols: Vec<&str> = line.split('\t').collect();
+            let (Some(cc), Some(code)) = (cols.get(8), cols.get(10)) else {
+                return false;
+            };
+            let code = code.trim();
+            !code.is_empty()
+                && code != "00"
+                && !admin1.contains_key(&format!("{}.{code}", cc.trim()))
+        })
+        .count()
 }
 
 /// `countryInfo.txt`: `#`-prefixed comments, then one country per
@@ -381,7 +411,7 @@ mod tests {
     }
 
     fn lookups() -> (HashMap<String, String>, HashMap<String, String>) {
-        let admin1 = parse_admin1("US.MA\tMassachusetts\tMassachusetts\t6254926");
+        let admin1 = parse_admin1("US.MA\tMassachusetts\tMassachusetts\t6254926").unwrap();
         let countries = parse_countries(
             "# comment line\nUS\tUSA\t840\tUS\tUnited States\tWashington\t9629091\t310232863\tNA",
         );
@@ -508,5 +538,123 @@ mod tests {
             data[0],
             "Boston\t\tMassachusetts\tUnited States\tUS\t42.36\t-71.06\t667137\tAmerica/New_York"
         );
+    }
+
+    /// A `cities1000.txt` row with the columns the fallback pick reads.
+    fn fallback_line(name: &str, feature: &str, population: &str, tz: &str) -> String {
+        let mut cols = vec![""; 19];
+        cols[1] = name;
+        cols[7] = feature;
+        cols[14] = population;
+        cols[17] = tz;
+        cols.join("\t")
+    }
+
+    /// The fallback takes a zone's administrative seat over a larger
+    /// town, and skips a zone the main dump already covers.
+    ///
+    /// Given: in `Pacific/Chatham`, a seat of 140 people and a town of
+    /// 4,000 that GeoNames tags with the zone, and a row for a zone that
+    /// is already covered.
+    /// When: the fallback lines are picked.
+    /// Then: only the seat is picked.
+    ///
+    /// Why it matters: the larger town is an Auckland suburb, so a pick
+    /// by population puts the Chatham clock in the wrong place.
+    #[test]
+    fn the_fallback_picks_a_zones_seat_over_a_larger_town() {
+        // Given:
+        let seat = fallback_line("Waitangi", FIRST_ORDER_SEAT, "140", "Pacific/Chatham");
+        let town = fallback_line("Suburb", "PPL", "4000", "Pacific/Chatham");
+        let covered_zone = fallback_line("Elsewhere", "PPL", "9000", "America/New_York");
+        let text = [town, seat.clone(), covered_zone].join("\n");
+        let covered = HashSet::from(["America/New_York"]);
+
+        // When:
+        let picked = pick_fallback_lines(&text, &covered);
+
+        // Then:
+        assert_eq!(picked, vec![seat.as_str()]);
+    }
+
+    /// A `zone.tab` row takes its name from the zone, and from the
+    /// comment only when the comment spells the same letters.
+    ///
+    /// Given: Dumont-d'Urville, whose comment restores the hyphens, and
+    /// Kanton, whose comment is a description, Port_Moresby, and a
+    /// covered zone.
+    /// When: the rows are built.
+    /// Then: the names are `Dumont-d'Urville`, `Kanton` and `Port
+    /// Moresby`, and the covered zone has no row.
+    ///
+    /// Why it matters: "Phoenix Islands" is a region, not a place, and
+    /// it would replace the station's name in the picker.
+    #[test]
+    fn a_zone_tab_row_takes_the_comment_only_when_it_spells_the_zone() {
+        // Given:
+        let text = "# comment\n\
+            AQ\t-6640+14001\tAntarctica/DumontDUrville\tDumont-d'Urville\n\
+            KI\t-0247-17143\tPacific/Kanton\tPhoenix Islands\n\
+            PG\t-0930+14710\tPacific/Port_Moresby\tPapua New Guinea (most areas)\n\
+            US\t+404251-0740023\tAmerica/New_York\tEastern (most areas)\n";
+        let covered = HashSet::from(["America/New_York"]);
+        let countries = HashMap::from([
+            ("AQ".to_string(), "Antarctica".to_string()),
+            ("KI".to_string(), "Kiribati".to_string()),
+            ("PG".to_string(), "Papua New Guinea".to_string()),
+            ("US".to_string(), "United States".to_string()),
+        ]);
+
+        // When:
+        let rows = zone_table_rows(text, &covered, &countries).unwrap();
+
+        // Then:
+        let names: Vec<&str> = rows.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, vec!["Dumont-d'Urville", "Kanton", "Port Moresby"]);
+    }
+
+    #[test]
+    fn a_short_zone_tab_row_is_an_error() {
+        let err =
+            zone_table_rows("AQ\t-6640+14001\n", &HashSet::new(), &HashMap::new()).unwrap_err();
+
+        assert!(err.contains("short row"), "got: {err}");
+    }
+
+    /// An empty state names file stops the generator.
+    ///
+    /// Given: an `admin1CodesASCII.txt` with no rows.
+    /// When: it is parsed.
+    /// Then: the result is an error.
+    ///
+    /// Why it matters: a cut-off download leaves an empty or partial
+    /// file, and every city would lose its state with no error.
+    #[test]
+    fn an_empty_state_names_file_is_an_error() {
+        assert!(parse_admin1("").is_err());
+    }
+
+    /// Rows whose state code has no name are counted.
+    ///
+    /// Given: Boston (US.MA, named), a row with code `ZZ` (not named),
+    /// and a row with the `00` placeholder.
+    /// When: the unnamed rows are counted.
+    /// Then: the count is one.
+    ///
+    /// Why it matters: such a row keeps an empty state, so the count in
+    /// the summary is the only sign that the names file is stale.
+    #[test]
+    fn rows_with_an_unnamed_state_code_are_counted() {
+        // Given:
+        let (admin1, _) = lookups();
+        let unnamed = boston_line().replace("\tMA\t", "\tZZ\t");
+        let placeholder = boston_line().replace("\tMA\t", "\t00\t");
+        let text = [boston_line(), unnamed, placeholder].join("\n");
+
+        // When:
+        let count = unnamed_admin1_rows(&text, &admin1);
+
+        // Then:
+        assert_eq!(count, 1);
     }
 }
