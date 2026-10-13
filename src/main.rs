@@ -37,9 +37,12 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-fn main() -> std::io::Result<()> {
+fn main() {
     let cli = cli::Cli::parse();
-    run_tui(cli.config_path())
+    if let Err(e) = run_tui(cli.config_path()) {
+        eprintln!("lazytimezone: {e}");
+        std::process::exit(1);
+    }
 }
 
 /// Initialises the terminal, runs the event loop, and restores the terminal
@@ -52,24 +55,33 @@ fn main() -> std::io::Result<()> {
 ///
 /// Propagates I/O errors from terminal setup, rendering, or event polling.
 fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
-    // ratatui::init() enables raw mode, enters the alternate screen, AND
-    // installs a panic hook that calls ratatui::restore() before unwinding,
-    // so a panic inside ui::draw can no longer leave the user's shell
-    // corrupted. Mouse capture is intentionally NOT enabled: we have no
-    // mouse handlers, and enabling it would break native terminal text
-    // selection (users would have to hold Shift/Option to select).
-    let mut terminal = ratatui::init();
+    // Mouse capture stays off: the app has no mouse handlers, and capture
+    // would break the terminal's own text selection. try_init can fail
+    // after it has turned raw mode on, so its error path restores too.
+    let mut terminal = match ratatui::try_init() {
+        Ok(terminal) => terminal,
+        Err(e) => {
+            ratatui::restore();
+            return Err(std::io::Error::new(
+                e.kind(),
+                format!("cannot open the terminal: {e}"),
+            ));
+        }
+    };
+    // ratatui's panic hook leaves raw mode and the alternate screen only.
+    let restore_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        disable_bracketed_paste();
+        restore_hook(info);
+    }));
 
-    // Opt into bracketed paste so the terminal delivers pasted text as a
-    // single Event::Paste payload instead of N synthetic keypresses —
-    // App::search_paste relies on this to run apply_filter exactly once
-    // per paste rather than per character.
-    crossterm::execute!(std::io::stdout(), crossterm::event::EnableBracketedPaste)?;
-
-    // Wrap the loop in a closure so cleanup runs unconditionally — any
-    // `?` propagation from terminal.draw or handle_events flows through
-    // `result` instead of skipping the restore() call below.
+    // Every `?` below lands in `result`, so the restore after the closure
+    // runs on every exit.
     let result = (|| -> std::io::Result<()> {
+        // Bracketed paste delivers a paste as one Event::Paste, so
+        // App::search_paste filters once per paste, not once per character.
+        crossterm::execute!(std::io::stdout(), crossterm::event::EnableBracketedPaste)?;
+
         let mut app = app::App::new(config_path);
         let mut events = events::TerminalEvents;
 
@@ -109,14 +121,13 @@ fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
         Ok(())
     })();
 
-    // Disable bracketed paste before ratatui::restore() drops us out of
-    // the alternate screen. We deliberately ignore the result here so
-    // the genuine `result` from the loop closure is what the caller
-    // sees — restoring the terminal must take priority over a paste-mode
-    // toggle failure.
-    let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableBracketedPaste);
-
-    // Restore terminal to its original state regardless of how the loop ended.
+    disable_bracketed_paste();
     ratatui::restore();
     result
+}
+
+/// Turns bracketed paste off. A failure is ignored: the caller is already
+/// leaving, and the error that made it leave is the one worth reporting.
+fn disable_bracketed_paste() {
+    let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableBracketedPaste);
 }
