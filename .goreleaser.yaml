@@ -12,6 +12,7 @@ builds:
     # city catalogue and has no place in a release archive.
     flags:
       - --release
+      - --locked
       - --bin=lazytimezone
     targets:
       - x86_64-apple-darwin

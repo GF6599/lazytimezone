@@ -21,7 +21,7 @@ demo:
 # Lint with the same denial level CI uses
 [group('dev')]
 lint:
-    cargo clippy --all-targets -- -D warnings
+    cargo clippy --locked --all-targets -- -D warnings
 
 # Format the workspace in place
 [group('dev')]
@@ -31,7 +31,7 @@ fmt:
 # Run the full test suite
 [group('dev')]
 test:
-    cargo test --all-targets
+    cargo test --locked --all-targets
 
 # CI installs the same version through `tools`, so the gate is one tool on
 # every machine.
@@ -71,7 +71,7 @@ gen-cities:
 # Build release binaries and copy to dist/
 [group('deploy')]
 build:
-    cargo build --release
+    cargo build --locked --release
     cross build --release --target x86_64-unknown-linux-gnu
     mkdir -p dist
     cp target/release/lazytimezone dist/
