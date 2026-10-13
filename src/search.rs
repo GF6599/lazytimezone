@@ -220,7 +220,13 @@ impl TimezoneSearchData {
             city: SearchText::new(entry.city),
             country: normalize_search_text(entry.country),
             region: normalize_search_text(region_of(entry.tz)),
-            timezone_words: normalize_search_text(&entry.tz.to_string()),
+            // The IANA name of a fixed offset inverts its sign: `Etc/GMT-10`
+            // is UTC+10. Its offset terms find it instead.
+            timezone_words: if entry.is_fixed_offset() {
+                String::new()
+            } else {
+                normalize_search_text(&entry.tz.to_string())
+            },
             state: normalize_search_text(entry.admin1),
             // Per-city aliases: the ASCII transliteration plus the
             // curated nicknames, exonyms, and landmarks. Other cities
