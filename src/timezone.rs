@@ -282,17 +282,17 @@ pub(crate) fn region_of(tz: Tz) -> &'static str {
 /// solar-position model. [`sun_times`] moves it onto a local clock.
 ///
 /// Inputs:
-/// - `latitude_deg` — positive = north, negative = south
-/// - `day_of_year` — 1..=366 (e.g. from `chrono::Datelike::ordinal`)
+/// - `latitude_deg`: positive = north, negative = south
+/// - `day_of_year`: 1..=366 (e.g. from `chrono::Datelike::ordinal`)
 ///
 /// Polar regions:
 /// - Polar day → returns `(0.0, 24.0)` (sun never sets)
-/// - Polar night → returns `(12.0, 12.0)` (sun never rises — empty window)
+/// - Polar night → returns `(12.0, 12.0)` (the sun never rises, an empty window)
 pub(crate) fn sun_window(latitude_deg: f64, day_of_year: u32) -> (f64, f64) {
     use std::f64::consts::PI;
 
     let lat = latitude_deg.to_radians();
-    // Cooper's formula for solar declination — accurate to within ~0.5°.
+    // Cooper's formula for solar declination, accurate to within ~0.5°.
     // The 365.0 denominator ignores leap years, introducing a ~1-day phase
     // error that's negligible for a binary day/night decision.
     let declination =
@@ -365,7 +365,7 @@ pub fn is_daytime_at_coordinates(place: Coordinates, local: &DateTime<Tz>) -> bo
 /// `UTC+5` or `UTC+5:30`.
 ///
 /// Used by both the table column ([`crate::ui`]) and the search scoring
-/// haystack ([`crate::search`]) — kept here in [`timezone`] because UTC
+/// haystack ([`crate::search`]). It lives in [`timezone`] because UTC
 /// offsets are a timezone concern, not a search concern.
 pub fn format_utc_offset(total_secs: i32) -> String {
     let sign = if total_secs >= 0 { '+' } else { '-' };
@@ -381,7 +381,7 @@ pub fn format_utc_offset(total_secs: i32) -> String {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the
+    // Tests panic on failure by design. See src/app.rs for the
     // rationale on why production lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
@@ -503,21 +503,21 @@ mod tests {
 
     #[test]
     fn high_latitude_summer_is_long_day() {
-        // Reykjavík (64°N) in late June — sun barely sets
+        // Reykjavík (64°N) in late June: the sun barely sets
         let (sunrise, sunset) = sun_window(64.13, 172);
         assert!(sunset - sunrise > 20.0);
     }
 
     #[test]
     fn high_latitude_winter_is_short_day() {
-        // Reykjavík in late December — only ~4 hours of daylight
+        // Reykjavík in late December: only ~4 hours of daylight
         let (sunrise, sunset) = sun_window(64.13, 355);
         assert!(sunset - sunrise < 6.0);
     }
 
     #[test]
     fn polar_summer_is_polar_day() {
-        // 80°N in mid-summer — sun never sets
+        // 80°N in mid-summer: the sun never sets
         let (sunrise, sunset) = sun_window(80.0, 172);
         assert_eq!(sunrise, 0.0);
         assert_eq!(sunset, 24.0);
@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn polar_winter_is_polar_night() {
-        // 80°N in mid-winter — sun never rises
+        // 80°N in mid-winter: the sun never rises
         let (sunrise, sunset) = sun_window(80.0, 355);
         assert_eq!(sunrise, 12.0);
         assert_eq!(sunset, 12.0);
@@ -713,7 +713,7 @@ mod tests {
         assert!(found, "{tz:?} should be findable as {term:?}");
     }
 
-    /// Section A — two- and three-letter city shortcuts. These were the
+    /// Section A: two- and three-letter city shortcuts. These were the
     /// biggest losses in the findability review because `score_field`'s
     /// 3-char minimum on contains-mode meant they never matched.
     #[test]
@@ -727,7 +727,7 @@ mod tests {
         assert_findable(Tz::Asia__Singapore, "SG");
     }
 
-    /// Section B — IATA airport codes route to the city whose timezone the
+    /// Section B: IATA airport codes route to the city whose timezone the
     /// airport actually sits in. The Houston/Dallas case is the most
     /// surprising one (Central Time → America/Chicago), so it's pinned here.
     #[test]
@@ -743,7 +743,7 @@ mod tests {
         assert_findable(Tz::Pacific__Auckland, "AKL");
     }
 
-    /// Section C — historical / colloquial city and country names route to
+    /// Section C: historical / colloquial city and country names route to
     /// the modern catalogue entry without overriding its display label.
     #[test]
     fn historical_names_bombay_kiev_route_correctly() {
@@ -756,12 +756,12 @@ mod tests {
         assert_findable(Tz::Asia__Tehran, "Persia");
         assert_findable(Tz::Asia__Bangkok, "Siam");
         assert_findable(Tz::Europe__Amsterdam, "Holland");
-        // Saigon was already aliased before this change — verify it's still
+        // Saigon was already aliased before this change. Check that it is still
         // resolvable so a future cleanup doesn't accidentally drop it.
         assert_findable(Tz::Asia__Ho_Chi_Minh, "Saigon");
     }
 
-    /// Section D — country abbreviations and endonyms resolve via
+    /// Section D: country abbreviations and endonyms resolve via
     /// `country_search_aliases`. Spot-checks the most common cases plus a
     /// pre-existing one to lock the contract in.
     #[test]

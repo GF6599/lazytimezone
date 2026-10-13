@@ -2,7 +2,7 @@
 //!
 //! Builds a per-entry search index from the static timezone catalogue,
 //! scores user queries against it, and returns ranked results. There is
-//! no I/O, no [`App`] state, and no mutable global — the module exists
+//! no I/O, no [`App`] state, and no mutable global. The module exists
 //! purely so [`crate::app::App::apply_filter`] can be a thin glue
 //! function instead of a 60-line method that rebuilds normalized
 //! haystacks on every keystroke.
@@ -52,8 +52,8 @@ use chrono::offset::Offset;
 
 /// Minimum query length required for a contains-style (substring) match.
 ///
-/// Shorter terms only count if they exactly equal or prefix a candidate
-/// — otherwise a single letter would match almost every entry and the
+/// Shorter terms only count if they exactly equal or prefix a candidate.
+/// Otherwise a single letter would match almost every entry and the
 /// substring pass would dominate the ranking.
 const CONTAINS_MIN_CHARS: usize = 3;
 
@@ -86,19 +86,16 @@ impl SearchIndex {
     /// `entries`, computed at the wall-clock instant `now`.
     ///
     /// Returns `None` when the query normalizes to no terms (empty
-    /// string or pure punctuation) — the caller should treat this
-    /// identically to an empty search box and fall back to the
-    /// unfiltered, favourites-first sort. `Some(vec)` always reflects
-    /// an actually-issued query, even if zero candidates matched.
+    /// string or pure punctuation). The caller then treats the box as
+    /// empty. `Some(vec)` always reflects an issued query, even if no
+    /// candidate matched.
     ///
-    /// Each result is `(entry_index, display_name, score)` sorted by
-    /// score descending, with display-name and city-name ties broken
-    /// alphabetically. Favorites receive a
-    /// [`FAVORITE_TIEBREAKER_BONUS`] score nudge so that they outrank
-    /// otherwise-equivalent matches (sum-only tiebreaker, never a
-    /// rank override — see module-level docs).
+    /// Each result is `(entry_index, display_name, score)`, sorted by
+    /// score descending, then population descending, then display name
+    /// and city name. Favorites gain [`FAVORITE_TIEBREAKER_BONUS`], so
+    /// they win a tie and only a tie.
     ///
-    /// `base_indices` is the candidate set — typically `0..entries.len()`
+    /// `base_indices` is the candidate set: typically `0..entries.len()`
     /// for the unfiltered catalogue, or just the favorites' indices when
     /// the favorites-only filter is active.
     ///
@@ -137,10 +134,9 @@ impl SearchIndex {
                     .entry(offset_secs)
                     .or_insert_with(|| offset_search_terms(offset_secs));
                 let mut score =
-                    score_phrase_match(&query, &self.entries[i], offset_terms.as_slice());
+                    score_against_haystack(&query.normalized, &self.entries[i], offset_terms);
                 for term in &query.terms {
-                    let term_score =
-                        score_search_term(term, &self.entries[i], offset_terms.as_slice());
+                    let term_score = score_against_haystack(term, &self.entries[i], offset_terms);
                     if term_score == 0 {
                         return None;
                     }
@@ -283,7 +279,7 @@ impl SearchQuery {
 /// Rewrites a lone bare `utc` or `gmt` term to `utc+0`.
 ///
 /// Without this rewrite, typing just `utc` would match every entry whose
-/// haystack contains the literal substring `utc` — which is almost every
+/// haystack contains the literal substring `utc`, which is almost every
 /// entry, because the cached offset aliases include UTC-prefixed forms.
 /// The rewrite only fires when the entire query is a single bare term,
 /// so compound queries like `utc tokyo` keep their literal `utc` term.
@@ -295,11 +291,8 @@ fn rewrite_bare_offset_aliases(terms: &mut Vec<String>) {
 
 // ── Scoring weights ─────────────────────────────────────────────────
 
-/// Per-field exact/prefix/contains weights.
-///
-/// Two separate weight tables ([`PHRASE_WEIGHTS`] and [`TERM_WEIGHTS`])
-/// hold the actual numbers; this struct just gives them names instead
-/// of leaving three magic integers at every call site.
+/// Per-field exact/prefix/contains weights. [`FIELD_WEIGHTS`] holds the
+/// numbers, and this struct names them.
 #[derive(Copy, Clone, Debug)]
 struct FieldWeights {
     exact: u32,
@@ -320,9 +313,8 @@ impl FieldWeights {
 
 /// Which field of an entry is being scored.
 ///
-/// One table drives the phrase pass, the per-term pass, and nothing
-/// else. The order of the entries doubles as the human-readable
-/// priority order: city outranks aliases outranks state, and so on.
+/// One table, [`FIELD_WEIGHTS`], weights each field for both the
+/// phrase pass and the per-term pass.
 #[derive(Copy, Clone, Debug)]
 enum Field {
     City,
@@ -413,24 +405,9 @@ const FIELD_WEIGHTS: [(Field, FieldWeights); 9] = [
 
 // ── Scoring ─────────────────────────────────────────────────────────
 
-fn score_phrase_match(
-    query: &SearchQuery,
-    search: &TimezoneSearchData,
-    offset_terms: &[String],
-) -> u32 {
-    if query.normalized.is_empty() {
-        return 0;
-    }
-    score_against_haystack(&query.normalized, search, offset_terms, &FIELD_WEIGHTS)
-}
-
-fn score_search_term(term: &str, search: &TimezoneSearchData, offset_terms: &[String]) -> u32 {
-    score_against_haystack(term, search, offset_terms, &FIELD_WEIGHTS)
-}
-
-/// Walks every field in `weights` (in declaration order, which is the
-/// human-readable priority order), scores `query` against that field's
-/// candidate strings, and returns the single best score.
+/// Scores `query` against every field in [`FIELD_WEIGHTS`] and returns
+/// the single best score. The weights rank the fields, so the order of
+/// the table does not matter.
 ///
 /// Multi-candidate fields (aliases, keywords, country_aliases, offset)
 /// expand to "best score across their candidates"; single-string fields
@@ -440,10 +417,9 @@ fn score_against_haystack(
     query: &str,
     search: &TimezoneSearchData,
     offset_terms: &[String],
-    weights: &[(Field, FieldWeights); 9],
 ) -> u32 {
     let mut best = 0;
-    for (field, w) in weights {
+    for (field, w) in &FIELD_WEIGHTS {
         let candidate_best = match field {
             Field::City => score_field(&search.city.normalized, query, *w),
             Field::Aliases => best_score(
@@ -518,7 +494,7 @@ fn best_score<'a>(
 }
 
 /// Scores how well `term` matches `field`, returning the weight that
-/// corresponds to the strongest match kind ([`MatchKind`]) — or zero
+/// corresponds to the strongest match kind ([`MatchKind`]), or zero
 /// when neither exact, prefix, nor contains rules apply.
 fn score_field(field: &str, term: &str, weights: FieldWeights) -> u32 {
     MatchKind::classify(field, term)
@@ -531,7 +507,7 @@ fn score_field(field: &str, term: &str, weights: FieldWeights) -> u32 {
 ///
 /// Separating "what kind of match was it?" from "how much is that
 /// match worth?" means the rules can be unit-tested independently of
-/// the weight tables — and adding a fourth match kind (e.g. fuzzy)
+/// the weight tables, and adding a fourth match kind (e.g. fuzzy)
 /// later doesn't require touching every call site.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum MatchKind {
@@ -594,7 +570,7 @@ fn ends_a_number(term: &str, rest: &str) -> bool {
 /// or matches `term` after stripping a leading offset sign.
 ///
 /// The sign-strip exists so that bare digit queries (`5`) match offset
-/// tokens like `+5` and `-5` inside the cached offset haystacks — the
+/// tokens like `+5` and `-5` inside the cached offset haystacks: the
 /// user expects `gmt 5` to find UTC+5 cities without typing the plus.
 fn word_matches_term(word: &str, term: &str) -> bool {
     if starts_with_term(word, term) {
@@ -731,7 +707,7 @@ fn normalize_search_text(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the
+    // Tests panic on failure by design. See src/app.rs for the
     // rationale on why production lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
@@ -840,7 +816,7 @@ mod tests {
     /// Builds a real `SearchIndex` from the full catalogue. End-to-end
     /// tests need the live catalogue because `TimezoneEntry` has
     /// `&'static str` fields that the supplemental-search-term lookup
-    /// hashes against — hand-rolling synthetic entries would
+    /// hashes against, and hand-rolling synthetic entries would
     /// short-circuit half the index.
     fn fixture() -> (&'static [TimezoneEntry], SearchIndex) {
         let entries = crate::timezone::all_timezones();
@@ -989,7 +965,7 @@ mod tests {
     fn search_and_logic_rejects_entry_missing_any_term() {
         let (entries, index) = fixture();
         let favorites = HashMap::new();
-        // "tokyo paris" cannot match a single entry — Tokyo's haystack
+        // "tokyo paris" cannot match a single entry: Tokyo's haystack
         // has no "paris" and vice versa. AND logic across terms means
         // the result set must be empty.
         let results =
@@ -1094,7 +1070,7 @@ mod tests {
     fn search_returns_none_for_pure_punctuation() {
         let (entries, index) = fixture();
         let favorites = HashMap::new();
-        // Pure punctuation normalizes to an empty term list — the
+        // Pure punctuation normalizes to an empty term list, and the
         // public contract is to return None so the caller can fall
         // back to the unfiltered view.
         assert!(run_search(&index, entries, "...", &favorites).is_none());

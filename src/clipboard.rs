@@ -7,7 +7,7 @@
 //! ## Why subprocesses instead of a clipboard crate?
 //!
 //! Native clipboard crates (`arboard`, `clipboard-rs`) pull in heavy
-//! platform dependencies — X11 / Wayland / AppKit FFI plus a background
+//! platform dependencies: X11 / Wayland / AppKit FFI plus a background
 //! thread to hold the selection. For a one-shot timestamp copy on a key
 //! press the subprocess approach is simpler and pulls no extra deps.
 //!
@@ -112,7 +112,7 @@ fn clipboard_commands() -> &'static [(&'static str, &'static [&'static str])] {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the rationale
+    // Tests panic on failure by design. See src/app.rs for the rationale
     // on why the production panic lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 

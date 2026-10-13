@@ -20,8 +20,8 @@
 //! - [`try_load`] / [`try_save`] take an explicit path and surface
 //!   [`io::Result`] so a caller can choose to abort, warn, or fall back
 //!   to defaults without auto-clobbering a malformed user file.
-//! - [`default_path`] exposes the canonical path so a caller can format
-//!   diagnostics or feed the rich API.
+//! - [`default_path`] gives the canonical path, used when no `--config`
+//!   flag names another.
 
 use crate::theme::Theme;
 use serde::{Deserialize, Serialize};
@@ -97,14 +97,10 @@ fn config_dir_from(xdg_config_home: Option<String>, home: Option<String>) -> Opt
         })
 }
 
-fn config_path() -> Option<PathBuf> {
-    config_dir().map(|d| d.join("lazytimezone").join("config.toml"))
-}
-
 /// Canonical on-disk config path, or `None` if neither `$XDG_CONFIG_HOME`
 /// nor `$HOME` is set.
 pub fn default_path() -> Option<PathBuf> {
-    config_path()
+    config_dir().map(|d| d.join("lazytimezone").join("config.toml"))
 }
 
 /// Path-aware loader that distinguishes the three states a caller cares
@@ -112,7 +108,7 @@ pub fn default_path() -> Option<PathBuf> {
 /// (config + any soft warnings), file present but unreadable / malformed
 /// (error).
 ///
-/// On a parse error the caller must NOT auto-save — that would clobber
+/// On a parse error the caller must NOT auto-save, because that would clobber
 /// the user's broken file before they have a chance to fix it.
 pub fn try_load(path: &Path) -> io::Result<(Config, Vec<LoadWarning>)> {
     if !path.exists() {
@@ -214,7 +210,7 @@ fn write_and_sync(path: &Path, bytes: &[u8]) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the rationale
+    // Tests panic on failure by design. See src/app.rs for the rationale
     // on why the production panic lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
     use super::*;

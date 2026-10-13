@@ -1,7 +1,7 @@
 //! # Keyboard event handling.
 //!
 //! Maps raw crossterm key events to [`App`] method calls. The module is
-//! intentionally thin — all business logic lives in [`App`]; this layer
+//! intentionally thin. All business logic lives in [`App`], and this layer
 //! only decides *which* method to call.
 //!
 //! Key bindings are split by [`InputMode`]:
@@ -40,13 +40,14 @@ impl EventSource for TerminalEvents {
 /// so piped or held input stalls the redraw and the quit check.
 const MAX_DRAINED_EVENTS: usize = 256;
 
-/// Polls for a key event for at most `timeout`.
+/// Polls for terminal events (keys, pastes and resizes) for at most
+/// `timeout`.
 ///
 /// The caller (the event loop in `main`) computes `timeout` so the
 /// poll wakes at the next tick boundary, keeping clock updates tight
 /// (≤ tick) while drawing only once per tick when idle.
 ///
-/// Only `KeyEventKind::Press` is handled — release and repeat events
+/// Only `KeyEventKind::Press` is handled. Release and repeat events
 /// are ignored to prevent duplicate actions on platforms that emit them.
 pub fn handle_events(
     app: &mut App,
@@ -91,8 +92,7 @@ fn dispatch_event(app: &mut App, event: Event) {
 }
 
 /// Routes a single key event through the Ctrl-C, help-modal, and
-/// mode-specific handlers. Extracted so `handle_events` can also call it
-/// when draining a coalesced key-repeat burst.
+/// mode-specific handlers.
 fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
     if key.kind != KeyEventKind::Press {
         return;
@@ -103,7 +103,7 @@ fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
     }
     // Any keypress dismisses the startup-message banner so it never
     // lingers past the user's first interaction. Done up here (not
-    // inside the per-mode handlers) so EVERY key flushes the banner —
+    // inside the per-mode handlers) so EVERY key flushes the banner,
     // including ones that would otherwise be no-ops. The keypress is
     // still allowed to flow through to its normal handler below.
     app.dismiss_startup_messages();
@@ -182,8 +182,8 @@ fn handle_search_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Enter => app.commit_search_result_and_exit(),
         KeyCode::Backspace => app.search_backspace(),
         KeyCode::Delete => app.search_delete(),
-        KeyCode::Up => app.move_up(),
-        KeyCode::Down => app.move_down(),
+        KeyCode::Up => app.select_previous_result(),
+        KeyCode::Down => app.select_next_result(),
         KeyCode::Left => app.search_cursor_left(),
         KeyCode::Right => app.search_cursor_right(),
         KeyCode::Home => app.search_cursor_home(),
@@ -216,7 +216,7 @@ fn handle_search_mode(app: &mut App, key: crossterm::event::KeyEvent) {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the rationale
+    // Tests panic on failure by design. See src/app.rs for the rationale
     // on why the production panic lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 

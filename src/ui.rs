@@ -1,8 +1,9 @@
 //! # Terminal UI rendering.
 //!
-//! Pure rendering layer — reads [`App`] state and writes to a ratatui
-//! [`Frame`]. No input handling or state mutation happens here (aside
-//! from reading `App` fields and borrowing `&mut` for table state).
+//! Reads [`App`] state and writes a ratatui [`Frame`]. It handles no
+//! input. It writes two values back to `App`, because only the layout
+//! knows them: the number of panel columns, which the arrow keys need,
+//! and the help scroll limit.
 //!
 //! ## Layout (top to bottom)
 //!
@@ -55,8 +56,8 @@ use crate::timezone::{
     sun_times,
 };
 
-/// Top-level render entry point — splits the frame into five vertical
-/// zones and delegates to specialised draw functions.
+/// Top-level render entry point. Splits the frame into the title bar,
+/// the hero clock, the wall and the status bar.
 pub fn draw(frame: &mut Frame, app: &mut App) {
     draw_at(frame, app, Utc::now());
 }
@@ -94,12 +95,6 @@ fn draw_at(frame: &mut Frame, app: &mut App, now: DateTime<Utc>) {
     }
 }
 
-/// Renders a centered help popup listing every keybinding, grouped
-/// by mode. Scrolled with the arrows, dismissed by any other keypress
-/// (handled in `events.rs`).
-///
-/// Uses [`Clear`] to wipe the underlying cells before drawing, so
-/// the popup's transparent borders don't bleed background through.
 /// The README lists the same bindings for a reader who has not built the
 /// app yet. Both lists are hand-written, so
 /// `every_help_binding_appears_in_the_readme` holds them together.
@@ -139,6 +134,11 @@ fn section_header(title: &'static str, tc: &ThemeColors) -> Line<'static> {
     ))
 }
 
+/// Renders a centered help popup listing every keybinding, grouped by
+/// mode. The arrows scroll it, and any other key closes it.
+///
+/// [`Clear`] wipes the cells underneath first, so the background does
+/// not show through the popup's borders.
 fn draw_help_popup(frame: &mut Frame, app: &mut App, area: Rect, tc: &ThemeColors) {
     let mut lines: Vec<Line> = vec![section_header("Normal mode", tc)];
     lines.extend(
@@ -241,7 +241,7 @@ fn centered_rect(w: u16, h: u16, area: Rect) -> Rect {
 fn draw_title_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
     // Two-cell horizontal split: left flexes, right is exactly the
     // theme label plus a trailing space. ratatui handles truncation
-    // and padding — no manual width arithmetic required.
+    // and padding, with no manual width arithmetic required.
     let theme_text = format!("{} ", app.theme.label());
     let theme_text_width = theme_text.as_str().width() as u16;
     let chunks = Layout::default()
@@ -380,6 +380,13 @@ fn draw_hero_clock(
     .style(Style::default().bg(tc.bg));
     frame.render_widget(meta_line, chunks[3]);
 }
+
+/// How long the status bar shows the result of a copy.
+const COPY_FLASH_FOR: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Every theme shows a failure in this red, so it stands out against
+/// each palette. `ThemeColors` has no slot for it.
+const FAILURE_RED: Color = Color::Rgb(220, 80, 80);
 
 /// One gutter column and two border columns leave 24 cells inside, one
 /// for each hour of the day strip.
@@ -950,8 +957,8 @@ fn draw_picker(
         return;
     }
 
-    // Query line, with the same horizontal scroll rule the old search
-    // bar used: the cursor stays one column inside the right edge.
+    // The query scrolls so the cursor stays one column inside the right
+    // edge.
     let input_width = inner.width.saturating_sub(2);
     let cursor_col = app.search_query[..app.cursor_position].width() as u16;
     let scroll_x = cursor_col.saturating_sub(input_width.saturating_sub(1));
@@ -1090,12 +1097,8 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
             .add_modifier(Modifier::BOLD),
     );
 
-    // Search-mode status-bar hint:
-    //   * Keeps the original Esc/Enter/Ctrl-u bindings users already know.
-    //   * Appends a compact `hint:` suffix advertising the three highest-value
-    //     query shapes (city · offset · region). Suffix lives at the END so
-    //     it's the first thing the existing terminal truncation drops on
-    //     narrow screens — the bindings stay visible when space is tight.
+    // The `hint:` suffix comes last, so a narrow terminal cuts it first
+    // and the key bindings stay visible.
     //   * Stays under ~100 chars so it survives terminal widths down to ~80.
     let hints = match app.input_mode {
         InputMode::Normal => " q:quit  /:add  f:remove  J/K:reorder  t:theme  m:map  ?:help",
@@ -1107,13 +1110,8 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
 
     let mut spans = vec![mode_span, hint_span];
 
-    // Show clipboard feedback for ~3s after a copy attempt. The success
-    // case keeps the original short "Copied!" label so existing users
-    // see the same affordance; the failure case prefixes "✗" and uses a
-    // hard red so it stands out against the muted theme palette (no
-    // dedicated `bad` slot in `ThemeColors`).
     if let Some(flash) = &app.copy_flash
-        && flash.started_at.elapsed() < std::time::Duration::from_secs(3)
+        && flash.started_at.elapsed() < COPY_FLASH_FOR
     {
         match &flash.status {
             CopyStatus::Success => {
@@ -1126,7 +1124,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
                 spans.push(Span::styled(
                     format!(" \u{2717} Copy failed: {msg}"),
                     Style::default()
-                        .fg(Color::Rgb(220, 80, 80))
+                        .fg(FAILURE_RED)
                         .add_modifier(Modifier::BOLD),
                 ));
             }
@@ -1134,7 +1132,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
     }
 
     // Surface startup load warnings / parse errors for the first 10s
-    // after launch (the user can also dismiss them with any keypress —
+    // after launch (the user can also dismiss them with any keypress,
     // see `App::dismiss_startup_messages`). Render them after the copy
     // flash so the most recent feedback wins the rightmost slot.
     if !app.startup_messages.is_empty()
@@ -1144,7 +1142,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
         spans.push(Span::styled(
             format!(" \u{26A0} {joined}"),
             Style::default()
-                .fg(Color::Rgb(220, 80, 80))
+                .fg(FAILURE_RED)
                 .add_modifier(Modifier::BOLD),
         ));
     }
@@ -1161,7 +1159,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
 /// Formats the hour difference between two UTC offsets.
 ///
 /// Returns `"0h"` when offsets are identical but timezones differ
-/// (e.g. London/Lisbon both at UTC+0 in winter — distinct DST rules,
+/// (e.g. London/Lisbon both at UTC+0 in winter: distinct DST rules,
 /// same current offset). The caller is responsible for substituting
 /// `"---"` when the row IS the selected timezone.
 fn format_diff(offset_secs: i32, selected_offset_secs: i32) -> Cow<'static, str> {
@@ -1229,7 +1227,7 @@ fn truncate_display(s: &str, max_cols: usize) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — see src/app.rs for the rationale
+    // Tests panic on failure by design. See src/app.rs for the rationale
     // on why the production panic lints are relaxed inside test modules.
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
@@ -1467,7 +1465,7 @@ mod tests {
     #[test]
     fn the_wall_scrolls_to_keep_the_selected_panel_visible() {
         let mut app = wall_app(&["tokyo", "london", "paris", "denver", "cairo", "sydney"]);
-        // One column and room for two panel rows force scrolling.
+        // One column and room for three panel rows force scrolling.
         app.panel_last();
 
         let rendered = render_app(&mut app, 30, 20).join("\n");
@@ -1562,7 +1560,7 @@ mod tests {
     }
 
     #[test]
-    fn the_hero_clock_fills_a_tall_terminal_with_full_height_digits() {
+    fn a_tall_terminal_draws_the_hero_clock_as_art() {
         let mut app = wall_app(&["tokyo"]);
 
         let rows = render_app(&mut app, 100, 40);
@@ -1952,15 +1950,6 @@ mod tests {
         }
     }
 
-    /// A favourite south of the map's crop stays on the map.
-    ///
-    /// Given: Casey, an Antarctic base at 66°S, in the map view.
-    /// When: the frame is drawn.
-    /// Then: its dot is on the map's bottom row.
-    ///
-    /// Why it matters: the map stops at 58°S to keep Antarctica from
-    /// filling a quarter of it, and every Antarctic zone is in the
-    /// catalogue, so a dot outside the crop would vanish.
     /// At an equinox noon UTC the night side is the half of the world
     /// around the date line.
     ///
@@ -2081,6 +2070,15 @@ mod tests {
         }
     }
 
+    /// A favourite south of the map's crop stays on the map.
+    ///
+    /// Given: Casey, an Antarctic base at 66°S, in the map view.
+    /// When: the frame is drawn.
+    /// Then: its dot is on the map's bottom row.
+    ///
+    /// Why it matters: the map stops at 58°S to keep Antarctica from
+    /// filling a quarter of it, and every Antarctic zone is in the
+    /// catalogue, so a dot outside the crop would vanish.
     #[test]
     fn an_antarctic_favourite_is_pinned_to_the_maps_edge() {
         // Given:

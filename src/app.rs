@@ -12,7 +12,8 @@
 //! | Selection | `selection` (`tz` + `city_name` + `catalogue_index`) | No |
 //! | Search | `input_mode`, `search_query`, `cursor_position` | No |
 //! | Theme | `theme` | Yes (`~/.config/lazytimezone/config.toml`) |
-//! | Favorites | `favorites`, `selected_panel` | Yes (`~/.config/lazytimezone/config.toml`) |
+//! | Favorites | `favorites` | Yes (`~/.config/lazytimezone/config.toml`) |
+//! | Wall | `selected_panel`, `wall_columns`, `wall_view` | No |
 //! | Feedback | `copy_flash`, `startup_messages` | No |
 
 use std::collections::HashMap;
@@ -78,12 +79,6 @@ impl Catalogue {
     }
 }
 
-impl Default for Catalogue {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Ordered list of favourite timezones with O(1) membership lookup.
 ///
 /// Internally stores parsed [`Tz`] values (not strings) so search,
@@ -91,9 +86,8 @@ impl Default for Catalogue {
 /// only appear at the on-disk boundary via
 /// [`Favorites::from_config`] / [`Favorites::to_config`].
 ///
-/// The `position` map is always a correct projection of `ordered`:
-/// every mutator calls [`rebuild_positions`](Self::rebuild_positions)
-/// before returning, so external observers can never see a stale map.
+/// After every mutator, `position` maps each entry of `ordered` to its
+/// index, so a reader never sees a stale map.
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Favorites {
     ordered: Vec<usize>,
@@ -217,9 +211,7 @@ impl Favorites {
             self.rebuild_positions();
             false
         } else {
-            self.ordered.push(idx);
-            self.position.insert(idx, self.ordered.len() - 1);
-            true
+            self.add(idx)
         }
     }
 
@@ -262,7 +254,7 @@ impl Favorites {
 /// A single visible row of the picker list.
 ///
 /// `display_name` may differ from the entry's canonical `city` when
-/// the row matched on an alias — e.g. searching `boston` shows
+/// the row matched on an alias. For example, searching `boston` shows
 /// `Boston` instead of `New York`.
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct FilteredRow {
@@ -354,7 +346,7 @@ pub enum InputMode {
 /// would leave the big-clock label disagreeing with the actual
 /// time-zone being displayed).
 ///
-/// `city_name` may differ from the entry's canonical city — when the
+/// `city_name` may differ from the entry's canonical city when the
 /// user picks a row that matched on an alias (e.g. searching "boston"
 /// hits the New York entry), the alias label is what they expect to
 /// see, not "New York".
@@ -388,18 +380,15 @@ pub enum CopyStatus {
     Failure(String),
 }
 
-/// Transient feedback shown in the status bar after pressing `c`.
-///
-/// The UI auto-clears the flash after a short timeout based on
-/// `started_at`; the timeout used to be ~2 seconds for the success-only
-/// flow and is kept the same now that errors share the slot.
+/// Transient feedback shown in the status bar after pressing `c`, for
+/// the `COPY_FLASH_FOR` window in `ui` after `started_at`.
 #[derive(Debug, Clone)]
 pub(crate) struct CopyFlash {
     pub(crate) status: CopyStatus,
     pub(crate) started_at: Instant,
 }
 
-/// Central application state — owned exclusively by the event loop.
+/// Central application state, owned only by the event loop.
 ///
 /// ## Pattern: Index-Based Filtering
 ///
@@ -438,13 +427,9 @@ pub struct App {
     pub(crate) theme: Theme,
     /// Ordered favourites with O(1) membership lookup. See [`Favorites`].
     pub(crate) favorites: Favorites,
-    /// Most recent clipboard-copy result. The renderer in
-    /// [`crate::ui::draw_status_bar`] compares
-    /// `flash.started_at.elapsed()` against a 3-second window each
-    /// frame; once that window passes the flash is simply not drawn —
-    /// the field itself is overwritten on the next copy attempt rather
-    /// than being eagerly cleared by a state-mutation tick. Keeps
-    /// `App` allocation-free on the idle tick path.
+    /// Most recent clipboard-copy result. The status bar stops drawing
+    /// it once its window has passed, and the next copy overwrites it,
+    /// so no tick has to clear it.
     pub(crate) copy_flash: Option<CopyFlash>,
     /// When true, the UI renders a help popup over the main view.
     /// Toggled by `?`, scrolled with the arrows, dismissed by any other key.
@@ -461,7 +446,7 @@ pub struct App {
     pub(crate) startup_messages: Vec<String>,
     /// `true` when the on-disk config could not be parsed.
     ///
-    /// While set, [`App::save_config`] is a no-op — saving would
+    /// While set, [`App::save_config`] is a no-op: saving would
     /// overwrite the user's broken file before they can fix it. Cleared
     /// only by a successful reload (currently: process restart).
     pub(crate) config_load_failed: bool,
@@ -510,18 +495,13 @@ impl App {
             startup_messages.push(format!("Favorite {name} is not in the city catalogue"));
         }
 
-        let mut indices = Self::browse_indices_for(&favorites);
-        Self::sort_indices(&mut indices, catalogue.entries(), favorites.position_map());
-        let mut filtered_view = FilteredView::default();
-        filtered_view.set_from_indices(indices, &catalogue);
-
-        Self {
+        let mut app = Self {
             should_quit: false,
             input_mode: InputMode::Normal,
             search_query: String::new(),
             cursor_position: 0,
             catalogue,
-            filtered_view,
+            filtered_view: FilteredView::default(),
             selected_row: 0,
             selected_panel: 0,
             wall_columns: 1,
@@ -540,19 +520,19 @@ impl App {
             config_load_failed,
             config_path,
             started_at: Instant::now(),
-        }
+        };
+        app.apply_filter();
+        app
     }
 
     /// Dismisses the startup-message banner.
     ///
     /// Called from [`crate::events::dispatch_key`] on every keypress so
     /// the banner is gone the moment the user starts interacting with
-    /// the app — the 10-second auto-timeout in the renderer is the
+    /// the app. The 10-second auto-timeout in the renderer is the
     /// fallback when the user simply watches the screen.
     pub(crate) fn dismiss_startup_messages(&mut self) {
-        if !self.startup_messages.is_empty() {
-            self.startup_messages.clear();
-        }
+        self.startup_messages.clear();
     }
 
     pub(crate) fn toggle_map(&mut self) {
@@ -583,13 +563,13 @@ impl App {
         self.help_scroll = self.help_scroll.min(max);
     }
 
-    pub(crate) fn move_up(&mut self) {
+    pub(crate) fn select_previous_result(&mut self) {
         if self.selected_row > 0 {
             self.selected_row -= 1;
         }
     }
 
-    pub(crate) fn move_down(&mut self) {
+    pub(crate) fn select_next_result(&mut self) {
         if !self.filtered_view.is_empty() && self.selected_row < self.filtered_view.len() - 1 {
             self.selected_row += 1;
         }
@@ -712,7 +692,7 @@ impl App {
     /// Inserts a bulk pasted string at the cursor in one shot.
     ///
     /// Control characters (other than tab, which is converted to a
-    /// single space) are stripped — terminals frequently embed stray
+    /// single space) are stripped: terminals frequently embed stray
     /// `\r` or escape sequences in paste payloads. All other Unicode
     /// scalars are preserved so CJK, accented Latin, and copied IANA
     /// IDs paste verbatim.
@@ -745,7 +725,7 @@ impl App {
     /// Commits the currently highlighted search result, then exits
     /// search mode.
     ///
-    /// Enter in search mode is the "I want this one" path — it both
+    /// Enter in search mode is the "I want this one" path: it both
     /// picks the row and leaves the input box, so the user doesn't have
     /// to press Enter twice. Esc remains the "I changed my mind" path
     /// and only calls [`exit_search`](Self::exit_search).
@@ -770,7 +750,7 @@ impl App {
     /// word (readline `Ctrl-w` semantics).
     ///
     /// Walks past trailing whitespace first, then past the run of
-    /// non-whitespace before it — so `asia +9 ` followed by `Ctrl-w`
+    /// non-whitespace before it, so `asia +9 ` followed by `Ctrl-w`
     /// removes `+9 ` and leaves `asia `, matching the bash convention
     /// users expect.
     pub(crate) fn delete_word_before_cursor(&mut self) {
@@ -811,12 +791,7 @@ impl App {
 
     pub(crate) fn search_backspace(&mut self) {
         if self.cursor_position > 0 {
-            let prev = self.search_query[..self.cursor_position]
-                .chars()
-                .last()
-                .map(|c| c.len_utf8())
-                .unwrap_or(0);
-            self.cursor_position -= prev;
+            self.search_cursor_left();
             self.search_query.remove(self.cursor_position);
             self.apply_filter();
             self.select_first_result();
@@ -965,11 +940,7 @@ impl App {
     }
 
     fn set_sorted_results(&mut self, mut indices: Vec<usize>) {
-        Self::sort_indices(
-            &mut indices,
-            self.catalogue.entries(),
-            self.favorites.position_map(),
-        );
+        Self::sort_indices(&mut indices, self.favorites.position_map());
         self.filtered_view
             .set_from_indices(indices, &self.catalogue);
     }
@@ -988,11 +959,7 @@ impl App {
 
     /// Sorts indices so favourites appear first (in user-defined order),
     /// followed by non-favourites in catalogue (population) order.
-    fn sort_indices(
-        indices: &mut [usize],
-        _timezones: &[TimezoneEntry],
-        favorites_order: &HashMap<usize, usize>,
-    ) {
+    fn sort_indices(indices: &mut [usize], favorites_order: &HashMap<usize, usize>) {
         indices.sort_by(|&a, &b| {
             let a_pos = favorites_order.get(&a);
             let b_pos = favorites_order.get(&b);
@@ -1044,7 +1011,7 @@ impl App {
     ///
     /// The format string `%Y%m%dT%H%M%z` produces a date+time stamp
     /// followed by the numeric UTC offset (`+0900`), not a tz
-    /// abbreviation — abbreviations like `CST` are ambiguous between
+    /// abbreviation: abbreviations like `CST` are ambiguous between
     /// Central US and China Standard Time, so we deliberately avoid
     /// `%Z`.
     ///
@@ -1053,7 +1020,7 @@ impl App {
     /// - Windows: `clip`
     /// - Linux: `wl-copy` (Wayland) with `xclip` fallback (X11)
     ///
-    /// Records the outcome in [`Self::copy_flash`] — success when any
+    /// Records the outcome in [`Self::copy_flash`]: success when any
     /// candidate succeeds, failure (carrying the last underlying error
     /// message) when every candidate failed. The platform with no
     /// configured clipboard tool reports a specific message rather than
@@ -1073,7 +1040,7 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    // Tests panic on failure by design — assertions, expect, and explicit
+    // Tests panic on failure by design: assertions, expect, and explicit
     // panic!("…") are how a failing test reports its failure to the runner.
     // Re-enabling the production lints here would force `if let Some(_) = …`
     // boilerplate that obscures the actual invariant under test.
@@ -1519,19 +1486,19 @@ mod tests {
     // ── Navigation ──────────────────────────────────────────────────
 
     #[test]
-    fn move_up_at_top_stays_at_zero() {
+    fn select_previous_result_at_top_stays_at_zero() {
         let mut app = test_app();
         app.selected_row = 0;
-        app.move_up();
+        app.select_previous_result();
         assert_eq!(app.selected_row, 0);
     }
 
     #[test]
-    fn move_down_at_bottom_stays_at_last() {
+    fn select_next_result_at_bottom_stays_at_last() {
         let mut app = test_app();
         let last = app.filtered_view.len() - 1;
         app.selected_row = last;
-        app.move_down();
+        app.select_next_result();
         assert_eq!(app.selected_row, last);
     }
 
@@ -1541,8 +1508,8 @@ mod tests {
         apply_query(&mut app, "zzzzzznotaquery");
         assert!(app.filtered_view.is_empty());
 
-        app.move_up();
-        app.move_down();
+        app.select_previous_result();
+        app.select_next_result();
         assert_eq!(app.selected_row, 0);
     }
 
@@ -1635,7 +1602,7 @@ mod tests {
         app.exit_search();
         app.apply_filter();
 
-        // Find Tokyo in the unfiltered list — shouldn't be first
+        // Find Tokyo in the unfiltered list. It is not first
         let pos_before = app
             .filtered_view
             .rows()
@@ -1791,6 +1758,41 @@ mod tests {
         assert_eq!(app.selected_row, 0);
     }
 
+    /// Backspace removes the whole character before the cursor, even a
+    /// wide one, and does nothing at the start.
+    ///
+    /// Given: the picker with `tokyos東` typed.
+    /// When: backspace is pressed twice, then the cursor goes home and
+    /// backspace is pressed again.
+    /// Then: the first press leaves `tokyos`, the second `tokyo` with
+    /// Tokyo as the first row, and the press at the start changes
+    /// nothing.
+    ///
+    /// Why it matters: `東` takes three bytes, so a backspace that steps
+    /// back one byte would split it and panic.
+    #[test]
+    fn backspace_removes_one_whole_character_before_the_cursor() {
+        // Given:
+        let mut app = test_app();
+        app.enter_search();
+        for c in "tokyos\u{6771}".chars() {
+            app.search_input(c);
+        }
+
+        // When:
+        app.search_backspace();
+        let after_one = app.search_query.clone();
+        app.search_backspace();
+        app.search_cursor_home();
+        app.search_backspace();
+
+        // Then:
+        assert_eq!(after_one, "tokyos");
+        assert_eq!(first_city(&app), "Tokyo");
+        assert_eq!(app.search_query, "tokyo");
+        assert_eq!(app.cursor_position, 0);
+    }
+
     /// A paste drops control characters, turns a tab into a space, and
     /// keeps text in any script.
     ///
@@ -1860,12 +1862,12 @@ mod tests {
     fn delete_word_before_cursor_at_zero_is_noop() {
         let mut app = test_app();
         app.enter_search();
-        // Empty query, cursor at zero — must not panic or mutate.
+        // Empty query, cursor at zero: must not panic or mutate.
         app.delete_word_before_cursor();
         assert_eq!(app.search_query, "");
         assert_eq!(app.cursor_position, 0);
 
-        // Non-empty query but cursor parked at 0 — same invariant.
+        // Non-empty query but cursor parked at 0: same invariant.
         for c in "asia".chars() {
             app.search_input(c);
         }
@@ -1915,8 +1917,8 @@ mod tests {
         let mut app = test_app();
 
         apply_query(&mut app, "asia");
-        app.move_down();
-        app.move_down();
+        app.select_next_result();
+        app.select_next_result();
         assert_eq!(app.selected_row, 2);
         app.exit_search();
 

@@ -1,4 +1,4 @@
-//! # lazytimezone — A terminal world-clock browser.
+//! # lazytimezone: a terminal world-clock browser.
 //!
 //! ## Architecture
 //!
@@ -7,13 +7,17 @@
 //! ```text
 //! main ─► run_tui() ─► loop { draw → handle_events → check quit }
 //!              │
-//!              ├── cli       Command-line arguments
-//!              ├── app       Core state: selection, search, favorites, theme
-//!              ├── events    Keyboard input → App mutations
-//!              ├── ui        App state → ratatui Frame rendering
-//!              ├── config    TOML persistence (~/.config/lazytimezone/config.toml)
-//!              ├── theme     Color palettes
-//!              └── timezone  Generated catalogue of 34k world cities
+//!              ├── cli        Command-line arguments
+//!              ├── app        Core state: selection, search, favorites, theme
+//!              ├── events     Keys, pastes and resizes → App mutations
+//!              ├── ui         App state → ratatui Frame rendering
+//!              ├── digits     The hero clock's block digits
+//!              ├── sky        The sky band above the wall
+//!              ├── search     Search index and scoring
+//!              ├── clipboard  The copy key's clipboard tools
+//!              ├── config     TOML persistence (see `cli` for the path)
+//!              ├── theme      Color palettes
+//!              └── timezone   Generated catalogue of 34k world cities
 //! ```
 //!
 //! State flows unidirectionally: [`events`] mutates [`app::App`], then
@@ -49,7 +53,7 @@ fn main() {
 /// on exit.
 ///
 /// Uses crossterm's alternate screen so the user's scrollback buffer is
-/// preserved — the TUI disappears cleanly when the app quits.
+/// preserved, and the TUI disappears cleanly when the app quits.
 ///
 /// ## Errors
 ///
@@ -85,10 +89,9 @@ fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
         let mut app = app::App::new(config_path);
         let mut events = events::TerminalEvents;
 
-        // Tick rate matches the clock's display granularity (1 s).
-        // Idle iterations sleep until the next second boundary instead of
-        // polling at 20 Hz, which keeps battery usage low. Key events
-        // wake the loop immediately so input feels instant.
+        // Tick rate matches the clock's display granularity (1 s). An
+        // idle loop sleeps until the next second boundary, which keeps
+        // battery use low, and a key wakes it at once.
         let tick_rate = std::time::Duration::from_secs(1);
         let mut last_tick = std::time::Instant::now();
 
@@ -102,7 +105,7 @@ fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
 
             if last_tick.elapsed() >= tick_rate {
                 // Advance by exactly one tick_rate instead of snapping to
-                // Instant::now() — this preserves alignment to the real
+                // Instant::now(). This preserves alignment to the real
                 // second boundary even if poll wakeup added latency.
                 last_tick += tick_rate;
                 // Catch-up guard: if we fell more than one tick behind
