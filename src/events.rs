@@ -125,11 +125,23 @@ fn dispatch_key(app: &mut App, key: crossterm::event::KeyEvent) {
     }
 }
 
+/// A key held with Ctrl or Alt. Shift is not a chord, because it is
+/// how `G`, `J`, `K` and `?` arrive.
+fn is_chord(key: crossterm::event::KeyEvent) -> bool {
+    key.modifiers
+        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+}
+
 /// Wall bindings: `h/j/k/l` move between the favorite panels, Enter
 /// promotes one to the hero clock, `f` removes it, `J/K` reorder, `m`
 /// switches to the world map and back, and `/` opens the add-city
 /// picker.
 fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
+    // The picker binds Ctrl-f, and the same chord here must not remove
+    // a favourite.
+    if is_chord(key) {
+        return;
+    }
     match key.code {
         KeyCode::Char('q') => {
             app.should_quit = true;
@@ -147,7 +159,7 @@ fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Char('K') => app.move_panel_earlier(),
         KeyCode::Char('t') => app.cycle_theme(),
         KeyCode::Char('m') => app.toggle_map(),
-        KeyCode::Char('c') if !key.modifiers.contains(KeyModifiers::CONTROL) => app.copy_time(),
+        KeyCode::Char('c') => app.copy_time(),
         KeyCode::Char('?') => app.toggle_help(),
         _ => {}
     }
@@ -197,7 +209,7 @@ fn handle_search_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.toggle_favorite();
         }
-        KeyCode::Char(c) => app.search_input(c),
+        KeyCode::Char(c) if !is_chord(key) => app.search_input(c),
         _ => {}
     }
 }
