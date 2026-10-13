@@ -381,6 +381,13 @@ fn draw_hero_clock(
     frame.render_widget(meta_line, chunks[3]);
 }
 
+/// How long the status bar shows the result of a copy.
+const COPY_FLASH_FOR: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Every theme shows a failure in this red, so it stands out against
+/// each palette. `ThemeColors` has no slot for it.
+const FAILURE_RED: Color = Color::Rgb(220, 80, 80);
+
 /// One gutter column and two border columns leave 24 cells inside, one
 /// for each hour of the day strip.
 const PANEL_MIN_WIDTH: u16 = 27;
@@ -1107,13 +1114,8 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
 
     let mut spans = vec![mode_span, hint_span];
 
-    // Show clipboard feedback for ~3s after a copy attempt. The success
-    // case keeps the original short "Copied!" label so existing users
-    // see the same affordance; the failure case prefixes "✗" and uses a
-    // hard red so it stands out against the muted theme palette (no
-    // dedicated `bad` slot in `ThemeColors`).
     if let Some(flash) = &app.copy_flash
-        && flash.started_at.elapsed() < std::time::Duration::from_secs(3)
+        && flash.started_at.elapsed() < COPY_FLASH_FOR
     {
         match &flash.status {
             CopyStatus::Success => {
@@ -1126,7 +1128,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
                 spans.push(Span::styled(
                     format!(" \u{2717} Copy failed: {msg}"),
                     Style::default()
-                        .fg(Color::Rgb(220, 80, 80))
+                        .fg(FAILURE_RED)
                         .add_modifier(Modifier::BOLD),
                 ));
             }
@@ -1144,7 +1146,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect, tc: &ThemeColors) {
         spans.push(Span::styled(
             format!(" \u{26A0} {joined}"),
             Style::default()
-                .fg(Color::Rgb(220, 80, 80))
+                .fg(FAILURE_RED)
                 .add_modifier(Modifier::BOLD),
         ));
     }

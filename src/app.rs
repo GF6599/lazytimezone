@@ -211,9 +211,7 @@ impl Favorites {
             self.rebuild_positions();
             false
         } else {
-            self.ordered.push(idx);
-            self.position.insert(idx, self.ordered.len() - 1);
-            true
+            self.add(idx)
         }
     }
 
@@ -504,18 +502,13 @@ impl App {
             startup_messages.push(format!("Favorite {name} is not in the city catalogue"));
         }
 
-        let mut indices = Self::browse_indices_for(&favorites);
-        Self::sort_indices(&mut indices, favorites.position_map());
-        let mut filtered_view = FilteredView::default();
-        filtered_view.set_from_indices(indices, &catalogue);
-
-        Self {
+        let mut app = Self {
             should_quit: false,
             input_mode: InputMode::Normal,
             search_query: String::new(),
             cursor_position: 0,
             catalogue,
-            filtered_view,
+            filtered_view: FilteredView::default(),
             selected_row: 0,
             selected_panel: 0,
             wall_columns: 1,
@@ -534,7 +527,9 @@ impl App {
             config_load_failed,
             config_path,
             started_at: Instant::now(),
-        }
+        };
+        app.apply_filter();
+        app
     }
 
     /// Dismisses the startup-message banner.
@@ -803,12 +798,7 @@ impl App {
 
     pub(crate) fn search_backspace(&mut self) {
         if self.cursor_position > 0 {
-            let prev = self.search_query[..self.cursor_position]
-                .chars()
-                .last()
-                .map(|c| c.len_utf8())
-                .unwrap_or(0);
-            self.cursor_position -= prev;
+            self.search_cursor_left();
             self.search_query.remove(self.cursor_position);
             self.apply_filter();
             self.select_first_result();
