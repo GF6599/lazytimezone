@@ -48,9 +48,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("usage: gen_cities <geonames-dir> <output-tsv>".into());
     };
     let dir = PathBuf::from(input_dir);
-    let admin1 = parse_admin1(&std::fs::read_to_string(dir.join("admin1CodesASCII.txt"))?);
+    let admin1 = parse_admin1(&std::fs::read_to_string(dir.join("admin1CodesASCII.txt"))?)?;
     let countries = parse_countries(&std::fs::read_to_string(dir.join("countryInfo.txt"))?);
     let cities_txt = std::fs::read_to_string(dir.join("cities15000.txt"))?;
+    let unnamed_states = unnamed_admin1_rows(&cities_txt, &admin1);
 
     let mut rows = Vec::new();
     for (number, line) in cities_txt.lines().enumerate() {
@@ -84,20 +85,49 @@ fn main() -> Result<(), Box<dyn Error>> {
     eprintln!("wrote {} cities to {output}", rows.len());
     eprintln!("{fallback_count} of them cover a zone cities15000.txt misses");
     eprintln!("{zone_table_count} of them come from zone.tab alone");
+    eprintln!("{unnamed_states} cities15000.txt rows name a state code with no name");
     Ok(())
 }
 
 /// `admin1CodesASCII.txt`: `US.MA<TAB>Massachusetts<TAB>...`. Returns
 /// the `CC.CODE -> name` map.
-fn parse_admin1(text: &str) -> HashMap<String, String> {
-    text.lines()
+///
+/// A file with no rows is an error. The download step keeps a file it
+/// once fetched, so a cut-off transfer would otherwise strip every
+/// state name and still exit cleanly.
+fn parse_admin1(text: &str) -> Result<HashMap<String, String>, String> {
+    let names: HashMap<String, String> = text
+        .lines()
         .filter_map(|line| {
             let mut cols = line.split('\t');
             let key = cols.next()?;
             let name = cols.next()?;
             (!key.is_empty() && !name.is_empty()).then(|| (key.to_string(), name.to_string()))
         })
-        .collect()
+        .collect();
+    if names.is_empty() {
+        return Err("admin1CodesASCII.txt holds no state names".to_string());
+    }
+    Ok(names)
+}
+
+/// How many city rows carry a state code that `admin1` has no name
+/// for. Such a row keeps an empty state, so the count is the only sign
+/// of a stale or partial names file.
+fn unnamed_admin1_rows(cities: &str, admin1: &HashMap<String, String>) -> usize {
+    cities
+        .lines()
+        .filter(|line| {
+            let cols: Vec<&str> = line.split('\t').collect();
+            let (Some(cc), Some(code)) = (cols.get(8), cols.get(10)) else {
+                return false;
+            };
+            let code = code.trim();
+            !code.is_empty()
+                && code != "00"
+                && !admin1.contains_key(&format!("{}.{code}", cc.trim()))
+        })
+        .count()
 }
 
 /// `countryInfo.txt`: `#`-prefixed comments, then one country per
@@ -381,7 +411,7 @@ mod tests {
     }
 
     fn lookups() -> (HashMap<String, String>, HashMap<String, String>) {
-        let admin1 = parse_admin1("US.MA\tMassachusetts\tMassachusetts\t6254926");
+        let admin1 = parse_admin1("US.MA\tMassachusetts\tMassachusetts\t6254926").unwrap();
         let countries = parse_countries(
             "# comment line\nUS\tUSA\t840\tUS\tUnited States\tWashington\t9629091\t310232863\tNA",
         );
@@ -589,5 +619,42 @@ mod tests {
             zone_table_rows("AQ\t-6640+14001\n", &HashSet::new(), &HashMap::new()).unwrap_err();
 
         assert!(err.contains("short row"), "got: {err}");
+    }
+
+    /// An empty state names file stops the generator.
+    ///
+    /// Given: an `admin1CodesASCII.txt` with no rows.
+    /// When: it is parsed.
+    /// Then: the result is an error.
+    ///
+    /// Why it matters: a cut-off download leaves an empty or partial
+    /// file, and every city would lose its state with no error.
+    #[test]
+    fn an_empty_state_names_file_is_an_error() {
+        assert!(parse_admin1("").is_err());
+    }
+
+    /// Rows whose state code has no name are counted.
+    ///
+    /// Given: Boston (US.MA, named), a row with code `ZZ` (not named),
+    /// and a row with the `00` placeholder.
+    /// When: the unnamed rows are counted.
+    /// Then: the count is one.
+    ///
+    /// Why it matters: such a row keeps an empty state, so the count in
+    /// the summary is the only sign that the names file is stale.
+    #[test]
+    fn rows_with_an_unnamed_state_code_are_counted() {
+        // Given:
+        let (admin1, _) = lookups();
+        let unnamed = boston_line().replace("\tMA\t", "\tZZ\t");
+        let placeholder = boston_line().replace("\tMA\t", "\t00\t");
+        let text = [boston_line(), unnamed, placeholder].join("\n");
+
+        // When:
+        let count = unnamed_admin1_rows(&text, &admin1);
+
+        // Then:
+        assert_eq!(count, 1);
     }
 }
