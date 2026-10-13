@@ -708,16 +708,25 @@ mod tests {
     }
 
     #[test]
-    fn every_city_alias_targets_a_catalogue_row() {
+    fn every_city_alias_targets_exactly_one_catalogue_row() {
         for line in data_rows(CITY_ALIASES_TSV) {
             let mut cols = line.split('\t');
-            let (Some(alias), Some(city), Some(cc)) = (cols.next(), cols.next(), cols.next())
-            else {
-                panic!("city_aliases.tsv has a short row: {line:?}");
+            let (Some(alias), Some(city), Some(admin1), Some(cc), None) = (
+                cols.next(),
+                cols.next(),
+                cols.next(),
+                cols.next(),
+                cols.next(),
+            ) else {
+                panic!("city_aliases.tsv needs four columns: {line:?}");
             };
-            assert!(
-                all_timezones().iter().any(|e| e.city == city && e.cc == cc),
-                "alias {alias:?} targets {city:?} {cc:?}, which is not a catalogue row"
+            let targets = all_timezones()
+                .iter()
+                .filter(|e| e.city == city && e.admin1 == admin1 && e.cc == cc)
+                .count();
+            assert_eq!(
+                targets, 1,
+                "alias {alias:?} targets {city:?} {admin1:?} {cc:?}"
             );
         }
     }

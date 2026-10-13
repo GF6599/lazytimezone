@@ -893,6 +893,132 @@ mod tests {
         index.search(query, entries, &base, &now, favorites)
     }
 
+    /// Mid-January, when no zone in either hemisphere is changing its
+    /// offset, so offsets read here are the standard ones.
+    fn midwinter() -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339("2026-01-15T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc)
+    }
+
+    fn offset_at(entry: &TimezoneEntry, now: &DateTime<Utc>) -> i32 {
+        now.with_timezone(&entry.tz)
+            .offset()
+            .fix()
+            .local_minus_utc()
+    }
+
+    /// The `(zone, offset seconds, label)` of every result for `query`
+    /// in midwinter.
+    fn midwinter_results(query: &str) -> Vec<(Tz, i32, &'static str)> {
+        let (entries, index) = fixture();
+        let base: Vec<usize> = (0..entries.len()).collect();
+        let now = midwinter();
+        index
+            .search(query, entries, &base, &now, &HashMap::new())
+            .expect("non-empty query")
+            .into_iter()
+            .map(|(i, label, _)| (entries[i].tz, offset_at(&entries[i], &now), label))
+            .collect()
+    }
+
+    /// A bare `utc` or `gmt` lists the zones at UTC and nothing else.
+    ///
+    /// Given: midwinter, when London is at UTC and Shanghai at UTC+8.
+    /// When: the query is `utc`, then `gmt`.
+    /// Then: London is listed, and every result is at UTC.
+    ///
+    /// Why it matters: a user who types `utc` wants the zones on UTC,
+    /// and a populous UTC+8 city must not rank among them.
+    #[test]
+    fn a_bare_utc_or_gmt_lists_only_zones_at_utc() {
+        for query in ["utc", "gmt"] {
+            let results = midwinter_results(query);
+
+            assert!(
+                results.iter().any(|(tz, ..)| *tz == Tz::Europe__London),
+                "{query}: London missing"
+            );
+            let off: Vec<_> = results
+                .iter()
+                .filter(|(_, offset, _)| *offset != 0)
+                .collect();
+            assert!(
+                off.is_empty(),
+                "{query}: not at UTC: {:?}",
+                &off[..off.len().min(5)]
+            );
+        }
+    }
+
+    /// A GMT-style offset lists no fixed offset of the opposite sign.
+    ///
+    /// Given: the fixed rows UTC-10 (zone `Etc/GMT+10`) and UTC+10
+    /// (zone `Etc/GMT-10`).
+    /// When: the query is `gmt-10`.
+    /// Then: Honolulu and UTC-10 are listed, and nothing at UTC+10.
+    ///
+    /// Why it matters: the IANA name of a fixed offset inverts its sign,
+    /// so matching that name lists the opposite offset.
+    #[test]
+    fn a_gmt_offset_lists_no_fixed_offset_of_the_opposite_sign() {
+        let results = midwinter_results("gmt-10");
+
+        assert!(results.iter().any(|(tz, ..)| *tz == Tz::Pacific__Honolulu));
+        assert!(results.iter().any(|(_, _, label)| *label == "UTC-10"));
+        let opposite: Vec<_> = results
+            .iter()
+            .filter(|(_, offset, _)| *offset == 36_000)
+            .collect();
+        assert!(opposite.is_empty(), "listed: {opposite:?}");
+    }
+
+    /// A bare hour matches that hour, not a longer offset that starts
+    /// with the same digit.
+    ///
+    /// Given: midwinter, when Paris is at UTC+1 and Sydney at UTC+11.
+    /// When: the query is `gmt 1`.
+    /// Then: Paris is listed, and nothing ten or more hours from UTC.
+    ///
+    /// Why it matters: `1` is a whole hour, so UTC+10 and UTC+11 zones
+    /// in the list bury the zones the user asked for.
+    #[test]
+    fn a_bare_hour_matches_that_hour_and_not_longer_offsets() {
+        let results = midwinter_results("gmt 1");
+
+        assert!(results.iter().any(|(tz, ..)| *tz == Tz::Europe__Paris));
+        let longer: Vec<_> = results
+            .iter()
+            .filter(|(_, offset, _)| offset.abs() >= 36_000)
+            .collect();
+        assert!(
+            longer.is_empty(),
+            "listed: {:?}",
+            &longer[..longer.len().min(5)]
+        );
+    }
+
+    /// An alias names one city, not every city with the same name.
+    ///
+    /// Given: the alias `Washington DC` and three US cities named
+    /// Washington, in DC, Utah and Illinois.
+    /// When: the query is `washington dc`.
+    /// Then: one row carries the alias, and it is the capital.
+    ///
+    /// Why it matters: three rows named Washington DC with three
+    /// different clocks leave the user to guess which is right.
+    #[test]
+    fn an_alias_labels_only_the_city_it_names() {
+        let results = midwinter_results("washington dc");
+
+        let labelled: Vec<_> = results
+            .iter()
+            .filter(|(_, _, label)| *label == "Washington DC")
+            .collect();
+        assert_eq!(labelled.len(), 1, "labelled: {labelled:?}");
+        assert_eq!(labelled[0].0, Tz::America__New_York);
+    }
+
     #[test]
     fn search_and_logic_rejects_entry_missing_any_term() {
         let (entries, index) = fixture();
