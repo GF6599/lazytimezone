@@ -1,60 +1,60 @@
 # Curated city aliases: nicknames, exonyms, renames, and nearby
 # landmarks below the population threshold of the catalogue.
-# alias	city	cc
-Aarhus	Århus	DK
-Angkor Wat	Phnom Penh	KH
-Antigua	Antigua Guatemala	GT
-Bangalore	Bengaluru	IN
-Basra	Basrah	IQ
-Bocas del Toro	Panama City	PA
-Boracay	Manila	PH
-Bruges	Brussels	BE
-Cappadocia	Istanbul	TR
-Cebu	Manila	PH
-Chittagong	Chattogram	BD
-Cologne	Köln	DE
-Crete	Athens	GR
-Fez	Casablanca	MA
-Frankfurt	Frankfurt am Main	DE
-Fremantle	Perth	AU
-Ghent	Brussels	BE
-Gomel	Minsk	BY
-Gondar	Addis Ababa	ET
-Grodno	Minsk	BY
-Hargeisa	Mogadishu	SO
-Heraklion	Athens	GR
-Jeju	Seoul	KR
-Kauai	Honolulu	US
-Khiva	Tashkent	UZ
-Kilimanjaro	Dar es Salaam	TZ
-Kotor	Podgorica	ME
-Kwajalein	Majuro	MH
-Langkawi	Kuala Lumpur	MY
-Maui	Honolulu	US
-Mazar-i-Sharif	Kabul	AF
-Mecca	Makkah	SA
-Misrata	Tripoli	LY
-Monte Carlo	Monaco	MC
-Muharraq	Manama	BH
-Naypyidaw	Nay Pyi Taw	MM
-Nizhny Novgorod	Nizhniy Novgorod	RU
-Nosy Be	Antananarivo	MG
-Nur-Sultan	Astana	KZ
-Paro	Thimphu	BT
-Patras	Athens	GR
-Penang	Kuala Lumpur	MY
-Petra	Amman	JO
-Port Elizabeth	Gqeberha	ZA
-Punta del Este	Montevideo	UY
-Quebec City	Québec	CA
-Rangoon	Yangon	MM
-SF	San Francisco	US
-Saigon	Ho Chi Minh City	VN
-Santorini	Athens	GR
-Seville	Sevilla	ES
-St. Julian's	Valletta	MT
-Sumqayit	Baku	AZ
-Tamarindo	San José	CR
-Washington DC	Washington	US
-Whistler	Vancouver	CA
-Darkhan	Darhan	MN
+# alias	city	admin1	cc
+Aarhus	Århus	Central Jutland	DK
+Angkor Wat	Phnom Penh	Phnom Penh	KH
+Antigua	Antigua Guatemala	Sacatepéquez	GT
+Bangalore	Bengaluru	Karnataka	IN
+Basra	Basrah	Basra	IQ
+Bocas del Toro	Panama City	Panamá	PA
+Boracay	Manila	National Capital Region	PH
+Bruges	Brussels	Brussels Capital	BE
+Cappadocia	Istanbul	Istanbul	TR
+Cebu	Manila	National Capital Region	PH
+Chittagong	Chattogram	Chittagong	BD
+Cologne	Köln	North Rhine-Westphalia	DE
+Crete	Athens	Attica	GR
+Fez	Casablanca	Casablanca-Settat	MA
+Frankfurt	Frankfurt am Main	Hesse	DE
+Fremantle	Perth	Western Australia	AU
+Ghent	Brussels	Brussels Capital	BE
+Gomel	Minsk	Minsk City	BY
+Gondar	Addis Ababa	Addis Ababa	ET
+Grodno	Minsk	Minsk City	BY
+Hargeisa	Mogadishu	Banaadir	SO
+Heraklion	Athens	Attica	GR
+Jeju	Seoul	Seoul	KR
+Kauai	Honolulu	Hawaii	US
+Khiva	Tashkent	Tashkent	UZ
+Kilimanjaro	Dar es Salaam	Dar es Salaam Region	TZ
+Kotor	Podgorica	Podgorica	ME
+Kwajalein	Majuro	Majuro Atoll	MH
+Langkawi	Kuala Lumpur	Kuala Lumpur	MY
+Maui	Honolulu	Hawaii	US
+Mazar-i-Sharif	Kabul	Kabul	AF
+Mecca	Makkah	Mecca Region	SA
+Misrata	Tripoli	Tripoli	LY
+Monte Carlo	Monaco		MC
+Muharraq	Manama	Manama	BH
+Naypyidaw	Nay Pyi Taw	Nay Pyi Taw	MM
+Nizhny Novgorod	Nizhniy Novgorod	Nizhny Novgorod Oblast	RU
+Nosy Be	Antananarivo	Analamanga	MG
+Nur-Sultan	Astana	Astana	KZ
+Paro	Thimphu	Thimphu District	BT
+Patras	Athens	Attica	GR
+Penang	Kuala Lumpur	Kuala Lumpur	MY
+Petra	Amman	Amman	JO
+Port Elizabeth	Gqeberha	Eastern Cape	ZA
+Punta del Este	Montevideo	Montevideo Department	UY
+Quebec City	Québec	Quebec	CA
+Rangoon	Yangon	Yangon	MM
+SF	San Francisco	California	US
+Saigon	Ho Chi Minh City	Ho Chi Minh City (HCMC)	VN
+Santorini	Athens	Attica	GR
+Seville	Sevilla	Andalusia	ES
+St. Julian's	Valletta	Valletta	MT
+Sumqayit	Baku	Baki	AZ
+Tamarindo	San José	San José	CR
+Washington DC	Washington	District of Columbia	US
+Whistler	Vancouver	British Columbia	CA
+Darkhan	Darhan	Darhan Uul	MN

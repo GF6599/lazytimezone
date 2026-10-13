@@ -235,7 +235,7 @@ impl TimezoneSearchData {
                 .then(|| SearchText::new(entry.ascii))
                 .into_iter()
                 .chain(
-                    city_search_aliases(entry.city, entry.cc)
+                    city_search_aliases(entry)
                         .iter()
                         .copied()
                         .map(SearchText::new),
