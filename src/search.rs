@@ -220,7 +220,13 @@ impl TimezoneSearchData {
             city: SearchText::new(entry.city),
             country: normalize_search_text(entry.country),
             region: normalize_search_text(region_of(entry.tz)),
-            timezone_words: normalize_search_text(&entry.tz.to_string()),
+            // The IANA name of a fixed offset inverts its sign: `Etc/GMT-10`
+            // is UTC+10. Its offset terms find it instead.
+            timezone_words: if entry.is_fixed_offset() {
+                String::new()
+            } else {
+                normalize_search_text(&entry.tz.to_string())
+            },
             state: normalize_search_text(entry.admin1),
             // Per-city aliases: the ASCII transliteration plus the
             // curated nicknames, exonyms, and landmarks. Other cities
@@ -229,7 +235,7 @@ impl TimezoneSearchData {
                 .then(|| SearchText::new(entry.ascii))
                 .into_iter()
                 .chain(
-                    city_search_aliases(entry.city, entry.cc)
+                    city_search_aliases(entry)
                         .iter()
                         .copied()
                         .map(SearchText::new),
@@ -550,18 +556,38 @@ impl MatchKind {
         if field == term {
             return Some(MatchKind::Exact);
         }
-        if field.starts_with(term)
+        if starts_with_term(field, term)
             || field
                 .split_whitespace()
                 .any(|word| word_matches_term(word, term))
         {
             return Some(MatchKind::Prefix);
         }
-        if term.len() >= CONTAINS_MIN_CHARS && field.contains(term) {
+        if term.len() >= CONTAINS_MIN_CHARS
+            && field
+                .match_indices(term)
+                .any(|(at, _)| ends_a_number(term, &field[at + term.len()..]))
+        {
             return Some(MatchKind::Contains);
         }
         None
     }
+}
+
+/// Whether `field` starts with `term` where the term's number, if it
+/// ends in one, ends too.
+fn starts_with_term(field: &str, term: &str) -> bool {
+    field
+        .strip_prefix(term)
+        .is_some_and(|rest| ends_a_number(term, rest))
+}
+
+/// False when `term` ends in a digit and `rest`, the text after it,
+/// carries the number on. So `1` matches the hour in `+1` and `+1 30`
+/// but not in `+10`, and `utc+0` does not match `utc+0800`.
+fn ends_a_number(term: &str, rest: &str) -> bool {
+    !(term.ends_with(|c: char| c.is_ascii_digit())
+        && rest.starts_with(|c: char| c.is_ascii_digit()))
 }
 
 /// Returns `true` when `word` is the same as `term`, starts with `term`,
@@ -571,11 +597,11 @@ impl MatchKind {
 /// tokens like `+5` and `-5` inside the cached offset haystacks — the
 /// user expects `gmt 5` to find UTC+5 cities without typing the plus.
 fn word_matches_term(word: &str, term: &str) -> bool {
-    if word == term || word.starts_with(term) {
+    if starts_with_term(word, term) {
         return true;
     }
     let stripped = word.trim_start_matches(['+', '-']);
-    stripped != word && (stripped == term || stripped.starts_with(term))
+    stripped != word && starts_with_term(stripped, term)
 }
 
 // ── Normalization & offset alias expansion ─────────────────────────
@@ -740,44 +766,6 @@ mod tests {
         assert_eq!(normalize_search_text("south-east"), "south east");
     }
 
-    // ── offset_search_terms ────────────────────────────────────────
-
-    #[test]
-    fn offset_terms_for_utc_contain_canonical_aliases() {
-        let terms = offset_search_terms(0);
-        assert!(terms.iter().any(|t| t == "+0"));
-        assert!(terms.iter().any(|t| t == "utc+0"));
-        assert!(terms.iter().any(|t| t == "gmt+0"));
-    }
-
-    #[test]
-    fn offset_terms_for_plus_one_hour() {
-        let terms = offset_search_terms(3600);
-        assert!(terms.iter().any(|t| t == "+1"));
-        assert!(terms.iter().any(|t| t == "utc+1"));
-        assert!(terms.iter().any(|t| t == "gmt+1"));
-    }
-
-    #[test]
-    fn offset_terms_for_minus_five_hours() {
-        let terms = offset_search_terms(-5 * 3600);
-        assert!(terms.iter().any(|t| t == "utc-5"));
-        assert!(terms.iter().any(|t| t == "gmt-5"));
-        assert!(terms.iter().any(|t| t == "-5"));
-    }
-
-    #[test]
-    fn offset_terms_are_deduplicated() {
-        // For whole-hour offsets, several of the format permutations
-        // normalize to identical strings — the dedup pass should keep
-        // each unique form exactly once.
-        let terms = offset_search_terms(0);
-        let mut sorted = terms.clone();
-        sorted.sort();
-        sorted.dedup();
-        assert_eq!(sorted.len(), terms.len(), "found duplicates: {terms:?}");
-    }
-
     // ── format_utc_offset ──────────────────────────────────────────
 
     #[test]
@@ -793,28 +781,6 @@ mod tests {
         // examples for fractional offsets).
         assert_eq!(format_utc_offset(5 * 3600 + 30 * 60), "UTC+5:30");
         assert_eq!(format_utc_offset(-(3 * 3600 + 30 * 60)), "UTC-3:30");
-    }
-
-    // ── SearchQuery::new ───────────────────────────────────────────
-
-    #[test]
-    fn search_query_rewrites_bare_utc_to_plus_zero() {
-        let q = SearchQuery::new("utc");
-        assert_eq!(q.terms, vec!["utc+0".to_string()]);
-    }
-
-    #[test]
-    fn search_query_rewrites_bare_gmt_to_plus_zero() {
-        let q = SearchQuery::new("gmt");
-        assert_eq!(q.terms, vec!["utc+0".to_string()]);
-    }
-
-    #[test]
-    fn search_query_leaves_compound_queries_alone() {
-        // "utc tokyo" should NOT rewrite — the rewrite only fires for
-        // a single bare term.
-        let q = SearchQuery::new("utc tokyo");
-        assert_eq!(q.terms, vec!["utc".to_string(), "tokyo".to_string()]);
     }
 
     // ── MatchKind::classify ────────────────────────────────────────
@@ -893,6 +859,132 @@ mod tests {
         index.search(query, entries, &base, &now, favorites)
     }
 
+    /// Mid-January, when no zone in either hemisphere is changing its
+    /// offset, so offsets read here are the standard ones.
+    fn midwinter() -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339("2026-01-15T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc)
+    }
+
+    fn offset_at(entry: &TimezoneEntry, now: &DateTime<Utc>) -> i32 {
+        now.with_timezone(&entry.tz)
+            .offset()
+            .fix()
+            .local_minus_utc()
+    }
+
+    /// The `(zone, offset seconds, label)` of every result for `query`
+    /// in midwinter.
+    fn midwinter_results(query: &str) -> Vec<(Tz, i32, &'static str)> {
+        let (entries, index) = fixture();
+        let base: Vec<usize> = (0..entries.len()).collect();
+        let now = midwinter();
+        index
+            .search(query, entries, &base, &now, &HashMap::new())
+            .expect("non-empty query")
+            .into_iter()
+            .map(|(i, label, _)| (entries[i].tz, offset_at(&entries[i], &now), label))
+            .collect()
+    }
+
+    /// A bare `utc` or `gmt` lists the zones at UTC and nothing else.
+    ///
+    /// Given: midwinter, when London is at UTC and Shanghai at UTC+8.
+    /// When: the query is `utc`, then `gmt`.
+    /// Then: London is listed, and every result is at UTC.
+    ///
+    /// Why it matters: a user who types `utc` wants the zones on UTC,
+    /// and a populous UTC+8 city must not rank among them.
+    #[test]
+    fn a_bare_utc_or_gmt_lists_only_zones_at_utc() {
+        for query in ["utc", "gmt"] {
+            let results = midwinter_results(query);
+
+            assert!(
+                results.iter().any(|(tz, ..)| *tz == Tz::Europe__London),
+                "{query}: London missing"
+            );
+            let off: Vec<_> = results
+                .iter()
+                .filter(|(_, offset, _)| *offset != 0)
+                .collect();
+            assert!(
+                off.is_empty(),
+                "{query}: not at UTC: {:?}",
+                &off[..off.len().min(5)]
+            );
+        }
+    }
+
+    /// A GMT-style offset lists no fixed offset of the opposite sign.
+    ///
+    /// Given: the fixed rows UTC-10 (zone `Etc/GMT+10`) and UTC+10
+    /// (zone `Etc/GMT-10`).
+    /// When: the query is `gmt-10`.
+    /// Then: Honolulu and UTC-10 are listed, and nothing at UTC+10.
+    ///
+    /// Why it matters: the IANA name of a fixed offset inverts its sign,
+    /// so matching that name lists the opposite offset.
+    #[test]
+    fn a_gmt_offset_lists_no_fixed_offset_of_the_opposite_sign() {
+        let results = midwinter_results("gmt-10");
+
+        assert!(results.iter().any(|(tz, ..)| *tz == Tz::Pacific__Honolulu));
+        assert!(results.iter().any(|(_, _, label)| *label == "UTC-10"));
+        let opposite: Vec<_> = results
+            .iter()
+            .filter(|(_, offset, _)| *offset == 36_000)
+            .collect();
+        assert!(opposite.is_empty(), "listed: {opposite:?}");
+    }
+
+    /// A bare hour matches that hour, not a longer offset that starts
+    /// with the same digit.
+    ///
+    /// Given: midwinter, when Paris is at UTC+1 and Sydney at UTC+11.
+    /// When: the query is `gmt 1`.
+    /// Then: Paris is listed, and nothing ten or more hours from UTC.
+    ///
+    /// Why it matters: `1` is a whole hour, so UTC+10 and UTC+11 zones
+    /// in the list bury the zones the user asked for.
+    #[test]
+    fn a_bare_hour_matches_that_hour_and_not_longer_offsets() {
+        let results = midwinter_results("gmt 1");
+
+        assert!(results.iter().any(|(tz, ..)| *tz == Tz::Europe__Paris));
+        let longer: Vec<_> = results
+            .iter()
+            .filter(|(_, offset, _)| offset.abs() >= 36_000)
+            .collect();
+        assert!(
+            longer.is_empty(),
+            "listed: {:?}",
+            &longer[..longer.len().min(5)]
+        );
+    }
+
+    /// An alias names one city, not every city with the same name.
+    ///
+    /// Given: the alias `Washington DC` and three US cities named
+    /// Washington, in DC, Utah and Illinois.
+    /// When: the query is `washington dc`.
+    /// Then: one row carries the alias, and it is the capital.
+    ///
+    /// Why it matters: three rows named Washington DC with three
+    /// different clocks leave the user to guess which is right.
+    #[test]
+    fn an_alias_labels_only_the_city_it_names() {
+        let results = midwinter_results("washington dc");
+
+        let labelled: Vec<_> = results
+            .iter()
+            .filter(|(_, _, label)| *label == "Washington DC")
+            .collect();
+        assert_eq!(labelled.len(), 1, "labelled: {labelled:?}");
+        assert_eq!(labelled[0].0, Tz::America__New_York);
+    }
+
     #[test]
     fn search_and_logic_rejects_entry_missing_any_term() {
         let (entries, index) = fixture();
@@ -909,70 +1001,93 @@ mod tests {
         );
     }
 
+    /// An offset is found in each form people write it.
+    ///
+    /// Given: midwinter, when New York is at UTC-5 and Kolkata at
+    /// UTC+5:30.
+    /// When: the offset is typed as `utc-5`, `gmt-05:00`, `-0500`,
+    /// `utc+5:30` and `+0530`.
+    /// Then: each lists the city at that offset.
+    ///
+    /// Why it matters: a user copies an offset from a calendar invite or
+    /// a log line, and each source writes it differently.
     #[test]
-    fn search_favorite_bonus_is_tiebreaker_only() {
+    fn an_offset_is_found_in_each_form_people_write_it() {
+        for (query, tz) in [
+            ("utc-5", Tz::America__New_York),
+            ("gmt-05:00", Tz::America__New_York),
+            ("-0500", Tz::America__New_York),
+            ("utc+5:30", Tz::Asia__Kolkata),
+            ("+0530", Tz::Asia__Kolkata),
+        ] {
+            let results = midwinter_results(query);
+
+            assert!(results.iter().any(|(found, ..)| *found == tz), "{query}");
+        }
+    }
+
+    /// `utc` beside a city name is a word of the query, not a request
+    /// for the zones at UTC.
+    ///
+    /// Given: Tokyo at UTC+9.
+    /// When: the query is `utc tokyo`.
+    /// Then: Tokyo is the first result.
+    ///
+    /// Why it matters: only a bare `utc` means UTC+0, and a longer query
+    /// must still find its city.
+    #[test]
+    fn utc_beside_a_city_still_finds_the_city() {
+        let results = midwinter_results("utc tokyo");
+
+        assert_eq!(results.first().map(|(tz, ..)| *tz), Some(Tz::Asia__Tokyo));
+    }
+
+    /// A favourite wins a tie, and only a tie.
+    ///
+    /// Given: two rows that score the same for `eastern time`, and York
+    /// ranked above New York City for `york`.
+    /// When: the lower of the tied rows is a favourite, and then New
+    /// York City.
+    /// Then: the tied favourite moves ahead, and York stays above the
+    /// favourite New York City.
+    ///
+    /// Why it matters: a favourite should come first among equals, but
+    /// a stronger match must not drop below it.
+    #[test]
+    fn a_favourite_wins_a_tie_and_only_a_tie() {
         let (entries, index) = fixture();
+        let base: Vec<usize> = (0..entries.len()).collect();
+        let now = midwinter();
+        let rank = |query: &str, favourite: Option<usize>, row: usize| {
+            let favourites: HashMap<usize, usize> = favourite.map(|i| (i, 0)).into_iter().collect();
+            index
+                .search(query, entries, &base, &now, &favourites)
+                .expect("non-empty query")
+                .iter()
+                .position(|(i, ..)| *i == row)
+                .expect("row listed")
+        };
 
-        // Pick Tokyo's catalogue index and make it a favourite.
-        let tokyo_idx = entries
-            .iter()
-            .position(|e| e.tz == Tz::Asia__Tokyo)
-            .expect("Tokyo in catalogue");
-        let new_york_idx = entries
-            .iter()
-            .position(|e| e.tz == Tz::America__New_York)
-            .expect("New York in catalogue");
-
-        // Favourite Tokyo only.
-        let mut favorites = HashMap::new();
-        favorites.insert(tokyo_idx, 0usize);
-
-        // Query "new york" — Tokyo gets no match, New York gets a strong
-        // exact-city match. Despite the favourite bonus, New York wins:
-        // the bonus is a tiebreaker, not a rank override.
-        let results = run_search(&index, entries, "new york", &favorites).expect("non-empty");
-        assert!(!results.is_empty(), "expected matches for 'new york'");
-        assert_eq!(
-            results[0].0, new_york_idx,
-            "non-favourite New York must outrank favourite Tokyo when it has a strictly higher base score"
-        );
-        // Tokyo should not even be in the result set (no AND match).
+        let plain =
+            run_search(&index, entries, "eastern time", &HashMap::new()).expect("non-empty query");
+        let tie = plain
+            .windows(2)
+            .position(|pair| pair[0].2 == pair[1].2)
+            .expect("two rows with one score");
+        let (ahead, behind) = (plain[tie].0, plain[tie + 1].0);
         assert!(
-            !results.iter().any(|(i, _, _)| *i == tokyo_idx),
-            "Tokyo should not match 'new york' at all"
+            rank("eastern time", Some(behind), behind) < rank("eastern time", Some(behind), ahead)
         );
 
-        // Now flip the favourite onto Sydney and query something where
-        // Sydney and Melbourne would tie. They both live in Australia
-        // with similar haystacks; "australia" should match both, but
-        // marking Sydney as favourite lifts it above Melbourne. We
-        // verify that the favourite-bonus path actually fires.
-        let sydney_idx = entries
+        let new_york = entries
             .iter()
-            .position(|e| e.tz == Tz::Australia__Sydney)
-            .expect("Sydney in catalogue");
-        let mut favs2 = HashMap::new();
-        favs2.insert(sydney_idx, 0usize);
-
-        let with_bonus = run_search(&index, entries, "australia", &favs2).expect("non-empty");
-        let without_bonus =
-            run_search(&index, entries, "australia", &HashMap::new()).expect("non-empty");
-
-        let sydney_with = with_bonus
+            .position(|e| e.city == "New York City")
+            .expect("New York City");
+        let york = entries
             .iter()
-            .find(|(i, _, _)| *i == sydney_idx)
-            .expect("Sydney should match 'australia'")
-            .2;
-        let sydney_without = without_bonus
-            .iter()
-            .find(|(i, _, _)| *i == sydney_idx)
-            .expect("Sydney should match 'australia'")
-            .2;
-        assert_eq!(
-            sydney_with - sydney_without,
-            FAVORITE_TIEBREAKER_BONUS,
-            "favourite bonus should add exactly FAVORITE_TIEBREAKER_BONUS to the score"
-        );
+            .position(|e| e.city == "York" && e.cc == "GB")
+            .expect("York");
+        assert!(rank("york", Some(new_york), york) < rank("york", Some(new_york), new_york));
     }
 
     #[test]

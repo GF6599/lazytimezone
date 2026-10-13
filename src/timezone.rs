@@ -155,23 +155,29 @@ const CITY_ALIASES_TSV: &str = include_str!("../data/city_aliases.tsv");
 
 /// Curated aliases for one city: nicknames ("SF"), exonyms
 /// ("Cologne"), renames ("Bangalore"), and nearby landmarks below the
-/// catalogue's population threshold ("Petra"). Search-only.
-pub(crate) fn city_search_aliases(city: &'static str, cc: &'static str) -> &'static [&'static str] {
-    static ALIASES: OnceLock<HashMap<(&'static str, &'static str), Vec<&'static str>>> =
-        OnceLock::new();
+/// catalogue's population threshold ("Petra"). Search-only. The state
+/// is part of the key, because a name and a country can name several
+/// cities, as Washington does in the US.
+pub(crate) fn city_search_aliases(entry: &TimezoneEntry) -> &'static [&'static str] {
+    type CityKey = (&'static str, &'static str, &'static str);
+    static ALIASES: OnceLock<HashMap<CityKey, Vec<&'static str>>> = OnceLock::new();
     let by_city = ALIASES.get_or_init(|| {
-        let mut map: HashMap<(&'static str, &'static str), Vec<&'static str>> = HashMap::new();
+        let mut map: HashMap<CityKey, Vec<&'static str>> = HashMap::new();
         for line in data_rows(CITY_ALIASES_TSV) {
             let mut cols = line.split('\t');
-            let (Some(alias), Some(name), Some(cc)) = (cols.next(), cols.next(), cols.next())
+            let (Some(alias), Some(name), Some(admin1), Some(cc)) =
+                (cols.next(), cols.next(), cols.next(), cols.next())
             else {
                 continue;
             };
-            map.entry((name, cc)).or_default().push(alias);
+            map.entry((name, admin1, cc)).or_default().push(alias);
         }
         map
     });
-    by_city.get(&(city, cc)).map(Vec::as_slice).unwrap_or(&[])
+    by_city
+        .get(&(entry.city, entry.admin1, entry.cc))
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
 }
 
 /// Search aliases for a country: abbreviations and endonyms that the
@@ -708,16 +714,25 @@ mod tests {
     }
 
     #[test]
-    fn every_city_alias_targets_a_catalogue_row() {
+    fn every_city_alias_targets_exactly_one_catalogue_row() {
         for line in data_rows(CITY_ALIASES_TSV) {
             let mut cols = line.split('\t');
-            let (Some(alias), Some(city), Some(cc)) = (cols.next(), cols.next(), cols.next())
-            else {
-                panic!("city_aliases.tsv has a short row: {line:?}");
+            let (Some(alias), Some(city), Some(admin1), Some(cc), None) = (
+                cols.next(),
+                cols.next(),
+                cols.next(),
+                cols.next(),
+                cols.next(),
+            ) else {
+                panic!("city_aliases.tsv needs four columns: {line:?}");
             };
-            assert!(
-                all_timezones().iter().any(|e| e.city == city && e.cc == cc),
-                "alias {alias:?} targets {city:?} {cc:?}, which is not a catalogue row"
+            let targets = all_timezones()
+                .iter()
+                .filter(|e| e.city == city && e.admin1 == admin1 && e.cc == cc)
+                .count();
+            assert_eq!(
+                targets, 1,
+                "alias {alias:?} targets {city:?} {admin1:?} {cc:?}"
             );
         }
     }
@@ -731,7 +746,7 @@ mod tests {
         let found = all_timezones().iter().filter(|e| e.tz == tz).any(|e| {
             e.city.eq_ignore_ascii_case(term)
                 || e.ascii.eq_ignore_ascii_case(term)
-                || city_search_aliases(e.city, e.cc)
+                || city_search_aliases(e)
                     .iter()
                     .any(|a| a.eq_ignore_ascii_case(term))
                 || zone_search_terms(e.tz)
