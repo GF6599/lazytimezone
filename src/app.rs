@@ -1219,6 +1219,77 @@ mod tests {
         assert!((0..len).all(|n| seen.insert(nth_tz(&app, n))));
     }
 
+    /// A query with no letters or digits shows the browse list.
+    ///
+    /// Given: the picker.
+    /// When: the query is a space, then three dots.
+    /// Then: each lists the same rows as an empty query.
+    ///
+    /// Why it matters: a stray space or a punctuation key must not
+    /// flood the picker with every city and fixed offset there is.
+    #[test]
+    fn a_query_with_no_letters_or_digits_shows_the_browse_list() {
+        // Given:
+        let mut app = test_app();
+        let rows = |app: &App| -> Vec<usize> {
+            app.filtered_view
+                .rows()
+                .iter()
+                .map(|row| row.catalogue_idx)
+                .collect()
+        };
+        apply_query(&mut app, "");
+        let browse = rows(&app);
+
+        for query in [" ", "..."] {
+            // When:
+            apply_query(&mut app, query);
+
+            // Then:
+            let listed = rows(&app);
+            assert!(
+                listed == browse,
+                "query {query:?} listed {} rows, the browse list {}",
+                listed.len(),
+                browse.len()
+            );
+        }
+    }
+
+    /// Removing a favourite from the picker keeps the wall selection on
+    /// a panel.
+    ///
+    /// Given: three favourites with the last panel selected.
+    /// When: the picker removes the first favourite with Ctrl-f.
+    /// Then: the selection moves to the panel that is now last.
+    ///
+    /// Why it matters: a selection past the last panel lights nothing,
+    /// and Enter, `f`, `J` and `K` then do nothing.
+    #[test]
+    fn removing_a_favourite_from_the_picker_keeps_the_selection_on_a_panel() {
+        // Given:
+        let mut app = test_app();
+        for query in ["tokyo", "london", "paris"] {
+            app.enter_search();
+            for c in query.chars() {
+                app.search_input(c);
+            }
+            app.toggle_favorite();
+            app.exit_search();
+        }
+        assert_eq!(app.favorites.len(), 3);
+        app.selected_panel = 2;
+
+        // When:
+        app.enter_search();
+        app.toggle_favorite();
+        app.exit_search();
+
+        // Then:
+        assert_eq!(app.favorites.len(), 2);
+        assert_eq!(app.selected_panel, 1);
+    }
+
     #[test]
     fn the_browse_list_offers_cities_and_no_fixed_offsets() {
         let mut app = test_app();
