@@ -1224,6 +1224,34 @@ mod tests {
         assert!((0..len).all(|n| seen.insert(nth_tz(&app, n))));
     }
 
+    /// A change made while the config file has an error says that it
+    /// was not saved.
+    ///
+    /// Given: a config file with a syntax error, and the startup notice
+    /// dismissed by a key.
+    /// When: the theme changes.
+    /// Then: the status bar shows a message, and the file is unchanged.
+    ///
+    /// Why it matters: the startup notice is gone after the first key,
+    /// so without a message a whole session of changes is lost in
+    /// silence.
+    #[test]
+    fn a_change_while_the_config_is_broken_says_it_was_not_saved() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let broken = "theme = \"Nord\"\nfavorites = [ oops";
+        fs::write(tmp.path(), broken).unwrap();
+        let mut app = App::new(Some(tmp.path()));
+        app.dismiss_startup_messages();
+
+        // When:
+        app.cycle_theme();
+
+        // Then:
+        assert!(!app.startup_messages.is_empty());
+        assert_eq!(fs::read_to_string(tmp.path()).unwrap(), broken);
+    }
+
     /// A query with no letters or digits shows the browse list.
     ///
     /// Given: the picker.

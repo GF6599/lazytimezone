@@ -294,6 +294,49 @@ mod tests {
         assert_eq!(fs::read_to_string(&favorites).unwrap(), "Asia/Tokyo\n");
     }
 
+    /// A save through a symlink writes the file the link names and
+    /// keeps the link.
+    ///
+    /// Given: the config path is a symlink to a file in another folder,
+    /// and a second path is a symlink to a file that does not exist yet.
+    /// When: a config is saved to each path.
+    /// Then: both paths are still symlinks, and each target holds the
+    /// saved config.
+    ///
+    /// Why it matters: dotfile managers such as stow link the config
+    /// into place, and a save that replaces the link splits it from the
+    /// file the user keeps.
+    #[cfg(unix)]
+    #[test]
+    fn a_save_through_a_symlink_keeps_the_link() {
+        // Given:
+        let tmp = TempConfig::new();
+        let dotfiles = tmp.root.join("dotfiles");
+        fs::create_dir_all(&dotfiles).unwrap();
+        let existing = dotfiles.join("config.toml");
+        fs::write(&existing, "theme = \"Nord\"\n").unwrap();
+        std::os::unix::fs::symlink(&existing, tmp.config_path()).unwrap();
+        let dangling = tmp.app_dir().join("second.toml");
+        std::os::unix::fs::symlink("../dotfiles/second.toml", &dangling).unwrap();
+        let cfg = Config {
+            theme: "Gruvbox".to_string(),
+            ..Config::default()
+        };
+
+        for (link, target) in [
+            (tmp.config_path(), existing),
+            (dangling, dotfiles.join("second.toml")),
+        ] {
+            // When:
+            try_save(&link, &cfg).unwrap();
+
+            // Then:
+            let kind = fs::symlink_metadata(&link).unwrap().file_type();
+            assert!(kind.is_symlink(), "{} is no longer a link", link.display());
+            assert_eq!(try_load(&target).unwrap().0.theme, "Gruvbox");
+        }
+    }
+
     #[test]
     fn a_malformed_file_is_reported_and_left_untouched() {
         let tmp = TempConfig::new();
