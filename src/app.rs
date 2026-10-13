@@ -1772,27 +1772,55 @@ mod tests {
 
     // ── Search editing (paste, commit, word-delete, kill-line) ──────
 
+    /// A paste lands at the cursor, filters the list, and highlights
+    /// the first row.
+    ///
+    /// Given: the picker with `to` typed and the second row highlighted.
+    /// When: `kyo` is pasted.
+    /// Then: the query is `tokyo`, Tokyo is the first row, and the first
+    /// row is highlighted.
+    ///
+    /// Why it matters: a paste arrives as one event, so it must do the
+    /// filtering that typing each letter would have done.
     #[test]
-    fn search_paste_appends_at_cursor_and_runs_filter() {
+    fn a_paste_lands_at_the_cursor_and_filters_the_list() {
+        // Given:
         let mut app = test_app();
         app.enter_search();
         app.search_input('t');
         app.search_input('o');
-        // Cursor at end ("to"). Paste finishes "kyo" — including a
-        // control char that must be stripped and a CJK char that must
-        // be preserved.
-        app.search_paste("k\u{0007}yo東");
-        assert_eq!(app.search_query, "tokyo東");
-        assert_eq!(app.cursor_position, "tokyo東".len());
-        // apply_filter ran exactly once after the bulk insert and the
-        // selection snapped back to the first result.
-        assert_eq!(app.selected_row, 0);
-        // The CJK suffix is non-matching, but the search still
-        // executed — verify by clearing the suffix via Ctrl-k and
-        // checking that Tokyo is the first hit.
-        app.cursor_position = "tokyo".len();
-        app.delete_to_end_of_line();
+        app.selected_row = 1;
+
+        // When:
+        app.search_paste("kyo");
+
+        // Then:
+        assert_eq!(app.search_query, "tokyo");
+        assert_eq!(app.cursor_position, "tokyo".len());
         assert_eq!(first_city(&app), "Tokyo");
+        assert_eq!(app.selected_row, 0);
+    }
+
+    /// A paste drops control characters, turns a tab into a space, and
+    /// keeps text in any script.
+    ///
+    /// Given: the empty picker.
+    /// When: `a`, a bell, a tab, `b` and `東` are pasted.
+    /// Then: the query is `a b東`.
+    ///
+    /// Why it matters: a copied cell or terminal line can carry control
+    /// characters that would corrupt the query line.
+    #[test]
+    fn a_paste_drops_control_characters_and_keeps_any_script() {
+        // Given:
+        let mut app = test_app();
+        app.enter_search();
+
+        // When:
+        app.search_paste("a\u{0007}\tb\u{6771}");
+
+        // Then:
+        assert_eq!(app.search_query, "a b\u{6771}");
     }
 
     #[test]
