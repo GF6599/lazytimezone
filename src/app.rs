@@ -1786,6 +1786,130 @@ mod tests {
         );
     }
 
+    // ── Main clock across restarts ──────────────────────────────────
+
+    /// A city picked in search is on the main clock at the next start,
+    /// under its catalogue name.
+    ///
+    /// Given: the app on UTC with a config file.
+    /// When: the user searches `saigon`, presses Enter, and the app
+    /// starts again on that file.
+    /// Then: the new start shows Ho Chi Minh City in its own timezone.
+    ///
+    /// Why it matters: the user must not pick the main clock again at
+    /// every start. The file holds the city, not the search label.
+    #[test]
+    fn a_city_picked_in_search_is_on_the_main_clock_at_the_next_start() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let mut app = App::new(Some(tmp.path()));
+        assert_eq!(app.selection.tz, Tz::UTC);
+
+        // When:
+        apply_query(&mut app, "saigon");
+        app.commit_search_result_and_exit();
+        assert_eq!(app.selection.city_name, "Saigon");
+        let restarted = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(restarted.selection.city_name, "Ho Chi Minh City");
+        assert_eq!(restarted.selection.tz, Tz::Asia__Ho_Chi_Minh);
+        assert!(restarted.selection.catalogue_index.is_some());
+    }
+
+    /// A panel promoted to the main clock is there at the next start.
+    ///
+    /// Given: Tokyo and then London added from search, so London is on
+    /// the main clock.
+    /// When: the user promotes the Tokyo panel, and the app starts again.
+    /// Then: the new start shows Tokyo.
+    ///
+    /// Why it matters: the wall is the other way to set the main clock,
+    /// and its choice must last as long as a search pick.
+    #[test]
+    fn a_promoted_panel_is_on_the_main_clock_at_the_next_start() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let mut app = App::new(Some(tmp.path()));
+        for query in ["tokyo", "london"] {
+            apply_query(&mut app, query);
+            app.commit_search_result_and_exit();
+        }
+        assert_eq!(app.selection.city_name, "London");
+
+        // When:
+        app.panel_first();
+        app.promote_selected_panel();
+        let restarted = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(restarted.selection.city_name, "Tokyo");
+        assert_eq!(restarted.selection.tz, Tz::Asia__Tokyo);
+    }
+
+    /// A config file with no main clock opens on UTC.
+    ///
+    /// Given: a config file that names a theme and no main clock.
+    /// When: the app starts with that file.
+    /// Then: the main clock shows UTC, and no warning shows.
+    ///
+    /// Why it matters: every config file written before the main clock
+    /// was saved has no such key, and must open as it did before.
+    #[test]
+    fn a_config_file_without_a_main_clock_opens_on_utc() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        fs::write(tmp.path(), "theme = \"Nord\"\n").unwrap();
+
+        // When:
+        let app = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(app.selection.tz, Tz::UTC);
+        assert_eq!(app.selection.city_name, "UTC");
+        assert!(
+            app.startup_messages.is_empty(),
+            "{:?}",
+            app.startup_messages
+        );
+    }
+
+    /// A saved main clock the catalogue cannot match opens on UTC, and
+    /// the file keeps it.
+    ///
+    /// Given: a config file whose main clock names no catalogue row.
+    /// When: the app starts, and the user cycles the theme.
+    /// Then: the main clock shows UTC, the status bar names the city,
+    /// and the saved file still holds it.
+    ///
+    /// Why it matters: an unmatched favourite is kept the same way. A
+    /// save for an unrelated reason must not delete the user's choice.
+    #[test]
+    fn an_unmatched_main_clock_opens_on_utc_and_stays_in_the_file() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        fs::write(
+            tmp.path(),
+            "theme = \"Nord\"\n\n[main_clock]\ncity = \"Atlantis\"\nadmin1 = \"Nowhere\"\ncc = \"XX\"\n",
+        )
+        .unwrap();
+
+        // When:
+        let mut app = App::new(Some(tmp.path()));
+        app.cycle_theme();
+
+        // Then:
+        assert_eq!(app.selection.tz, Tz::UTC);
+        assert!(!app.config_load_failed);
+        assert_eq!(
+            app.startup_messages,
+            vec!["Main clock Atlantis is not in the city catalogue, using UTC".to_string()]
+        );
+        let saved = fs::read_to_string(tmp.path()).unwrap();
+        assert!(saved.contains("city = \"Atlantis\""), "{saved}");
+        assert!(saved.contains(Theme::Nord.next().label()), "{saved}");
+    }
+
     // ── Select timezone ─────────────────────────────────────────────
 
     #[test]
