@@ -454,8 +454,8 @@ pub struct App {
     /// Where [`App::save_config`] writes. `None` disables saving.
     config_path: Option<PathBuf>,
     /// The saved main clock city the catalogue could not match. Saves
-    /// write it back until the user shows another city on the main
-    /// clock, so a save for another reason does not delete it.
+    /// write it back while the main clock shows no catalogue city, so a
+    /// save for another reason does not delete it.
     unmatched_main_clock: Option<config::SavedCity>,
     /// Timestamp captured at construction time. Used by the UI to decide
     /// when to stop showing [`startup_messages`].
@@ -658,7 +658,6 @@ impl App {
             return;
         };
         self.selection.set(idx, entry.tz, city_name);
-        self.unmatched_main_clock = None;
         self.save_config();
     }
 
