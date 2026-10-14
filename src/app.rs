@@ -1810,19 +1810,28 @@ mod tests {
     /// A city picked in search is on the main clock at the next start,
     /// under its catalogue name.
     ///
-    /// Given: the app on UTC with a config file.
+    /// Given: the app on UTC with a config file whose favourites already
+    /// hold Ho Chi Minh City, so the pick adds no favourite.
     /// When: the user searches `saigon`, presses Enter, and the app
     /// starts again on that file.
     /// Then: the new start shows Ho Chi Minh City in its own timezone.
     ///
     /// Why it matters: the user must not pick the main clock again at
-    /// every start. The file holds the city, not the search label.
+    /// every start. The file holds the city, not the search label. A new
+    /// favourite saves the file anyway, so the test starts from one that
+    /// is already there.
     #[test]
     fn a_city_picked_in_search_is_on_the_main_clock_at_the_next_start() {
         // Given:
         let tmp = TempConfigPath::new();
+        fs::write(
+            tmp.path(),
+            "[[favorites]]\ncity = \"Ho Chi Minh City\"\nadmin1 = \"Ho Chi Minh City (HCMC)\"\ncc = \"VN\"\n",
+        )
+        .unwrap();
         let mut app = App::new(Some(tmp.path()));
         assert_eq!(app.selection.tz, Tz::UTC);
+        assert_eq!(app.favorites.len(), 1);
 
         // When:
         apply_query(&mut app, "saigon");
