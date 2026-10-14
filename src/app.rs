@@ -13,7 +13,8 @@
 //! | Search | `input_mode`, `search_query`, `cursor_position` | No |
 //! | Theme | `theme` | Yes (`~/.config/lazytimezone/config.toml`) |
 //! | Favorites | `favorites` | Yes (`~/.config/lazytimezone/config.toml`) |
-//! | Wall | `selected_panel`, `wall_columns`, `wall_view` | No |
+//! | Wall | `selected_panel`, `wall_columns` | No |
+//! | Wall view | `wall_view` | Yes (`~/.config/lazytimezone/config.toml`) |
 //! | Feedback | `copy_flash`, `startup_messages` | No |
 
 use std::collections::HashMap;
@@ -323,11 +324,28 @@ impl FilteredView {
 }
 
 /// What the area under the clock shows: a panel for each favourite, or
-/// the world map with a dot for each one. The app opens on the panels.
+/// the world map with a dot for each one. The app opens on the view the
+/// config file saved, or on the panels when it saved none.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WallView {
     Panels,
     Map,
+}
+
+impl WallView {
+    /// The value the config file holds for this view.
+    fn label(self) -> &'static str {
+        match self {
+            WallView::Panels => "panels",
+            WallView::Map => "map",
+        }
+    }
+
+    fn try_from_label(label: &str) -> Option<Self> {
+        [WallView::Panels, WallView::Map]
+            .into_iter()
+            .find(|view| view.label() == label)
+    }
 }
 
 /// Whether the app is accepting navigation keys or search text input.
@@ -494,6 +512,16 @@ impl App {
         for name in unmatched {
             startup_messages.push(format!("Favorite {name} is not in the city catalogue"));
         }
+        let wall_view = match cfg.wall_view.as_deref() {
+            None => WallView::Panels,
+            Some(label) => WallView::try_from_label(label).unwrap_or_else(|| {
+                startup_messages.push(format!(
+                    "Unknown wall view '{label}', using {}",
+                    WallView::Panels.label()
+                ));
+                WallView::Panels
+            }),
+        };
 
         let mut app = Self {
             should_quit: false,
@@ -514,7 +542,7 @@ impl App {
             favorites,
             copy_flash: None,
             show_help: false,
-            wall_view: WallView::Panels,
+            wall_view,
             help_scroll: 0,
             startup_messages,
             config_load_failed,
@@ -540,6 +568,7 @@ impl App {
             WallView::Panels => WallView::Map,
             WallView::Map => WallView::Panels,
         };
+        self.save_config();
     }
 
     pub(crate) fn toggle_help(&mut self) {
@@ -990,6 +1019,7 @@ impl App {
         let cfg = config::Config {
             theme: self.theme.label().to_string(),
             favorites: self.favorites.to_config(self.catalogue.entries()),
+            wall_view: Some(self.wall_view.label().to_string()),
         };
         // The alternate screen hides stderr, so the status bar is the
         // only place a failure can show.
@@ -1370,6 +1400,7 @@ mod tests {
             &config::Config {
                 theme: "Default".to_string(),
                 favorites: vec![unmatched.clone()],
+                ..config::Config::default()
             },
         )
         .unwrap();
@@ -1662,7 +1693,7 @@ mod tests {
             &tmp.path(),
             &config::Config {
                 theme: "Rose Pine".to_string(),
-                favorites: Vec::new(),
+                ..config::Config::default()
             },
         )
         .unwrap();
