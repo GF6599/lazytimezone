@@ -23,7 +23,6 @@ use std::sync::OnceLock;
 use std::time::Instant;
 
 use chrono::Utc;
-use chrono_tz::Tz;
 
 use crate::clipboard;
 use crate::config;
@@ -82,7 +81,7 @@ impl Catalogue {
 
 /// Ordered list of favourite timezones with O(1) membership lookup.
 ///
-/// Internally stores parsed [`Tz`] values (not strings) so search,
+/// Internally stores parsed [`Tz`](chrono_tz::Tz) values (not strings) so search,
 /// sort, and rendering paths never re-parse on the hot path. Strings
 /// only appear at the on-disk boundary via
 /// [`Favorites::from_config`] / [`Favorites::to_config`].
@@ -97,7 +96,7 @@ pub(crate) struct Favorites {
     /// held in the saved list. Held so a save can write them back
     /// rather than destroy them. Built in ascending index order, which
     /// [`to_config`](Self::to_config) relies on when it splices them in.
-    unresolved: Vec<(usize, config::FavoriteEntry)>,
+    unresolved: Vec<(usize, config::SavedCity)>,
 }
 
 impl Favorites {
@@ -107,31 +106,19 @@ impl Favorites {
     /// aside for the next save and named in the second return value,
     /// so the caller can report it.
     pub(crate) fn from_config(
-        items: &[config::FavoriteEntry],
+        items: &[config::SavedCity],
         entries: &[TimezoneEntry],
     ) -> (Self, Vec<String>) {
         let mut ordered = Vec::new();
         let mut unresolved = Vec::new();
         let mut unmatched = Vec::new();
         for (position, item) in items.iter().enumerate() {
-            let resolved = match item {
-                config::FavoriteEntry::City { city, admin1, cc } => entries
-                    .iter()
-                    .position(|e| e.city == city && e.admin1 == admin1 && e.cc == cc),
-                config::FavoriteEntry::Zone(zone) => zone
-                    .parse::<Tz>()
-                    .ok()
-                    .and_then(|tz| entries.iter().position(|e| e.tz == tz)),
-            };
-            match resolved {
+            match item.find_in(entries) {
                 Some(idx) if !ordered.contains(&idx) => ordered.push(idx),
                 Some(_) => {}
                 None => {
                     unresolved.push((position, item.clone()));
-                    unmatched.push(match item {
-                        config::FavoriteEntry::City { city, .. } => city.clone(),
-                        config::FavoriteEntry::Zone(zone) => zone.clone(),
-                    });
+                    unmatched.push(item.name().to_string());
                 }
             }
         }
@@ -148,16 +135,12 @@ impl Favorites {
 
     /// Serializes back to the on-disk `City` form, with every entry the
     /// catalogue could not match returned to the place it came from.
-    pub(crate) fn to_config(&self, entries: &[TimezoneEntry]) -> Vec<config::FavoriteEntry> {
-        let mut out: Vec<config::FavoriteEntry> = self
+    pub(crate) fn to_config(&self, entries: &[TimezoneEntry]) -> Vec<config::SavedCity> {
+        let mut out: Vec<config::SavedCity> = self
             .ordered
             .iter()
             .filter_map(|&idx| entries.get(idx))
-            .map(|e| config::FavoriteEntry::City {
-                city: e.city.to_string(),
-                admin1: e.admin1.to_string(),
-                cc: e.cc.to_string(),
-            })
+            .map(config::SavedCity::of)
             .collect();
         for (position, entry) in &self.unresolved {
             let at = (*position).min(out.len());
@@ -1077,6 +1060,7 @@ mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
     use super::*;
+    use chrono_tz::Tz;
     use std::fs;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -1370,7 +1354,7 @@ mod tests {
     #[test]
     fn a_legacy_zone_favorite_becomes_its_major_city() {
         let cfg = config::Config {
-            favorites: vec![config::FavoriteEntry::Zone("Asia/Tokyo".to_string())],
+            favorites: vec![config::SavedCity::Zone("Asia/Tokyo".to_string())],
             ..config::Config::default()
         };
         let app = App::with_config(cfg);
@@ -1390,7 +1374,7 @@ mod tests {
     fn a_favorite_the_catalogue_cannot_match_stays_in_the_config_file() {
         // Given:
         let tmp = TempConfigPath::new();
-        let unmatched = config::FavoriteEntry::City {
+        let unmatched = config::SavedCity::City {
             city: "Tokyo".to_string(),
             admin1: "Renamed Prefecture".to_string(),
             cc: "JP".to_string(),
@@ -1413,7 +1397,7 @@ mod tests {
         // Then:
         let (saved, _) = config::try_load(&tmp.path()).unwrap();
         let saved_london = saved.favorites.iter().any(
-            |f| matches!(f, config::FavoriteEntry::City { city, .. } if city.as_str() == "London"),
+            |f| matches!(f, config::SavedCity::City { city, .. } if city.as_str() == "London"),
         );
         assert!(
             saved_london,

@@ -1331,7 +1331,7 @@ mod tests {
     /// config file stores it.
     fn fixed_offset_app(city: &str) -> App {
         App::with_config(config::Config {
-            favorites: vec![config::FavoriteEntry::City {
+            favorites: vec![config::SavedCity::City {
                 city: city.to_string(),
                 admin1: String::new(),
                 cc: String::new(),
@@ -1863,7 +1863,7 @@ mod tests {
         App::with_config(config::Config {
             favorites: cities
                 .iter()
-                .map(|&(city, admin1, cc)| config::FavoriteEntry::City {
+                .map(|&(city, admin1, cc)| config::SavedCity::City {
                     city: city.to_string(),
                     admin1: admin1.to_string(),
                     cc: cc.to_string(),

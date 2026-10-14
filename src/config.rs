@@ -13,7 +13,7 @@
 //! ```
 //!
 //! A favorite from the pre-city format, a bare IANA zone string such
-//! as `"Asia/Tokyo"`, still parses ([`FavoriteEntry::Zone`]) and is
+//! as `"Asia/Tokyo"`, still parses ([`SavedCity::Zone`]) and is
 //! resolved to the zone's major city at load.
 //!
 //! ## API shape
@@ -25,6 +25,7 @@
 //!   flag names another.
 
 use crate::theme::Theme;
+use crate::timezone::TimezoneEntry;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
@@ -37,26 +38,60 @@ pub struct Config {
     #[serde(default = "default_theme")]
     pub theme: String,
     #[serde(default)]
-    pub favorites: Vec<FavoriteEntry>,
+    pub favorites: Vec<SavedCity>,
     /// The label of the view under the clock. The app owns the labels,
     /// and a file without the key opens on the panels.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wall_view: Option<String>,
 }
 
-/// One favorite in the config file.
+/// A city as the config file saves it.
 ///
-/// `Zone` is the pre-city format. It still deserializes so an old
-/// config keeps its favorites, and saving writes the `City` form.
+/// `Zone` is the pre-city format of a favorite. It still deserializes
+/// so an old config keeps its favorites, and saving writes the `City`
+/// form.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum FavoriteEntry {
+pub enum SavedCity {
     City {
         city: String,
         admin1: String,
         cc: String,
     },
     Zone(String),
+}
+
+impl SavedCity {
+    /// The saved form of a catalogue row.
+    pub fn of(entry: &TimezoneEntry) -> Self {
+        SavedCity::City {
+            city: entry.city.to_string(),
+            admin1: entry.admin1.to_string(),
+            cc: entry.cc.to_string(),
+        }
+    }
+
+    /// The catalogue row this names. A `Zone` names the zone's most
+    /// populous city, which is its first row in the catalogue.
+    pub fn find_in(&self, entries: &[TimezoneEntry]) -> Option<usize> {
+        match self {
+            SavedCity::City { city, admin1, cc } => entries
+                .iter()
+                .position(|e| e.city == city && e.admin1 == admin1 && e.cc == cc),
+            SavedCity::Zone(zone) => zone
+                .parse::<chrono_tz::Tz>()
+                .ok()
+                .and_then(|tz| entries.iter().position(|e| e.tz == tz)),
+        }
+    }
+
+    /// The name a warning about this city shows.
+    pub fn name(&self) -> &str {
+        match self {
+            SavedCity::City { city, .. } => city,
+            SavedCity::Zone(zone) => zone,
+        }
+    }
 }
 
 fn default_theme() -> String {
@@ -266,12 +301,12 @@ mod tests {
         let cfg = Config {
             theme: "Nord".to_string(),
             favorites: vec![
-                FavoriteEntry::City {
+                SavedCity::City {
                     city: "Boston".to_string(),
                     admin1: "Massachusetts".to_string(),
                     cc: "US".to_string(),
                 },
-                FavoriteEntry::Zone("Asia/Tokyo".to_string()),
+                SavedCity::Zone("Asia/Tokyo".to_string()),
             ],
             wall_view: Some("map".to_string()),
         };
