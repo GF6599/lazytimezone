@@ -1674,6 +1674,87 @@ mod tests {
         assert_eq!(app.theme.label(), "Rose Pine");
     }
 
+    // ── Wall view ───────────────────────────────────────────────────
+
+    /// The wall opens on the view the user left it on.
+    ///
+    /// Given: the app on the panels with a config file.
+    /// When: the user switches to the map, and the app starts again on
+    /// that file.
+    /// Then: the new start opens on the map.
+    ///
+    /// Why it matters: a user who keeps the map open must not switch to
+    /// it again at every start.
+    #[test]
+    fn switching_to_the_map_opens_the_next_start_on_the_map() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let mut app = App::new(Some(tmp.path()));
+        assert_eq!(app.wall_view, WallView::Panels);
+
+        // When:
+        app.toggle_map();
+        let restarted = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(restarted.wall_view, WallView::Map);
+    }
+
+    /// A config file with no wall view opens on the panels.
+    ///
+    /// Given: a config file that names a theme and no wall view.
+    /// When: the app starts with that file.
+    /// Then: the wall shows the panels, and no warning shows.
+    ///
+    /// Why it matters: every config file written before the view was
+    /// saved has no such key, and must open as it did before.
+    #[test]
+    fn a_config_file_without_a_wall_view_opens_on_the_panels() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        fs::write(tmp.path(), "theme = \"Nord\"\n").unwrap();
+
+        // When:
+        let app = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(app.wall_view, WallView::Panels);
+        assert_eq!(app.theme.label(), "Nord");
+        assert!(
+            app.startup_messages.is_empty(),
+            "{:?}",
+            app.startup_messages
+        );
+    }
+
+    /// An unknown wall view opens on the panels with a warning.
+    ///
+    /// Given: a config file whose wall view is "globe".
+    /// When: the app starts with that file.
+    /// Then: the wall shows the panels, the rest of the file still
+    /// loads, and the status bar names the unknown value.
+    ///
+    /// Why it matters: an unknown theme gets the same treatment, and a
+    /// typo in one setting must not cost the user the others.
+    #[test]
+    fn an_unknown_wall_view_opens_on_the_panels_with_a_warning() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        fs::write(tmp.path(), "theme = \"Nord\"\nwall_view = \"globe\"\n").unwrap();
+
+        // When:
+        let app = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(app.wall_view, WallView::Panels);
+        assert_eq!(app.theme.label(), "Nord");
+        assert!(!app.config_load_failed);
+        assert_eq!(
+            app.startup_messages,
+            vec!["Unknown wall view 'globe', using panels".to_string()]
+        );
+    }
+
     // ── Select timezone ─────────────────────────────────────────────
 
     #[test]
