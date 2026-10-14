@@ -13,7 +13,8 @@
 //! | Search | `input_mode`, `search_query`, `cursor_position` | No |
 //! | Theme | `theme` | Yes (`~/.config/lazytimezone/config.toml`) |
 //! | Favorites | `favorites` | Yes (`~/.config/lazytimezone/config.toml`) |
-//! | Wall | `selected_panel`, `wall_columns`, `wall_view` | No |
+//! | Wall | `selected_panel`, `wall_columns` | No |
+//! | Wall view | `wall_view` | Yes (`~/.config/lazytimezone/config.toml`) |
 //! | Feedback | `copy_flash`, `startup_messages` | No |
 
 use std::collections::HashMap;
@@ -323,11 +324,28 @@ impl FilteredView {
 }
 
 /// What the area under the clock shows: a panel for each favourite, or
-/// the world map with a dot for each one. The app opens on the panels.
+/// the world map with a dot for each one. The app opens on the view the
+/// config file saved, or on the panels when it saved none.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WallView {
     Panels,
     Map,
+}
+
+impl WallView {
+    /// The value the config file holds for this view.
+    fn label(self) -> &'static str {
+        match self {
+            WallView::Panels => "panels",
+            WallView::Map => "map",
+        }
+    }
+
+    fn try_from_label(label: &str) -> Option<Self> {
+        [WallView::Panels, WallView::Map]
+            .into_iter()
+            .find(|view| view.label() == label)
+    }
 }
 
 /// Whether the app is accepting navigation keys or search text input.
@@ -494,6 +512,16 @@ impl App {
         for name in unmatched {
             startup_messages.push(format!("Favorite {name} is not in the city catalogue"));
         }
+        let wall_view = match cfg.wall_view.as_deref() {
+            None => WallView::Panels,
+            Some(label) => WallView::try_from_label(label).unwrap_or_else(|| {
+                startup_messages.push(format!(
+                    "Unknown wall view '{label}', using {}",
+                    WallView::Panels.label()
+                ));
+                WallView::Panels
+            }),
+        };
 
         let mut app = Self {
             should_quit: false,
@@ -514,7 +542,7 @@ impl App {
             favorites,
             copy_flash: None,
             show_help: false,
-            wall_view: WallView::Panels,
+            wall_view,
             help_scroll: 0,
             startup_messages,
             config_load_failed,
@@ -540,6 +568,7 @@ impl App {
             WallView::Panels => WallView::Map,
             WallView::Map => WallView::Panels,
         };
+        self.save_config();
     }
 
     pub(crate) fn toggle_help(&mut self) {
@@ -990,6 +1019,7 @@ impl App {
         let cfg = config::Config {
             theme: self.theme.label().to_string(),
             favorites: self.favorites.to_config(self.catalogue.entries()),
+            wall_view: Some(self.wall_view.label().to_string()),
         };
         // The alternate screen hides stderr, so the status bar is the
         // only place a failure can show.
@@ -1370,6 +1400,7 @@ mod tests {
             &config::Config {
                 theme: "Default".to_string(),
                 favorites: vec![unmatched.clone()],
+                ..config::Config::default()
             },
         )
         .unwrap();
@@ -1662,7 +1693,7 @@ mod tests {
             &tmp.path(),
             &config::Config {
                 theme: "Rose Pine".to_string(),
-                favorites: Vec::new(),
+                ..config::Config::default()
             },
         )
         .unwrap();
@@ -1672,6 +1703,87 @@ mod tests {
 
         // Then:
         assert_eq!(app.theme.label(), "Rose Pine");
+    }
+
+    // ── Wall view ───────────────────────────────────────────────────
+
+    /// The wall opens on the view the user left it on.
+    ///
+    /// Given: the app on the panels with a config file.
+    /// When: the user switches to the map, and the app starts again on
+    /// that file.
+    /// Then: the new start opens on the map.
+    ///
+    /// Why it matters: a user who keeps the map open must not switch to
+    /// it again at every start.
+    #[test]
+    fn switching_to_the_map_opens_the_next_start_on_the_map() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let mut app = App::new(Some(tmp.path()));
+        assert_eq!(app.wall_view, WallView::Panels);
+
+        // When:
+        app.toggle_map();
+        let restarted = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(restarted.wall_view, WallView::Map);
+    }
+
+    /// A config file with no wall view opens on the panels.
+    ///
+    /// Given: a config file that names a theme and no wall view.
+    /// When: the app starts with that file.
+    /// Then: the wall shows the panels, and no warning shows.
+    ///
+    /// Why it matters: every config file written before the view was
+    /// saved has no such key, and must open as it did before.
+    #[test]
+    fn a_config_file_without_a_wall_view_opens_on_the_panels() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        fs::write(tmp.path(), "theme = \"Nord\"\n").unwrap();
+
+        // When:
+        let app = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(app.wall_view, WallView::Panels);
+        assert_eq!(app.theme.label(), "Nord");
+        assert!(
+            app.startup_messages.is_empty(),
+            "{:?}",
+            app.startup_messages
+        );
+    }
+
+    /// An unknown wall view opens on the panels with a warning.
+    ///
+    /// Given: a config file whose wall view is "globe".
+    /// When: the app starts with that file.
+    /// Then: the wall shows the panels, the rest of the file still
+    /// loads, and the status bar names the unknown value.
+    ///
+    /// Why it matters: an unknown theme gets the same treatment, and a
+    /// typo in one setting must not cost the user the others.
+    #[test]
+    fn an_unknown_wall_view_opens_on_the_panels_with_a_warning() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        fs::write(tmp.path(), "theme = \"Nord\"\nwall_view = \"globe\"\n").unwrap();
+
+        // When:
+        let app = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(app.wall_view, WallView::Panels);
+        assert_eq!(app.theme.label(), "Nord");
+        assert!(!app.config_load_failed);
+        assert_eq!(
+            app.startup_messages,
+            vec!["Unknown wall view 'globe', using panels".to_string()]
+        );
     }
 
     // ── Select timezone ─────────────────────────────────────────────

@@ -4,6 +4,7 @@
 //!
 //! ```toml
 //! theme = "Nord"
+//! wall_view = "map"
 //!
 //! [[favorites]]
 //! city = "Boston"
@@ -37,6 +38,10 @@ pub struct Config {
     pub theme: String,
     #[serde(default)]
     pub favorites: Vec<FavoriteEntry>,
+    /// The label of the view under the clock. The app owns the labels,
+    /// and a file without the key opens on the panels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wall_view: Option<String>,
 }
 
 /// One favorite in the config file.
@@ -63,6 +68,7 @@ impl Default for Config {
         Config {
             theme: default_theme(),
             favorites: vec![],
+            wall_view: None,
         }
     }
 }
@@ -267,6 +273,7 @@ mod tests {
                 },
                 FavoriteEntry::Zone("Asia/Tokyo".to_string()),
             ],
+            wall_view: Some("map".to_string()),
         };
 
         try_save(&tmp.config_path(), &cfg).unwrap();
@@ -274,6 +281,7 @@ mod tests {
 
         assert!(warnings.is_empty());
         assert_eq!(loaded.favorites, cfg.favorites);
+        assert_eq!(loaded.wall_view, cfg.wall_view);
     }
 
     /// A config path that does not exist yet loads the defaults and
