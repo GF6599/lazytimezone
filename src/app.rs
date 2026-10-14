@@ -9,7 +9,7 @@
 //! | Group | Fields | Persisted? |
 //! |-------|--------|-----------|
 //! | Navigation | `selected_row`, `filtered_view` | No |
-//! | Selection | `selection` (`tz` + `city_name` + `catalogue_index`) | No |
+//! | Selection | `selection` (`tz` + `city_name` + `catalogue_index`) | The city only (`~/.config/lazytimezone/config.toml`) |
 //! | Search | `input_mode`, `search_query`, `cursor_position` | No |
 //! | Theme | `theme` | Yes (`~/.config/lazytimezone/config.toml`) |
 //! | Favorites | `favorites` | Yes (`~/.config/lazytimezone/config.toml`) |
@@ -348,13 +348,13 @@ pub enum InputMode {
 /// time-zone being displayed).
 ///
 /// `city_name` may differ from the entry's canonical city when the
-/// user picks a row that matched on an alias (e.g. searching "boston"
-/// hits the New York entry), the alias label is what they expect to
-/// see, not "New York".
+/// user picks a row that matched on an alias: searching "saigon" shows
+/// "Saigon" on the Ho Chi Minh City entry. The config file saves only
+/// the city, so the next start shows the canonical name.
 ///
 /// `catalogue_index` is the catalogue entry the selection came from, so
-/// the map can find the main clock's place. The startup UTC clock came
-/// from no entry.
+/// the map can find the main clock's place. The UTC clock, at a start
+/// with no saved city, came from no entry.
 #[derive(Debug, Clone)]
 pub(crate) struct Selection {
     pub(crate) tz: chrono_tz::Tz,
@@ -453,6 +453,10 @@ pub struct App {
     pub(crate) config_load_failed: bool,
     /// Where [`App::save_config`] writes. `None` disables saving.
     config_path: Option<PathBuf>,
+    /// The saved main clock city the catalogue could not match. Saves
+    /// write it back until the user shows another city on the main
+    /// clock, so a save for another reason does not delete it.
+    unmatched_main_clock: Option<config::SavedCity>,
     /// Timestamp captured at construction time. Used by the UI to decide
     /// when to stop showing [`startup_messages`].
     pub(crate) started_at: Instant,
@@ -505,6 +509,27 @@ impl App {
                 WallView::Panels
             }),
         };
+        let mut selection = Selection {
+            tz: chrono_tz::Tz::UTC,
+            city_name: "UTC".to_string(),
+            catalogue_index: None,
+        };
+        let mut unmatched_main_clock = None;
+        if let Some(saved) = cfg.main_clock {
+            match saved
+                .find_in(catalogue.entries())
+                .and_then(|idx| Some((idx, catalogue.get(idx)?)))
+            {
+                Some((idx, entry)) => selection.set(idx, entry.tz, entry.city),
+                None => {
+                    startup_messages.push(format!(
+                        "Main clock {} is not in the city catalogue, using UTC",
+                        saved.name()
+                    ));
+                    unmatched_main_clock = Some(saved);
+                }
+            }
+        }
 
         let mut app = Self {
             should_quit: false,
@@ -516,11 +541,7 @@ impl App {
             selected_row: 0,
             selected_panel: 0,
             wall_columns: 1,
-            selection: Selection {
-                tz: chrono_tz::Tz::UTC,
-                city_name: "UTC".to_string(),
-                catalogue_index: None,
-            },
+            selection,
             theme,
             favorites,
             copy_flash: None,
@@ -530,6 +551,7 @@ impl App {
             startup_messages,
             config_load_failed,
             config_path,
+            unmatched_main_clock,
             started_at: Instant::now(),
         };
         app.apply_filter();
@@ -625,8 +647,19 @@ impl App {
         if let Some(idx) = self.favorites.at(self.selected_panel)
             && let Some(entry) = self.catalogue.get(idx)
         {
-            self.selection.set(idx, entry.tz, entry.city);
+            self.show_on_main_clock(idx, entry.city);
         }
+    }
+
+    /// Shows catalogue row `idx` on the main clock under `city_name`,
+    /// and saves the city for the next start.
+    fn show_on_main_clock(&mut self, idx: usize, city_name: &'static str) {
+        let Some(entry) = self.catalogue.get(idx) else {
+            return;
+        };
+        self.selection.set(idx, entry.tz, city_name);
+        self.unmatched_main_clock = None;
+        self.save_config();
     }
 
     fn clamp_selected_panel(&mut self) {
@@ -675,10 +708,8 @@ impl App {
     }
 
     pub(crate) fn select_timezone(&mut self) {
-        if let Some((idx, display_name)) = self.current_result()
-            && let Some(entry) = self.catalogue.get(idx)
-        {
-            self.selection.set(idx, entry.tz, display_name);
+        if let Some((idx, display_name)) = self.current_result() {
+            self.show_on_main_clock(idx, display_name);
         }
     }
 
@@ -1003,6 +1034,10 @@ impl App {
             theme: self.theme.label().to_string(),
             favorites: self.favorites.to_config(self.catalogue.entries()),
             wall_view: Some(self.wall_view.label().to_string()),
+            main_clock: match self.selection.catalogue_index {
+                Some(idx) => self.catalogue.get(idx).map(config::SavedCity::of),
+                None => self.unmatched_main_clock.clone(),
+            },
         };
         // The alternate screen hides stderr, so the status bar is the
         // only place a failure can show.

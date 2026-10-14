@@ -10,6 +10,11 @@
 //! city = "Boston"
 //! admin1 = "Massachusetts"
 //! cc = "US"
+//!
+//! [main_clock]
+//! city = "Tokyo"
+//! admin1 = "Tokyo"
+//! cc = "JP"
 //! ```
 //!
 //! A favorite from the pre-city format, a bare IANA zone string such
@@ -43,6 +48,9 @@ pub struct Config {
     /// and a file without the key opens on the panels.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wall_view: Option<String>,
+    /// The city on the main clock. A file without it opens on UTC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub main_clock: Option<SavedCity>,
 }
 
 /// A city as the config file saves it.
@@ -104,6 +112,7 @@ impl Default for Config {
             theme: default_theme(),
             favorites: vec![],
             wall_view: None,
+            main_clock: None,
         }
     }
 }
@@ -309,6 +318,11 @@ mod tests {
                 SavedCity::Zone("Asia/Tokyo".to_string()),
             ],
             wall_view: Some("map".to_string()),
+            main_clock: Some(SavedCity::City {
+                city: "Tokyo".to_string(),
+                admin1: "Tokyo".to_string(),
+                cc: "JP".to_string(),
+            }),
         };
 
         try_save(&tmp.config_path(), &cfg).unwrap();
@@ -317,6 +331,7 @@ mod tests {
         assert!(warnings.is_empty());
         assert_eq!(loaded.favorites, cfg.favorites);
         assert_eq!(loaded.wall_view, cfg.wall_view);
+        assert_eq!(loaded.main_clock, cfg.main_clock);
     }
 
     /// A config path that does not exist yet loads the defaults and
