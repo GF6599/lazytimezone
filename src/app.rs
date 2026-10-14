@@ -9,7 +9,7 @@
 //! | Group | Fields | Persisted? |
 //! |-------|--------|-----------|
 //! | Navigation | `selected_row`, `filtered_view` | No |
-//! | Selection | `selection` (`tz` + `city_name` + `catalogue_index`) | No |
+//! | Selection | `selection` (`tz` + `city_name` + `catalogue_index`) | The city only (`~/.config/lazytimezone/config.toml`) |
 //! | Search | `input_mode`, `search_query`, `cursor_position` | No |
 //! | Theme | `theme` | Yes (`~/.config/lazytimezone/config.toml`) |
 //! | Favorites | `favorites` | Yes (`~/.config/lazytimezone/config.toml`) |
@@ -23,7 +23,6 @@ use std::sync::OnceLock;
 use std::time::Instant;
 
 use chrono::Utc;
-use chrono_tz::Tz;
 
 use crate::clipboard;
 use crate::config;
@@ -82,7 +81,7 @@ impl Catalogue {
 
 /// Ordered list of favourite timezones with O(1) membership lookup.
 ///
-/// Internally stores parsed [`Tz`] values (not strings) so search,
+/// Internally stores parsed [`Tz`](chrono_tz::Tz) values (not strings) so search,
 /// sort, and rendering paths never re-parse on the hot path. Strings
 /// only appear at the on-disk boundary via
 /// [`Favorites::from_config`] / [`Favorites::to_config`].
@@ -97,7 +96,7 @@ pub(crate) struct Favorites {
     /// held in the saved list. Held so a save can write them back
     /// rather than destroy them. Built in ascending index order, which
     /// [`to_config`](Self::to_config) relies on when it splices them in.
-    unresolved: Vec<(usize, config::FavoriteEntry)>,
+    unresolved: Vec<(usize, config::SavedCity)>,
 }
 
 impl Favorites {
@@ -107,31 +106,19 @@ impl Favorites {
     /// aside for the next save and named in the second return value,
     /// so the caller can report it.
     pub(crate) fn from_config(
-        items: &[config::FavoriteEntry],
+        items: &[config::SavedCity],
         entries: &[TimezoneEntry],
     ) -> (Self, Vec<String>) {
         let mut ordered = Vec::new();
         let mut unresolved = Vec::new();
         let mut unmatched = Vec::new();
         for (position, item) in items.iter().enumerate() {
-            let resolved = match item {
-                config::FavoriteEntry::City { city, admin1, cc } => entries
-                    .iter()
-                    .position(|e| e.city == city && e.admin1 == admin1 && e.cc == cc),
-                config::FavoriteEntry::Zone(zone) => zone
-                    .parse::<Tz>()
-                    .ok()
-                    .and_then(|tz| entries.iter().position(|e| e.tz == tz)),
-            };
-            match resolved {
+            match item.find_in(entries) {
                 Some(idx) if !ordered.contains(&idx) => ordered.push(idx),
                 Some(_) => {}
                 None => {
                     unresolved.push((position, item.clone()));
-                    unmatched.push(match item {
-                        config::FavoriteEntry::City { city, .. } => city.clone(),
-                        config::FavoriteEntry::Zone(zone) => zone.clone(),
-                    });
+                    unmatched.push(item.name().to_string());
                 }
             }
         }
@@ -148,16 +135,12 @@ impl Favorites {
 
     /// Serializes back to the on-disk `City` form, with every entry the
     /// catalogue could not match returned to the place it came from.
-    pub(crate) fn to_config(&self, entries: &[TimezoneEntry]) -> Vec<config::FavoriteEntry> {
-        let mut out: Vec<config::FavoriteEntry> = self
+    pub(crate) fn to_config(&self, entries: &[TimezoneEntry]) -> Vec<config::SavedCity> {
+        let mut out: Vec<config::SavedCity> = self
             .ordered
             .iter()
             .filter_map(|&idx| entries.get(idx))
-            .map(|e| config::FavoriteEntry::City {
-                city: e.city.to_string(),
-                admin1: e.admin1.to_string(),
-                cc: e.cc.to_string(),
-            })
+            .map(config::SavedCity::of)
             .collect();
         for (position, entry) in &self.unresolved {
             let at = (*position).min(out.len());
@@ -365,13 +348,13 @@ pub enum InputMode {
 /// time-zone being displayed).
 ///
 /// `city_name` may differ from the entry's canonical city when the
-/// user picks a row that matched on an alias (e.g. searching "boston"
-/// hits the New York entry), the alias label is what they expect to
-/// see, not "New York".
+/// user picks a row that matched on an alias: searching "saigon" shows
+/// "Saigon" on the Ho Chi Minh City entry. The config file saves only
+/// the city, so the next start shows the canonical name.
 ///
 /// `catalogue_index` is the catalogue entry the selection came from, so
-/// the map can find the main clock's place. The startup UTC clock came
-/// from no entry.
+/// the map can find the main clock's place. The UTC clock, at a start
+/// with no saved city, came from no entry.
 #[derive(Debug, Clone)]
 pub(crate) struct Selection {
     pub(crate) tz: chrono_tz::Tz,
@@ -470,6 +453,10 @@ pub struct App {
     pub(crate) config_load_failed: bool,
     /// Where [`App::save_config`] writes. `None` disables saving.
     config_path: Option<PathBuf>,
+    /// The saved main clock city the catalogue could not match. Saves
+    /// write it back while the main clock shows no catalogue city, so a
+    /// save for another reason does not delete it.
+    unmatched_main_clock: Option<config::SavedCity>,
     /// Timestamp captured at construction time. Used by the UI to decide
     /// when to stop showing [`startup_messages`].
     pub(crate) started_at: Instant,
@@ -522,6 +509,27 @@ impl App {
                 WallView::Panels
             }),
         };
+        let mut selection = Selection {
+            tz: chrono_tz::Tz::UTC,
+            city_name: "UTC".to_string(),
+            catalogue_index: None,
+        };
+        let mut unmatched_main_clock = None;
+        if let Some(saved) = cfg.main_clock {
+            match saved
+                .find_in(catalogue.entries())
+                .and_then(|idx| Some((idx, catalogue.get(idx)?)))
+            {
+                Some((idx, entry)) => selection.set(idx, entry.tz, entry.city),
+                None => {
+                    startup_messages.push(format!(
+                        "Main clock {} is not in the city catalogue, using UTC",
+                        saved.name()
+                    ));
+                    unmatched_main_clock = Some(saved);
+                }
+            }
+        }
 
         let mut app = Self {
             should_quit: false,
@@ -533,11 +541,7 @@ impl App {
             selected_row: 0,
             selected_panel: 0,
             wall_columns: 1,
-            selection: Selection {
-                tz: chrono_tz::Tz::UTC,
-                city_name: "UTC".to_string(),
-                catalogue_index: None,
-            },
+            selection,
             theme,
             favorites,
             copy_flash: None,
@@ -547,6 +551,7 @@ impl App {
             startup_messages,
             config_load_failed,
             config_path,
+            unmatched_main_clock,
             started_at: Instant::now(),
         };
         app.apply_filter();
@@ -642,8 +647,18 @@ impl App {
         if let Some(idx) = self.favorites.at(self.selected_panel)
             && let Some(entry) = self.catalogue.get(idx)
         {
-            self.selection.set(idx, entry.tz, entry.city);
+            self.show_on_main_clock(idx, entry.city);
         }
+    }
+
+    /// Shows catalogue row `idx` on the main clock under `city_name`,
+    /// and saves the city for the next start.
+    fn show_on_main_clock(&mut self, idx: usize, city_name: &'static str) {
+        let Some(entry) = self.catalogue.get(idx) else {
+            return;
+        };
+        self.selection.set(idx, entry.tz, city_name);
+        self.save_config();
     }
 
     fn clamp_selected_panel(&mut self) {
@@ -692,10 +707,8 @@ impl App {
     }
 
     pub(crate) fn select_timezone(&mut self) {
-        if let Some((idx, display_name)) = self.current_result()
-            && let Some(entry) = self.catalogue.get(idx)
-        {
-            self.selection.set(idx, entry.tz, display_name);
+        if let Some((idx, display_name)) = self.current_result() {
+            self.show_on_main_clock(idx, display_name);
         }
     }
 
@@ -1020,6 +1033,10 @@ impl App {
             theme: self.theme.label().to_string(),
             favorites: self.favorites.to_config(self.catalogue.entries()),
             wall_view: Some(self.wall_view.label().to_string()),
+            main_clock: match self.selection.catalogue_index {
+                Some(idx) => self.catalogue.get(idx).map(config::SavedCity::of),
+                None => self.unmatched_main_clock.clone(),
+            },
         };
         // The alternate screen hides stderr, so the status bar is the
         // only place a failure can show.
@@ -1077,6 +1094,7 @@ mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
     use super::*;
+    use chrono_tz::Tz;
     use std::fs;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -1370,7 +1388,7 @@ mod tests {
     #[test]
     fn a_legacy_zone_favorite_becomes_its_major_city() {
         let cfg = config::Config {
-            favorites: vec![config::FavoriteEntry::Zone("Asia/Tokyo".to_string())],
+            favorites: vec![config::SavedCity::Zone("Asia/Tokyo".to_string())],
             ..config::Config::default()
         };
         let app = App::with_config(cfg);
@@ -1390,7 +1408,7 @@ mod tests {
     fn a_favorite_the_catalogue_cannot_match_stays_in_the_config_file() {
         // Given:
         let tmp = TempConfigPath::new();
-        let unmatched = config::FavoriteEntry::City {
+        let unmatched = config::SavedCity::City {
             city: "Tokyo".to_string(),
             admin1: "Renamed Prefecture".to_string(),
             cc: "JP".to_string(),
@@ -1413,7 +1431,7 @@ mod tests {
         // Then:
         let (saved, _) = config::try_load(&tmp.path()).unwrap();
         let saved_london = saved.favorites.iter().any(
-            |f| matches!(f, config::FavoriteEntry::City { city, .. } if city.as_str() == "London"),
+            |f| matches!(f, config::SavedCity::City { city, .. } if city.as_str() == "London"),
         );
         assert!(
             saved_london,
@@ -1784,6 +1802,139 @@ mod tests {
             app.startup_messages,
             vec!["Unknown wall view 'globe', using panels".to_string()]
         );
+    }
+
+    // ── Main clock across restarts ──────────────────────────────────
+
+    /// A city picked in search is on the main clock at the next start,
+    /// under its catalogue name.
+    ///
+    /// Given: the app on UTC with a config file whose favourites already
+    /// hold Ho Chi Minh City, so the pick adds no favourite.
+    /// When: the user searches `saigon`, presses Enter, and the app
+    /// starts again on that file.
+    /// Then: the new start shows Ho Chi Minh City in its own timezone.
+    ///
+    /// Why it matters: the user must not pick the main clock again at
+    /// every start. The file holds the city, not the search label. A new
+    /// favourite saves the file anyway, so the test starts from one that
+    /// is already there.
+    #[test]
+    fn a_city_picked_in_search_is_on_the_main_clock_at_the_next_start() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        fs::write(
+            tmp.path(),
+            "[[favorites]]\ncity = \"Ho Chi Minh City\"\nadmin1 = \"Ho Chi Minh City (HCMC)\"\ncc = \"VN\"\n",
+        )
+        .unwrap();
+        let mut app = App::new(Some(tmp.path()));
+        assert_eq!(app.selection.tz, Tz::UTC);
+        assert_eq!(app.favorites.len(), 1);
+
+        // When:
+        apply_query(&mut app, "saigon");
+        app.commit_search_result_and_exit();
+        assert_eq!(app.selection.city_name, "Saigon");
+        let restarted = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(restarted.selection.city_name, "Ho Chi Minh City");
+        assert_eq!(restarted.selection.tz, Tz::Asia__Ho_Chi_Minh);
+        assert!(restarted.selection.catalogue_index.is_some());
+    }
+
+    /// A panel promoted to the main clock is there at the next start.
+    ///
+    /// Given: Tokyo and then London added from search, so London is on
+    /// the main clock.
+    /// When: the user promotes the Tokyo panel, and the app starts again.
+    /// Then: the new start shows Tokyo.
+    ///
+    /// Why it matters: the wall is the other way to set the main clock,
+    /// and its choice must last as long as a search pick.
+    #[test]
+    fn a_promoted_panel_is_on_the_main_clock_at_the_next_start() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let mut app = App::new(Some(tmp.path()));
+        for query in ["tokyo", "london"] {
+            apply_query(&mut app, query);
+            app.commit_search_result_and_exit();
+        }
+        assert_eq!(app.selection.city_name, "London");
+
+        // When:
+        app.panel_first();
+        app.promote_selected_panel();
+        let restarted = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(restarted.selection.city_name, "Tokyo");
+        assert_eq!(restarted.selection.tz, Tz::Asia__Tokyo);
+    }
+
+    /// A config file with no main clock opens on UTC.
+    ///
+    /// Given: a config file that names a theme and no main clock.
+    /// When: the app starts with that file.
+    /// Then: the main clock shows UTC, and no warning shows.
+    ///
+    /// Why it matters: every config file written before the main clock
+    /// was saved has no such key, and must open as it did before.
+    #[test]
+    fn a_config_file_without_a_main_clock_opens_on_utc() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        fs::write(tmp.path(), "theme = \"Nord\"\n").unwrap();
+
+        // When:
+        let app = App::new(Some(tmp.path()));
+
+        // Then:
+        assert_eq!(app.selection.tz, Tz::UTC);
+        assert_eq!(app.selection.city_name, "UTC");
+        assert!(
+            app.startup_messages.is_empty(),
+            "{:?}",
+            app.startup_messages
+        );
+    }
+
+    /// A saved main clock the catalogue cannot match opens on UTC, and
+    /// the file keeps it.
+    ///
+    /// Given: a config file whose main clock names no catalogue row.
+    /// When: the app starts, and the user cycles the theme.
+    /// Then: the main clock shows UTC, the status bar names the city,
+    /// and the saved file still holds it.
+    ///
+    /// Why it matters: an unmatched favourite is kept the same way. A
+    /// save for an unrelated reason must not delete the user's choice.
+    #[test]
+    fn an_unmatched_main_clock_opens_on_utc_and_stays_in_the_file() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        fs::write(
+            tmp.path(),
+            "theme = \"Nord\"\n\n[main_clock]\ncity = \"Atlantis\"\nadmin1 = \"Nowhere\"\ncc = \"XX\"\n",
+        )
+        .unwrap();
+
+        // When:
+        let mut app = App::new(Some(tmp.path()));
+        app.cycle_theme();
+
+        // Then:
+        assert_eq!(app.selection.tz, Tz::UTC);
+        assert!(!app.config_load_failed);
+        assert_eq!(
+            app.startup_messages,
+            vec!["Main clock Atlantis is not in the city catalogue, using UTC".to_string()]
+        );
+        let saved = fs::read_to_string(tmp.path()).unwrap();
+        assert!(saved.contains("city = \"Atlantis\""), "{saved}");
+        assert!(saved.contains(Theme::Nord.next().label()), "{saved}");
     }
 
     // ── Select timezone ─────────────────────────────────────────────

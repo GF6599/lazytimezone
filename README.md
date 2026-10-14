@@ -107,7 +107,7 @@ A search can match an alias city or a geographic keyword. The table then shows t
 
 Press `t` to cycle the theme. The cycle order is Default, Dracula, Solarized, Nord, Monokai, Gruvbox, and Rose Pine.
 
-The app writes the theme, the favorites and the wall view to `~/.config/lazytimezone/config.toml`. When `$XDG_CONFIG_HOME` is set, the app writes to `$XDG_CONFIG_HOME/lazytimezone/config.toml` instead. Pass `--config <path>` to read and write a different file, for example one file per project or a scratch file for a test run.
+The app writes the theme, the favorites, the wall view and the main clock city to `~/.config/lazytimezone/config.toml`. When `$XDG_CONFIG_HOME` is set, the app writes to `$XDG_CONFIG_HOME/lazytimezone/config.toml` instead. Pass `--config <path>` to read and write a different file, for example one file per project or a scratch file for a test run.
 
 ## Development
 
