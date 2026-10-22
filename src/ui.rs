@@ -44,7 +44,6 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 use std::borrow::Cow;
-use std::ops::Range;
 use std::time::Duration;
 
 use unicode_width::UnicodeWidthStr;
@@ -346,34 +345,13 @@ fn colon_colour(into: Duration, bright: Color, dim: Color) -> Color {
     }
 }
 
+/// How far the top of each digit shades toward the text colour, and the
+/// bottom toward the border colour, both of the theme.
+const DIGIT_SHADE: f32 = 0.35;
+
 /// Fast at the start and slow into place, the way a wheel settles.
 fn ease_out(t: f64) -> f64 {
     1.0 - (1.0 - t).powi(3)
-}
-
-/// One row of hero art, with the cells in `colons` in `colon_style`.
-/// `colons` runs left to right, as [`digits::colon_cells`] gives them.
-fn art_line(
-    row: &str,
-    colons: &[Range<usize>],
-    digit_style: Style,
-    colon_style: Style,
-) -> Line<'static> {
-    let cells: Vec<char> = row.chars().collect();
-    let run = |range: Range<usize>| -> String {
-        cells[range.start.min(cells.len())..range.end.min(cells.len())]
-            .iter()
-            .collect()
-    };
-    let mut spans = Vec::new();
-    let mut start = 0;
-    for colon in colons {
-        spans.push(Span::styled(run(start..colon.start), digit_style));
-        spans.push(Span::styled(run(colon.clone()), colon_style));
-        start = colon.end;
-    }
-    spans.push(Span::styled(run(start..cells.len()), digit_style));
-    Line::from(spans)
 }
 
 fn clock_colour(app: &App, utc_now: &DateTime<Utc>, tc: &ThemeColors) -> Color {
@@ -452,31 +430,32 @@ fn draw_hero_clock(
     };
 
     let into = into_second(utc_now);
-    let art = if app.clock_animation && into < ROLL {
+    let (before, progress) = if app.clock_animation && into < ROLL {
         let before = (now - TimeDelta::seconds(1)).format("%H:%M:%S").to_string();
-        digits::render_rolling(
-            &before,
-            &time_str,
-            rows,
-            ease_out(into.div_duration_f64(ROLL)),
-        )
+        (before, ease_out(into.div_duration_f64(ROLL)))
     } else {
-        digits::render(&time_str, rows)
+        (time_str.clone(), 0.0)
     };
     let colon_color = if app.clock_animation {
         colon_colour(into, clock_color, tc.muted)
     } else {
         clock_color
     };
-    let digit_style = Style::default().fg(clock_color).bg(tc.bg);
-    let colon_style = digit_style.fg(colon_color);
-    let colons = digits::colon_cells(&time_str, rows);
-    let art_lines: Vec<Line> = art
-        .into_iter()
-        .map(|row| art_line(&row, &colons, digit_style, colon_style))
-        .collect();
-    let art = Paragraph::new(art_lines).style(Style::default().bg(tc.bg));
-    frame.render_widget(art, clock_area);
+    let top = octant::mix(clock_color, tc.fg, DIGIT_SHADE);
+    let bottom = octant::mix(clock_color, tc.border, DIGIT_SHADE);
+    let mut art = octant::Canvas::new(clock_area.width, clock_area.height);
+    digits::paint(
+        &mut art,
+        &before,
+        &time_str,
+        rows,
+        progress,
+        |part| match part {
+            digits::Part::Colon => colon_color,
+            digits::Part::Digit { down } => octant::mix(top, bottom, down as f32),
+        },
+    );
+    art.render(clock_area, frame.buffer_mut());
 
     let meta_line = Paragraph::new(Line::from(Span::styled(
         meta,
@@ -1671,11 +1650,7 @@ mod tests {
 
         let rows = render_app(&mut app, 100, 40);
 
-        let ink_rows = rows
-            .iter()
-            .take(13)
-            .filter(|row| row.contains('\u{2588}'))
-            .count();
+        let (ink_rows, _) = hero_ink(&rows[..13]);
         assert!(
             ink_rows >= 6,
             "the hero art spans only {ink_rows} rows:\n{}",
@@ -1796,19 +1771,35 @@ mod tests {
             .collect()
     }
 
-    /// The foreground of each hero art cell. At 80x24 the art is 7 rows
-    /// tall and starts under the title bar and one gap row.
-    fn hero_art_colours(buffer: &Buffer) -> Vec<Color> {
-        let mut colours = Vec::new();
+    /// Each hero art cell with its place and foreground. At 80x24 the art
+    /// is 7 rows tall and starts under the title bar and one gap row.
+    fn hero_art_cells(buffer: &Buffer) -> Vec<((u16, u16), Color)> {
+        let mut cells = Vec::new();
         for y in 2..9 {
             for x in 0..buffer.area.width {
                 let cell = &buffer[(x, y)];
                 if cell.symbol().chars().any(is_art_glyph) {
-                    colours.push(cell.fg);
+                    cells.push(((x, y), cell.fg));
                 }
             }
         }
-        colours
+        cells
+    }
+
+    /// The foreground of each hero art cell.
+    fn hero_art_colours(buffer: &Buffer) -> Vec<Color> {
+        hero_art_cells(buffer)
+            .into_iter()
+            .map(|(_, colour)| colour)
+            .collect()
+    }
+
+    /// How light `colour` looks, from its sRGB channels.
+    fn luma(colour: Color) -> f32 {
+        let Color::Rgb(r, g, b) = colour else {
+            panic!("{colour:?} has no RGB value");
+        };
+        0.2126 * f32::from(r) + 0.7152 * f32::from(g) + 0.0722 * f32::from(b)
     }
 
     /// The main clock rolls a changed digit into place.
@@ -1890,10 +1881,11 @@ mod tests {
 
     /// The colons fade between bright and dim.
     ///
-    /// Given: the clock with its animation on.
+    /// Given: the clock with its animation on, and its colon cells, the
+    /// cells in the muted colour 700 ms into a second.
     /// When: it is drawn half way through the fade to dim, and half way
     /// through the fade back to bright.
-    /// Then: each time some hero art is in a colour between the clock
+    /// Then: each time every colon cell is in a colour between the clock
     /// colour and the muted colour.
     ///
     /// Why it matters: a colour that switches in one frame blinks. A fade
@@ -1903,21 +1895,71 @@ mod tests {
         // Given:
         let mut app = test_app();
         let tc = app.theme.colors();
-
-        // When:
-        let mut between = |millis| {
+        let mut cells = |millis| {
             let at = into_twelve_thirty_four_fifty_seven(millis);
-            let clock = clock_colour(&app, &at, &tc);
-            hero_art_colours(&render_buffer_at(&mut app, 80, 24, at))
-                .into_iter()
-                .any(|c| c != clock && c != tc.muted)
+            (
+                clock_colour(&app, &at, &tc),
+                hero_art_cells(&render_buffer_at(&mut app, 80, 24, at)),
+            )
         };
-        let dimming = between(575);
-        let brightening = between(75);
+        let (_, dim) = cells(700);
+        let colons: Vec<(u16, u16)> = dim
+            .into_iter()
+            .filter(|(_, c)| *c == tc.muted)
+            .map(|(at, _)| at)
+            .collect();
+        assert!(!colons.is_empty(), "no colon dims at 700 ms");
 
-        // Then:
-        assert!(dimming, "no fade to dim");
-        assert!(brightening, "no fade to bright");
+        for millis in [575, 75] {
+            // When:
+            let (clock, drawn) = cells(millis);
+
+            // Then:
+            for (at, colour) in drawn.into_iter().filter(|(at, _)| colons.contains(at)) {
+                assert!(
+                    colour != clock && colour != tc.muted,
+                    "{millis} ms: colon cell {at:?} is {colour:?}"
+                );
+            }
+        }
+    }
+
+    /// The digits shade from a lighter top to a deeper bottom.
+    ///
+    /// Given: the clock at rest, with its animation on and off.
+    /// When: each is drawn 400 ms into a second, after the roll.
+    /// Then: every digit cell in the top row of the art is lighter than
+    /// every digit cell in the bottom row.
+    ///
+    /// Why it matters: the shade gives the digits depth, and a still clock
+    /// keeps it, because it is no motion.
+    #[test]
+    fn the_digits_shade_from_a_lighter_top_to_a_deeper_bottom() {
+        for animated in [true, false] {
+            // Given:
+            let mut app = test_app();
+            app.clock_animation = animated;
+
+            // When:
+            let at = into_twelve_thirty_four_fifty_seven(400);
+            let cells = hero_art_cells(&render_buffer_at(&mut app, 80, 24, at));
+
+            // Then:
+            let row = |y| {
+                cells
+                    .iter()
+                    .filter(move |((_, cy), _)| *cy == y)
+                    .map(|(_, c)| luma(*c))
+            };
+            let top = cells.iter().map(|((_, y), _)| *y).min().unwrap();
+            let bottom = cells.iter().map(|((_, y), _)| *y).max().unwrap();
+            let darkest_top = row(top).fold(f32::INFINITY, f32::min);
+            let lightest_bottom = row(bottom).fold(0.0, f32::max);
+            assert!(
+                darkest_top > lightest_bottom,
+                "animated {animated}: top {darkest_top} is not lighter than bottom {lightest_bottom}"
+            );
+        }
     }
 
     /// The next frame comes when the main clock next changes.

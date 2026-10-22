@@ -1,4 +1,4 @@
-//! Clock digits drawn from strokes into octant cells.
+//! Clock digits drawn from strokes onto an octant canvas.
 //!
 //! Each glyph is a few polylines in a box one unit tall. Drawing them
 //! at the size the hero asks for, instead of scaling a fixed bitmap,
@@ -6,12 +6,9 @@
 
 use std::ops::Range;
 
-use ratatui::symbols::pixel::OCTANTS;
+use ratatui::style::Color;
 
-/// An octant cell holds 2 by 4 dots. A terminal cell is about twice as
-/// tall as it is wide, so each dot is close to square.
-const DOTS_ACROSS: usize = 2;
-const DOTS_DOWN: usize = 4;
+use crate::octant::{CELL_HEIGHT, CELL_WIDTH, Canvas};
 
 /// Every digit shares one width, so the clock does not shift sideways
 /// when a 1 becomes an 8.
@@ -24,38 +21,49 @@ const STROKE: f64 = 0.14;
 
 type Point = (f64, f64);
 
+/// What a pixel of the clock belongs to, which decides its colour.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Part {
+    /// A pixel of a digit, `down` its glyph from 0 at the top to 1 at the
+    /// bottom. A rolling glyph carries its own `down` as it moves.
+    Digit {
+        down: f64,
+    },
+    Colon,
+}
+
 /// The width of `text` in cells when drawn `rows` cells tall.
 pub fn width(text: &str, rows: u16) -> u16 {
-    let dots = layout(text, rows).last().map_or(0, |&(_, x, w)| x + w);
-    u16::try_from(dots.div_ceil(DOTS_ACROSS)).unwrap_or(u16::MAX)
+    let pixels = layout(text, rows).last().map_or(0, |&(_, x, w)| x + w);
+    u16::try_from(pixels.div_ceil(CELL_WIDTH)).unwrap_or(u16::MAX)
 }
 
-/// Draws `text` as one string per cell row, `rows` rows tall. Every
-/// row has [`width`] cells.
-pub fn render(text: &str, rows: u16) -> Vec<String> {
-    render_rolling(text, text, rows, 0.0)
-}
-
-/// Draws the change from `from` to `to` at `progress`, from 0 at the
-/// start to 1 at the end. Each glyph of `to` that differs from the glyph
-/// of `from` at the same place rolls: the old glyph leaves upward and
-/// the new glyph enters from below. Both texts must share one layout,
-/// as two times of day do.
-pub fn render_rolling(from: &str, to: &str, rows: u16, progress: f64) -> Vec<String> {
-    let tall = usize::from(rows) * DOTS_DOWN;
-    let glyphs = layout(to, rows);
-    let wide = glyphs.last().map_or(0, |&(_, x, w)| x + w);
+/// Paints the change from `from` to `to` at `progress`, from 0 at the
+/// start to 1 at the end, onto `canvas` from its top left, `rows` cells
+/// tall. Each inked pixel takes the colour `colour` gives its [`Part`].
+/// Each glyph of `to` that differs from the glyph of `from` at the same
+/// place rolls: the old glyph leaves upward and the new glyph enters from
+/// below. Both texts must share one layout, as two times of day do.
+pub fn paint(
+    canvas: &mut Canvas,
+    from: &str,
+    to: &str,
+    rows: u16,
+    progress: f64,
+    colour: impl Fn(Part) -> Color,
+) {
+    let tall = usize::from(rows) * CELL_HEIGHT;
     let scale = tall as f64;
     let shift = progress.clamp(0.0, 1.0);
-
-    let mut ink = vec![false; wide * tall];
     let mut leaving = from.chars();
-    for &(c, x0, w) in &glyphs {
+    for (c, x0, w) in layout(to, rows) {
         let old = leaving.next();
         if c == ':' {
             for (xs, ys) in colon_dots(x0, w, tall) {
                 for y in ys {
-                    ink[y * wide + xs.start..y * wide + xs.end].fill(true);
+                    for x in xs.clone() {
+                        canvas.set(x, y, colour(Part::Colon));
+                    }
                 }
             }
             continue;
@@ -65,54 +73,31 @@ pub fn render_rolling(from: &str, to: &str, rows: u16, progress: f64) -> Vec<Str
         for y in 0..tall {
             for x in 0..w {
                 let p = ((x as f64 + 0.5) / scale, (y as f64 + 0.5) / scale);
-                ink[y * wide + x0 + x] = match &left {
-                    None => entering.iter().any(|line| near(line, p)),
+                let down = match &left {
+                    None => entering.iter().any(|line| near(line, p)).then_some(p.1),
                     Some(old) => {
                         let up = (p.0, p.1 + shift);
                         let below = (p.0, up.1 - 1.0);
-                        (up.1 < 1.0 && old.iter().any(|line| near(line, up)))
-                            || (below.1 >= 0.0 && entering.iter().any(|line| near(line, below)))
+                        if up.1 < 1.0 && old.iter().any(|line| near(line, up)) {
+                            Some(up.1)
+                        } else if below.1 >= 0.0 && entering.iter().any(|line| near(line, below)) {
+                            Some(below.1)
+                        } else {
+                            None
+                        }
                     }
                 };
+                if let Some(down) = down {
+                    canvas.set(x0 + x, y, colour(Part::Digit { down }));
+                }
             }
         }
     }
-
-    let inked = |x: usize, y: usize| x < wide && ink[y * wide + x];
-    (0..tall)
-        .step_by(DOTS_DOWN)
-        .map(|y0| {
-            (0..wide)
-                .step_by(DOTS_ACROSS)
-                .map(|x0| {
-                    let mut bits = 0;
-                    for dy in 0..DOTS_DOWN {
-                        for dx in 0..DOTS_ACROSS {
-                            if inked(x0 + dx, y0 + dy) {
-                                bits |= 1 << (dy * DOTS_ACROSS + dx);
-                            }
-                        }
-                    }
-                    OCTANTS[bits]
-                })
-                .collect()
-        })
-        .collect()
 }
 
-/// The cell columns of each colon in `text` drawn `rows` cells tall.
-/// A colon's ink sits clear of its box edges, so the cells inside the
-/// box hold no digit ink.
-pub fn colon_cells(text: &str, rows: u16) -> Vec<Range<usize>> {
-    layout(text, rows)
-        .into_iter()
-        .filter(|&(c, _, _)| c == ':')
-        .map(|(_, x0, w)| x0.div_ceil(DOTS_ACROSS)..(x0 + w) / DOTS_ACROSS)
-        .collect()
-}
-
-/// The two dots of a colon whose box starts at dot `x0` and is `w` dots
-/// wide, as (columns, rows) of dots, for a glyph `tall` dots tall.
+/// The two dots of a colon whose box starts at pixel `x0` and is `w`
+/// pixels wide, as (columns, rows) of pixels, for a glyph `tall` pixels
+/// tall.
 ///
 /// A round dot lands on partial cells and reads as chipped. So each dot
 /// is a square one stroke thick that starts and ends on a cell edge
@@ -120,14 +105,14 @@ pub fn colon_cells(text: &str, rows: u16) -> Vec<Range<usize>> {
 /// solid.
 fn colon_dots(x0: usize, w: usize, tall: usize) -> [(Range<usize>, Range<usize>); 2] {
     let snap = |at: f64, step: usize| ((at / step as f64).round().max(0.0) as usize) * step;
-    let half_cell = DOTS_DOWN / 2;
+    let half_cell = CELL_HEIGHT / 2;
     let side = half_cell * ((STROKE * tall as f64 / half_cell as f64).round() as usize).max(1);
-    let down_step = if side.is_multiple_of(DOTS_DOWN) {
-        DOTS_DOWN
+    let down_step = if side.is_multiple_of(CELL_HEIGHT) {
+        CELL_HEIGHT
     } else {
         half_cell
     };
-    let left = snap(x0 as f64 + (w as f64 - side as f64) / 2.0, DOTS_ACROSS);
+    let left = snap(x0 as f64 + (w as f64 - side as f64) / 2.0, CELL_WIDTH);
     let dot = |centre: f64| {
         let top = snap(centre * tall as f64 - side as f64 / 2.0, down_step);
         (left..left + side, top..top + side)
@@ -135,17 +120,17 @@ fn colon_dots(x0: usize, w: usize, tall: usize) -> [(Range<usize>, Range<usize>)
     [dot(0.325), dot(0.725)]
 }
 
-/// Places each glyph as (char, first dot, width in dots).
+/// Places each glyph as (char, first pixel, width in pixels).
 fn layout(text: &str, rows: u16) -> Vec<(char, usize, usize)> {
-    let tall = f64::from(rows) * DOTS_DOWN as f64;
-    let dots = |units: f64| (units * tall).round() as usize;
+    let tall = f64::from(rows) * CELL_HEIGHT as f64;
+    let pixels = |units: f64| (units * tall).round() as usize;
     let mut x = 0;
     let mut placed = Vec::new();
     for (i, c) in text.chars().enumerate() {
         if i > 0 {
-            x += dots(GAP);
+            x += pixels(GAP);
         }
-        let w = dots(if c == ':' { COLON_WIDTH } else { DIGIT_WIDTH });
+        let w = pixels(if c == ':' { COLON_WIDTH } else { DIGIT_WIDTH });
         placed.push((c, x, w));
         x += w;
     }
@@ -261,7 +246,52 @@ fn strokes(c: char) -> Vec<Vec<Point>> {
 mod tests {
     #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
+    use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
+
     use super::*;
+
+    const INK: Color = Color::Rgb(235, 111, 146);
+    const OTHER: Color = Color::Rgb(156, 207, 216);
+
+    /// Paints the roll from `from` to `to` at `progress` with each part in
+    /// the colour `colour` gives, and draws it into a buffer of its size.
+    fn draw_rolling(
+        from: &str,
+        to: &str,
+        rows: u16,
+        progress: f64,
+        colour: impl Fn(Part) -> Color,
+    ) -> Buffer {
+        let area = Rect::new(0, 0, width(to, rows), rows);
+        let mut canvas = Canvas::new(area.width, area.height);
+        paint(&mut canvas, from, to, rows, progress, colour);
+        let mut buffer = Buffer::empty(area);
+        canvas.render(area, &mut buffer);
+        buffer
+    }
+
+    /// The glyphs of a buffer, one string per row.
+    fn glyphs(buffer: &Buffer) -> Vec<String> {
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol().to_string())
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// The roll from `from` to `to` at `progress` in one ink, one string
+    /// per row.
+    fn render_rolling(from: &str, to: &str, rows: u16, progress: f64) -> Vec<String> {
+        glyphs(&draw_rolling(from, to, rows, progress, |_| INK))
+    }
+
+    /// `text` at rest in one ink, one string per row.
+    fn render(text: &str, rows: u16) -> Vec<String> {
+        render_rolling(text, text, rows, 0.0)
+    }
 
     /// A zero is a closed ring that is empty in the middle.
     ///
@@ -421,13 +451,24 @@ mod tests {
     fn each_colon_dot_is_a_solid_square_at_every_size() {
         for rows in [4, 7, 14, 21] {
             // Given:
-            let colon = colon_cells("00:00:00", rows)[0].clone();
+            let colour = |part| match part {
+                Part::Colon => OTHER,
+                Part::Digit { .. } => INK,
+            };
 
             // When:
-            let art = render("00:00:00", rows);
+            let buffer = draw_rolling("00:00:00", "00:00:00", rows, 0.0, colour);
+            let art = glyphs(&buffer);
 
             // Then:
             let shown = art.join("\n");
+            let first = (0..buffer.area.width)
+                .find(|&x| (0..rows).any(|y| buffer[(x, y)].fg == OTHER))
+                .unwrap_or_else(|| panic!("rows {rows}: no colon:\n{shown}"));
+            let end = (first..buffer.area.width)
+                .find(|&x| (0..rows).all(|y| buffer[(x, y)].fg != OTHER))
+                .unwrap_or(buffer.area.width);
+            let colon = usize::from(first)..usize::from(end);
             let mut halves: Vec<Option<String>> = Vec::new();
             for row in &art {
                 let cells: String = row.chars().skip(colon.start).take(colon.len()).collect();
@@ -460,8 +501,8 @@ mod tests {
             }
             assert_eq!(dots.len(), 2, "rows {rows}:\n{shown}");
             for dot in &dots {
-                let width = dot[0].trim().chars().count() * DOTS_ACROSS;
-                let height = dot.len() * DOTS_DOWN / 2;
+                let width = dot[0].trim().chars().count() * CELL_WIDTH;
+                let height = dot.len() * CELL_HEIGHT / 2;
                 assert!(
                     dot.iter().all(|cells| cells == &dot[0]),
                     "rows {rows}: not a rectangle:\n{shown}"
@@ -471,39 +512,69 @@ mod tests {
         }
     }
 
-    /// The colon cells hold the colons and nothing else.
+    /// Digits and colons never share a cell.
     ///
-    /// Given: two times with the thinnest and the widest digits.
-    /// When: the colon cells of each are read.
-    /// Then: there are two runs of cells, each holds ink, and the two
-    /// times hold the same ink there.
+    /// Given: the widest time of day, with the digits in one ink and the
+    /// colons in another, at each rung of the hero ladder.
+    /// When: it is drawn.
+    /// Then: every cell with ink has the terminal's own background behind
+    /// it, so no cell holds both inks.
     ///
-    /// Why it matters: the hero colours the colon cells apart from the
-    /// digits. A cell that also held part of a digit would dim that
-    /// digit with the colons.
+    /// Why it matters: the colons pulse apart from the digits. A cell that
+    /// held both would take one of the two inks for all its pixels.
     #[test]
-    fn the_colon_cells_hold_the_colons_and_nothing_else() {
+    fn digits_and_colons_never_share_a_cell() {
+        for rows in [4, 7, 14, 21] {
+            // Given:
+            let colour = |part| match part {
+                Part::Colon => OTHER,
+                Part::Digit { .. } => INK,
+            };
+
+            // When:
+            let buffer = draw_rolling("88:88:88", "88:88:88", rows, 0.0, colour);
+
+            // Then:
+            for cell in buffer.content() {
+                if cell.symbol() != " " {
+                    assert_eq!(cell.bg, Color::Reset, "rows {rows}: {cell:?}");
+                }
+            }
+        }
+    }
+
+    /// A rolling digit carries its own shade.
+    ///
+    /// Given: a change from 6 to 7 at a height of 8 rows, with each digit
+    /// pixel in one ink in the lower half of its glyph and in another ink
+    /// in the upper half.
+    /// When: the roll is drawn half way.
+    /// Then: the top 4 rows show only the lower-half ink, and the bottom 4
+    /// rows show only the upper-half ink.
+    ///
+    /// Why it matters: the clock shades each digit from top to bottom. A
+    /// shade fixed to the screen would slide through a digit as it rolls.
+    #[test]
+    fn a_rolling_digit_carries_its_own_shade() {
         // Given:
-        let rows = 7;
-        let (thin, wide) = (render("11:11:11", rows), render("88:88:88", rows));
+        let rows = 8;
+        let colour = |part| match part {
+            Part::Digit { down } if down >= 0.5 => INK,
+            _ => OTHER,
+        };
 
         // When:
-        let cells = colon_cells("88:88:88", rows);
+        let buffer = draw_rolling("6", "7", rows, 0.5, colour);
 
         // Then:
-        assert_eq!(cells.len(), 2, "{cells:?}");
-        let slice = |art: &[String], run: &std::ops::Range<usize>| -> Vec<String> {
-            art.iter()
-                .map(|row| row.chars().skip(run.start).take(run.len()).collect())
-                .collect()
-        };
-        for run in &cells {
-            let colon = slice(&wide, run);
-            assert!(
-                colon.iter().any(|row| row.chars().any(|c| c != ' ')),
-                "no ink in {run:?}"
-            );
-            assert_eq!(colon, slice(&thin, run), "digit ink in {run:?}");
+        for y in 0..rows {
+            let expected = if y < rows / 2 { INK } else { OTHER };
+            for x in 0..buffer.area.width {
+                let cell = &buffer[(x, y)];
+                if cell.symbol() != " " {
+                    assert_eq!(cell.fg, expected, "({x}, {y})");
+                }
+            }
         }
     }
 }
