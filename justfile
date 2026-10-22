@@ -83,8 +83,8 @@ natural_earth := "v5.1.2"
 [group('dev')]
 gen-land:
     mkdir -p target/natural-earth
-    test -f target/natural-earth/{{ natural_earth }}-ne_110m_land.geojson || curl -fsSL -o target/natural-earth/{{ natural_earth }}-ne_110m_land.geojson https://raw.githubusercontent.com/nvkelso/natural-earth-vector/{{ natural_earth }}/geojson/ne_110m_land.geojson
-    cargo run --bin gen_land -- target/natural-earth/{{ natural_earth }}-ne_110m_land.geojson data/land.tsv
+    test -f target/natural-earth/{{ natural_earth }}-ne_50m_land.geojson || curl -fsSL -o target/natural-earth/{{ natural_earth }}-ne_50m_land.geojson https://raw.githubusercontent.com/nvkelso/natural-earth-vector/{{ natural_earth }}/geojson/ne_50m_land.geojson
+    cargo run --bin gen_land -- target/natural-earth/{{ natural_earth }}-ne_50m_land.geojson data/land.tsv
 
 # Build the release binary, sign it ad hoc, and copy it to dist/
 [group('deploy')]

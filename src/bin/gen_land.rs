@@ -1,6 +1,6 @@
 //! Generates `data/land.tsv` from the Natural Earth land shapes.
 //!
-//! The input is `ne_110m_land.geojson`, which the `gen-land` recipe in
+//! The input is `ne_50m_land.geojson`, which the `gen-land` recipe in
 //! the justfile downloads. The output is the land the map view embeds at
 //! compile time: one ring per line, as `longitude,latitude` points split
 //! by spaces. A ring is the outline of land or of a hole in it, and the
@@ -11,7 +11,7 @@ use std::error::Error;
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = std::env::args().skip(1);
     let (Some(input), Some(output)) = (args.next(), args.next()) else {
-        return Err("usage: gen_land <ne_110m_land.geojson> <output-tsv>".into());
+        return Err("usage: gen_land <ne_50m_land.geojson> <output-tsv>".into());
     };
     let rings = rings(&std::fs::read_to_string(input)?)?;
     std::fs::write(&output, tsv(&rings))?;
