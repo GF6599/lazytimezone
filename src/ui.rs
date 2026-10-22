@@ -775,7 +775,7 @@ fn local_time_style(entry: &TimezoneEntry, local: &DateTime<Tz>, tc: &ThemeColor
 }
 
 /// The map is about 5 cells wide for each row: 360° by 142° drawn in
-/// 2 by 4 Braille dots a cell, with a cell twice as tall as it is wide.
+/// 2 by 4 pixels a cell, with a cell twice as tall as it is wide.
 const MAP_COLUMNS_PER_ROW: u16 = 5;
 /// The map stops at 58°S and 84°N. South of that is Antarctica, which
 /// would take a quarter of the height and holds no city, so a favourite
@@ -2710,8 +2710,8 @@ mod tests {
     /// one after.
     /// Then: the sky changes after one second and returns after two.
     ///
-    /// Why it matters: the sky moves only on the one-second tick the
-    /// app already has, so it costs no extra frames, and a star that
+    /// Why it matters: the sky moves only when the second changes, which
+    /// already draws a frame, so it costs no extra frames, and a star that
     /// returned at random would read as noise.
     #[test]
     fn stars_twinkle_on_a_two_second_beat() {
