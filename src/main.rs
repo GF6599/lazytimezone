@@ -89,8 +89,8 @@ fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
         let mut app = app::App::new(config_path);
         let mut events = events::TerminalEvents;
 
-        // An idle loop sleeps until the main clock next changes, which
-        // keeps battery use low, and a key wakes it at once.
+        // With the animation off the loop wakes once a second, which keeps
+        // battery use low, and a key wakes it at once.
         loop {
             terminal.draw(|frame| {
                 ui::draw(frame, &mut app);
