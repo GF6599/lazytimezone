@@ -31,6 +31,7 @@ mod clipboard;
 mod config;
 mod digits;
 mod events;
+mod octant;
 mod search;
 mod sky;
 mod theme;

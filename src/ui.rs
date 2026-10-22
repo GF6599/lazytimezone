@@ -51,6 +51,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, CopyStatus, InputMode, WallView};
 use crate::digits;
+use crate::octant;
 use crate::sky;
 use crate::theme::ThemeColors;
 use crate::timezone::{
@@ -294,10 +295,13 @@ fn hero_variant(area: Rect) -> (HeroVariant, u16) {
 
 /// How long a changed digit of the main clock takes to roll into place.
 const ROLL: Duration = Duration::from_millis(250);
-/// The frame interval during a roll, about 30 frames a second.
-const ROLL_FRAME: Duration = Duration::from_millis(33);
-/// How far into each second the colons dim.
+/// The frame interval while the main clock moves, 60 frames a second.
+const MOTION_FRAME: Duration = Duration::from_micros(16_667);
+/// How far into each second the colons start to fade to dim.
 const COLON_DIM_AT: Duration = Duration::from_millis(500);
+/// How long the colons take to fade between bright and dim. The fade
+/// back to bright starts with the second, inside the roll.
+const COLON_FADE: Duration = Duration::from_millis(150);
 const SECOND: Duration = Duration::from_secs(1);
 
 /// How far `now` is into its second. A leap second counts as the end of
@@ -312,15 +316,33 @@ fn into_second(now: &DateTime<Utc>) -> Duration {
 /// clock changes when the second does.
 pub fn until_next_frame(now: DateTime<Utc>, animated: bool) -> Duration {
     let into = into_second(&now);
-    if !animated {
-        return SECOND - into;
+    if animated {
+        for moving in [
+            Duration::ZERO..ROLL,
+            COLON_DIM_AT..COLON_DIM_AT + COLON_FADE,
+        ] {
+            if moving.contains(&into) {
+                return MOTION_FRAME.min(moving.end - into);
+            }
+            if into < moving.start {
+                return moving.start - into;
+            }
+        }
     }
-    if into < ROLL {
-        ROLL_FRAME.min(ROLL - into)
-    } else if into < COLON_DIM_AT {
-        COLON_DIM_AT - into
+    SECOND - into
+}
+
+/// The colour of the colons `into` a second: a fade from `dim` to
+/// `bright` as the second starts, and back to `dim` from
+/// [`COLON_DIM_AT`].
+fn colon_colour(into: Duration, bright: Color, dim: Color) -> Color {
+    let fade = |from, to, since: Duration| {
+        octant::mix(from, to, since.div_duration_f64(COLON_FADE) as f32)
+    };
+    if into < COLON_DIM_AT {
+        fade(dim, bright, into)
     } else {
-        SECOND - into
+        fade(bright, dim, into - COLON_DIM_AT)
     }
 }
 
@@ -441,8 +463,8 @@ fn draw_hero_clock(
     } else {
         digits::render(&time_str, rows)
     };
-    let colon_color = if app.clock_animation && into >= COLON_DIM_AT {
-        tc.muted
+    let colon_color = if app.clock_animation {
+        colon_colour(into, clock_color, tc.muted)
     } else {
         clock_color
     };
@@ -1866,13 +1888,45 @@ mod tests {
         assert!(!held.contains(&muted), "a still clock pulsed");
     }
 
+    /// The colons fade between bright and dim.
+    ///
+    /// Given: the clock with its animation on.
+    /// When: it is drawn half way through the fade to dim, and half way
+    /// through the fade back to bright.
+    /// Then: each time some hero art is in a colour between the clock
+    /// colour and the muted colour.
+    ///
+    /// Why it matters: a colour that switches in one frame blinks. A fade
+    /// reads as a pulse.
+    #[test]
+    fn the_colons_fade_between_bright_and_dim() {
+        // Given:
+        let mut app = test_app();
+        let tc = app.theme.colors();
+
+        // When:
+        let mut between = |millis| {
+            let at = into_twelve_thirty_four_fifty_seven(millis);
+            let clock = clock_colour(&app, &at, &tc);
+            hero_art_colours(&render_buffer_at(&mut app, 80, 24, at))
+                .into_iter()
+                .any(|c| c != clock && c != tc.muted)
+        };
+        let dimming = between(575);
+        let brightening = between(75);
+
+        // Then:
+        assert!(dimming, "no fade to dim");
+        assert!(brightening, "no fade to bright");
+    }
+
     /// The next frame comes when the main clock next changes.
     ///
     /// Given: instants across one second.
     /// When: the delay to the next frame is asked for, with the
     /// animation on and off.
-    /// Then: an animated clock draws a frame every [`ROLL_FRAME`] during
-    /// the roll, one when the roll ends, one when the colons dim, and
+    /// Then: an animated clock draws a frame every [`MOTION_FRAME`] while
+    /// the digits roll and while the colons fade, one when each ends, and
     /// one when the seconds change. A still clock draws only when the
     /// seconds change.
     ///
@@ -1890,9 +1944,11 @@ mod tests {
         let still = |millis| until_next_frame(at(millis), false);
 
         // Then:
-        assert_eq!(animated(0), ROLL_FRAME);
+        assert_eq!(animated(0), MOTION_FRAME);
         assert_eq!(animated(240), ms(10), "the frame that ends the roll");
-        assert_eq!(animated(300), ms(200), "the frame that dims the colons");
+        assert_eq!(animated(300), ms(200), "the frame that starts the fade");
+        assert_eq!(animated(500), MOTION_FRAME);
+        assert_eq!(animated(640), ms(10), "the frame that ends the fade");
         assert_eq!(animated(700), ms(300));
         assert_eq!(still(100), ms(900));
         assert_eq!(still(700), ms(300));
