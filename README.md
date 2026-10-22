@@ -9,7 +9,7 @@ A terminal world clock browser. Search by city, region, country, or UTC offset, 
 ## Features
 
 - **Large clock.** The time, the city, and the date, in block digits. The digits scale up with the terminal size.
-- **Favorite wall.** Each favorite city is a framed panel with its own time, date, and offset from the main clock. The panels stretch to the terminal width. A day strip shows when the sun is up in each city, one cell for each hour of the main clock's day, with the current hour marked. A tall terminal adds the timezone and the sunrise and sunset times. Move between panels, promote one to the main clock, and reorder them. The app saves the wall.
+- **Favorite wall.** Each favorite city is a framed panel with its own time, date, and offset from the main clock. The panels stretch to the terminal width. A day strip shows when the sun is up in each city, one cell for each hour of the main clock's day, with a blend through twilight at sunrise and sunset and the current half hour marked. A tall terminal adds the timezone and the sunrise and sunset times. Move between panels, promote one to the main clock, and reorder them. The app saves the wall.
 - **34,000 cities.** Every GeoNames place above 15,000 people, with its state and country.
 - **Add-city search.** Press `/`, type a city, a state, a country, or a UTC offset, and pick a result. Examples: `+5:30`, `UTC-8`, `portland maine`, `asia +9`.
 - **7 themes.** The app saves your choice.
@@ -124,4 +124,4 @@ just check    # the quality gate: clippy, the tests, cargo deny, then a format c
 
 ## License
 
-MIT. The city catalogue in `data/cities.tsv` derives from [GeoNames](https://www.geonames.org/), licensed CC BY 4.0.
+MIT. The city catalogue in `data/cities.tsv` derives from [GeoNames](https://www.geonames.org/), licensed CC BY 4.0. The land of the world map in `data/land.tsv` derives from [Natural Earth](https://www.naturalearthdata.com/), which is in the public domain.
