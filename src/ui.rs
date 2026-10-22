@@ -34,9 +34,11 @@ use chrono_tz::Tz;
 
 use ratatui::{
     Frame,
+    buffer::Buffer,
     layout::Alignment,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
+    symbols,
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
 };
@@ -873,9 +875,7 @@ fn draw_map(
     // The selected dot is written last, so it stays on top of a
     // neighbour in the same cell.
     marks.sort_by_key(|&(selected, ..)| selected);
-    let mut map = octant::Canvas::new(map_width, map_rows);
-    paint_map(&mut map, utc_now, tc);
-    map.render(map_area, frame.buffer_mut());
+    paint_map(map_area, frame.buffer_mut(), utc_now, tc);
     if !map_area.is_empty() {
         for &(_, place, glyph, colour) in &marks {
             let latitude = place.latitude.clamp(MAP_SOUTH, MAP_NORTH);
@@ -896,48 +896,103 @@ fn draw_map(
     );
 }
 
-/// Paints the map over the whole of `canvas` as `utc_now` lights it:
-/// land in the day colour, the night colour, or a blend of the two at the
-/// terminator, and the sea on the night side as a stipple on every other
-/// pixel across and down, so night reads over the terminal's own
-/// background and day stays clear.
+/// Paints the map over `area` of `buf` as `utc_now` lights it, as one
+/// Braille dot for each pixel, two across and four down in a cell, so a
+/// gap shows round every dot.
+///
+/// A cell takes one colour, so a cell with land in it draws only its land
+/// dots: in the day colour, the night colour, or a blend of the two at the
+/// terminator, lightened on the coast and lighter still under a city at
+/// night. A cell of sea draws a line of the graticule, or on the night
+/// side a stipple on every other pixel across and down, so night reads
+/// over the terminal's own background and day stays clear.
 ///
 /// The light comes from [`daylight_margins`] on the UTC clock, the same
 /// sun model the panels and day strips use, so a city's land and its
 /// panel always agree on whether it is night.
-fn paint_map(canvas: &mut octant::Canvas, utc_now: &DateTime<Utc>, tc: &ThemeColors) {
-    let (width, height) = (canvas.width(), canvas.height());
+fn paint_map(area: Rect, buf: &mut Buffer, utc_now: &DateTime<Utc>, tc: &ThemeColors) {
+    let width = usize::from(area.width) * octant::CELL_WIDTH;
+    let height = usize::from(area.height) * octant::CELL_HEIGHT;
     let m = map_colours(tc);
     let layers = map_layers(width, height);
     let latitudes: Vec<f64> = (0..height).map(|y| map_latitude(height, y)).collect();
     let longitudes: Vec<f64> = (0..width).map(|x| map_longitude(width, x)).collect();
     let margins = daylight_margins(&latitudes, &longitudes, &utc_now.with_timezone(&Tz::UTC));
-    for y in 0..height {
-        for x in 0..width {
-            let light = light_of(margins[y * width + x]);
-            let at = y * width + x;
-            match layers.ground[at] {
-                Ground::Land | Ground::Coast => {
-                    let land = octant::mix(m.night, m.day, light);
-                    let glow = layers.glow[at];
-                    let colour = if light < 0.5 && glow > 0.0 {
-                        city_light(land, glow, tc)
-                    } else if layers.ground[at] == Ground::Coast {
-                        coast_colour(land, tc)
-                    } else {
-                        land
-                    };
-                    canvas.set(x, y, colour);
-                }
-                Ground::Equator => canvas.set(x, y, m.equator),
-                Ground::Graticule => canvas.set(x, y, m.grid),
-                Ground::Sea if light < 0.5 && x % 2 == 0 && y % 2 == 0 => {
-                    canvas.set(x, y, m.stipple);
-                }
-                Ground::Sea => {}
+    for row in 0..area.height {
+        for column in 0..area.width {
+            let left = usize::from(column) * octant::CELL_WIDTH;
+            let top = usize::from(row) * octant::CELL_HEIGHT;
+            let pixels: [usize; octant::CELL_WIDTH * octant::CELL_HEIGHT] =
+                std::array::from_fn(|bit| {
+                    (top + bit / octant::CELL_WIDTH) * width + left + bit % octant::CELL_WIDTH
+                });
+            let (dots, colour) = map_cell(&pixels, &layers, &margins, &m, tc);
+            if let Some(cell) = buf.cell_mut((area.x + column, area.y + row)) {
+                let glyph = if dots == 0 {
+                    ' '
+                } else {
+                    symbols::braille::BRAILLE[dots]
+                };
+                cell.set_char(glyph).set_fg(colour).set_bg(Color::Reset);
             }
         }
     }
+}
+
+/// The dots of a map cell on every other pixel across and down: its top
+/// left pixel and the one two rows under it. A cell starts on an even
+/// pixel both ways, so the pattern runs on unbroken from cell to cell.
+const STIPPLE_DOTS: usize = 0b0001_0001;
+
+/// The dots of one map cell and their colour, from the map index of each
+/// of its pixels in Braille order: left to right, then top to bottom.
+fn map_cell(
+    pixels: &[usize],
+    layers: &MapLayers,
+    margins: &[f64],
+    m: &MapColours,
+    tc: &ThemeColors,
+) -> (usize, Color) {
+    let dots = |keep: &dyn Fn(usize) -> bool| {
+        pixels
+            .iter()
+            .enumerate()
+            .filter(|&(_, &at)| keep(at))
+            .fold(0, |dots, (bit, _)| dots | 1 << bit)
+    };
+    let is_land = |at: usize| matches!(layers.ground[at], Ground::Land | Ground::Coast);
+    let land: Vec<usize> = pixels.iter().copied().filter(|&at| is_land(at)).collect();
+    if !land.is_empty() {
+        let mean = land.iter().map(|&at| light_of(margins[at])).sum::<f32>() / land.len() as f32;
+        let steps = f32::from(LIGHT_STEPS);
+        let light = (mean * steps).round() / steps;
+        let colour = octant::mix(m.night, m.day, light);
+        let glow = land.iter().map(|&at| layers.glow[at]).fold(0.0, f32::max);
+        let colour = if light < 0.5 && glow > 0.0 {
+            city_light(colour, glow, tc)
+        } else if land.iter().any(|&at| layers.ground[at] == Ground::Coast) {
+            coast_colour(colour, tc)
+        } else {
+            colour
+        };
+        return (dots(&is_land), colour);
+    }
+    let line_dots = dots(&|at| matches!(layers.ground[at], Ground::Equator | Ground::Graticule));
+    if line_dots != 0 {
+        let equator = pixels
+            .iter()
+            .any(|&at| layers.ground[at] == Ground::Equator);
+        return (line_dots, if equator { m.equator } else { m.grid });
+    }
+    let stipple = dots(&|at| light_of(margins[at]) < 0.5) & STIPPLE_DOTS;
+    (
+        stipple,
+        if stipple == 0 {
+            Color::Reset
+        } else {
+            m.stipple
+        },
+    )
 }
 
 /// The colours of the map, from the theme.
@@ -1527,11 +1582,13 @@ mod tests {
             .collect()
     }
 
-    /// Whether `c` is a block or octant glyph, the characters the hero
-    /// art is drawn in. No text or border uses them, but a panel's day
-    /// strip draws its day cells as full blocks.
+    /// Whether `c` is a block, octant or Braille glyph, the characters the
+    /// hero art and the map are drawn in. No text or border uses them, but
+    /// a panel's day strip draws its day cells as full blocks.
     fn is_art_glyph(c: char) -> bool {
-        c != ' ' && ratatui::symbols::pixel::OCTANTS.contains(&c)
+        c != ' '
+            && (ratatui::symbols::pixel::OCTANTS.contains(&c)
+                || ratatui::symbols::braille::BRAILLE.contains(&c))
     }
 
     /// Measures the hero art as (rows with art glyphs, widest ink span
@@ -2526,16 +2583,90 @@ mod tests {
         }
     }
 
+    /// A map of `columns` by `rows` cells painted at `utc_now`.
+    fn painted_map(utc_now: DateTime<Utc>, columns: u16, rows: u16) -> ratatui::buffer::Buffer {
+        let mut buffer = ratatui::buffer::Buffer::empty(Rect::new(0, 0, columns, rows));
+        paint_map(
+            buffer.area,
+            &mut buffer,
+            &utc_now,
+            &test_app().theme.colors(),
+        );
+        buffer
+    }
+
+    /// The colour of the dot at pixel (x, y) of a painted map, or none
+    /// where the pixel has no dot.
+    fn map_dot(map: &ratatui::buffer::Buffer, x: usize, y: usize) -> Option<Color> {
+        let cell = &map[(
+            u16::try_from(x / octant::CELL_WIDTH).unwrap(),
+            u16::try_from(y / octant::CELL_HEIGHT).unwrap(),
+        )];
+        let glyph = cell.symbol().chars().next()?;
+        let bits = ratatui::symbols::braille::BRAILLE
+            .iter()
+            .position(|&dots| dots == glyph)?;
+        let bit = y % octant::CELL_HEIGHT * octant::CELL_WIDTH + x % octant::CELL_WIDTH;
+        (bits & 1 << bit != 0).then_some(cell.fg)
+    }
+
+    /// The pixels across and down of a painted map.
+    fn map_pixels(map: &ratatui::buffer::Buffer) -> (usize, usize) {
+        (
+            usize::from(map.area.width) * octant::CELL_WIDTH,
+            usize::from(map.area.height) * octant::CELL_HEIGHT,
+        )
+    }
+
+    /// The colour of the dot nearest (longitude, latitude) on a painted
+    /// map, or none where it has no dot.
+    fn map_dot_at(map: &ratatui::buffer::Buffer, longitude: f64, latitude: f64) -> Option<Color> {
+        let (width, height) = map_pixels(map);
+        let x = ((longitude + 180.0) / 360.0 * (width - 1) as f64).round() as usize;
+        let y = ((MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * (height - 1) as f64).round()
+            as usize;
+        map_dot(map, x, y)
+    }
+
+    /// The map draws its land as Braille dots, not as solid blocks.
+    ///
+    /// Given: a map of 95 by 19 cells at noon UTC on 21 June.
+    /// When: it is painted.
+    /// Then: every cell is blank or a Braille pattern, and the cells over
+    /// Chad and Brazil hold all eight dots.
+    ///
+    /// Why it matters: a dot leaves a gap round each pixel, so the land
+    /// reads as a dotted map. A block fills the whole cell and reads as a
+    /// solid sheet of colour.
+    #[test]
+    fn the_map_draws_its_land_as_braille_dots() {
+        // Given, when:
+        let map = painted_map(midsummer_noon_utc(), 95, 19);
+
+        // Then:
+        for pos in map.area.positions() {
+            let glyph = map[pos].symbol().chars().next().unwrap();
+            assert!(
+                glyph == ' ' || ratatui::symbols::braille::BRAILLE.contains(&glyph),
+                "{glyph:?} at {pos:?}"
+            );
+        }
+        let area = map.area;
+        for (name, longitude, latitude) in [("Chad", 19.0, 15.0), ("Brazil", -50.0, -10.0)] {
+            let cell = &map[map_dot_cell(area, longitude, latitude)];
+            assert_eq!(cell.symbol(), "\u{28ff}", "{name}");
+        }
+    }
+
     /// The places of the night stipple on a map of `columns` by `rows`
     /// cells painted at `utc_now`.
     fn stipple_places(utc_now: DateTime<Utc>, columns: u16, rows: u16) -> Vec<Coordinates> {
         let tc = test_app().theme.colors();
-        let mut map = octant::Canvas::new(columns, rows);
-        paint_map(&mut map, &utc_now, &tc);
-        let (width, height) = (map.width(), map.height());
+        let map = painted_map(utc_now, columns, rows);
+        let (width, height) = map_pixels(&map);
         (0..height)
             .flat_map(|y| (0..width).map(move |x| (x, y)))
-            .filter(|&(x, y)| map.get(x, y) == Some(tc.border))
+            .filter(|&(x, y)| map_dot(&map, x, y) == Some(tc.border))
             .map(|(x, y)| Coordinates {
                 latitude: map_latitude(height, y),
                 longitude: map_longitude(width, x),
@@ -2660,8 +2791,8 @@ mod tests {
     ///
     /// Given: a map of 95 by 19 cells at noon UTC on 21 June.
     /// When: it is painted.
-    /// Then: the pixel over Chad and the pixel over Brazil are land, the
-    /// pixel over the Ionian Sea is not, and some land pixel is a blend
+    /// Then: the dot over Chad and the dot over Brazil are land, the pixel
+    /// over the Ionian Sea has no land dot, and some land dot is a blend
     /// strictly between the night and the day colour.
     ///
     /// Why it matters: an outline gives no area to colour by day and
@@ -2671,29 +2802,26 @@ mod tests {
     fn the_land_is_solid_a_sea_stays_open_and_the_terminator_blends() {
         // Given:
         let tc = test_app().theme.colors();
-        let mut map = octant::Canvas::new(95, 19);
+        let m = map_colours(&tc);
 
         // When:
-        paint_map(&mut map, &midsummer_noon_utc(), &tc);
+        let map = painted_map(midsummer_noon_utc(), 95, 19);
 
         // Then:
-        let (width, height) = (map.width(), map.height());
-        let pixel = |longitude: f64, latitude: f64| {
-            let x = ((longitude + 180.0) / 360.0 * (width - 1) as f64).round() as usize;
-            let y = ((MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * (height - 1) as f64).round()
-                as usize;
-            map.get(x, y).unwrap()
+        let (width, height) = map_pixels(&map);
+        let land = |dot: Option<Color>| {
+            dot.is_some_and(|colour| ![m.stipple, m.grid, m.equator].contains(&colour))
         };
-        let land = |colour: Color| colour != Color::Reset && colour != tc.border;
-        assert!(land(pixel(19.0, 15.0)), "Chad is not land");
-        assert!(land(pixel(-50.0, -10.0)), "Brazil is not land");
-        assert!(!land(pixel(18.0, 35.0)), "the Ionian Sea is land");
+        assert!(land(map_dot_at(&map, 19.0, 15.0)), "Chad is not land");
+        assert!(land(map_dot_at(&map, -50.0, -10.0)), "Brazil is not land");
+        assert!(
+            !land(map_dot_at(&map, 18.0, 35.0)),
+            "the Ionian Sea is land"
+        );
         let twilight = (0..height)
             .flat_map(|y| (0..width).map(move |x| (x, y)))
-            .any(|(x, y)| {
-                let colour = map.get(x, y).unwrap();
-                land(colour) && colour != tc.good && colour != tc.accent_secondary
-            });
+            .filter_map(|(x, y)| map_dot(&map, x, y).filter(|&c| land(Some(c))))
+            .any(|colour| colour != tc.good && colour != tc.accent_secondary);
         assert!(twilight, "no land in twilight");
     }
 
@@ -2701,7 +2829,7 @@ mod tests {
     ///
     /// Given: a map painted at 95 by 19 cells.
     /// When: a map is painted at 60 by 12 cells.
-    /// Then: its land pixels are the land filled fresh for that size.
+    /// Then: its land dots are the land filled fresh for that size.
     ///
     /// Why it matters: the map keeps its land for its size, and land kept
     /// past a resize would draw the continents of the old size.
@@ -2710,14 +2838,13 @@ mod tests {
         // Given:
         let tc = test_app().theme.colors();
         let m = map_colours(&tc);
-        paint_map(&mut octant::Canvas::new(95, 19), &midsummer_noon_utc(), &tc);
+        painted_map(midsummer_noon_utc(), 95, 19);
 
         // When:
-        let mut map = octant::Canvas::new(60, 12);
-        paint_map(&mut map, &midsummer_noon_utc(), &tc);
+        let map = painted_map(midsummer_noon_utc(), 60, 12);
 
         // Then:
-        let (width, height) = (map.width(), map.height());
+        let (width, height) = map_pixels(&map);
         let fresh = land::mask(
             width,
             height,
@@ -2726,36 +2853,25 @@ mod tests {
         );
         for y in 0..height {
             for x in 0..width {
-                let colour = map.get(x, y).unwrap();
-                let sea = [Color::Reset, m.stipple, m.grid, m.equator];
-                assert_eq!(!sea.contains(&colour), fresh[y * width + x], "({x}, {y})");
+                let land = map_dot(&map, x, y)
+                    .is_some_and(|colour| ![m.stipple, m.grid, m.equator].contains(&colour));
+                assert_eq!(land, fresh[y * width + x], "({x}, {y})");
             }
         }
     }
 
-    /// A painted map of 95 by 19 cells at noon UTC on 21 June, with the
-    /// pixel nearest each place.
-    fn midsummer_map() -> (octant::Canvas, impl Fn(&octant::Canvas, f64, f64) -> Color) {
-        let tc = test_app().theme.colors();
-        let mut map = octant::Canvas::new(95, 19);
-        paint_map(&mut map, &midsummer_noon_utc(), &tc);
-        let pixel = |map: &octant::Canvas, longitude: f64, latitude: f64| {
-            let (width, height) = (map.width(), map.height());
-            let x = ((longitude + 180.0) / 360.0 * (width - 1) as f64).round() as usize;
-            let y = ((MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * (height - 1) as f64).round()
-                as usize;
-            map.get(x, y).unwrap()
-        };
-        (map, pixel)
+    /// A painted map of 95 by 19 cells at noon UTC on 21 June.
+    fn midsummer_map() -> ratatui::buffer::Buffer {
+        painted_map(midsummer_noon_utc(), 95, 19)
     }
 
     /// The coast is lit, and the land inside it is not.
     ///
     /// Given: the map at noon UTC on 21 June.
     /// When: it is painted.
-    /// Then: every day land pixel next to the sea is the coast tint of the
-    /// day colour, every other day land pixel is the day colour, and both
-    /// show.
+    /// Then: every day cell with a land dot next to the sea or the edge
+    /// is the coast tint of the day colour, every other day cell is the
+    /// day colour, and both show.
     ///
     /// Why it matters: the coast edge is hard against the terminal
     /// background, so a lighter rim is what makes a shape read sharp. A
@@ -2765,33 +2881,41 @@ mod tests {
         // Given:
         let tc = test_app().theme.colors();
         let m = map_colours(&tc);
-        let (map, _) = midsummer_map();
-        let (width, height) = (map.width(), map.height());
-        let sea = |x: usize, y: usize| {
-            let colour = map.get(x, y).unwrap();
-            colour == Color::Reset || colour == m.stipple || colour == m.grid || colour == m.equator
+        let map = midsummer_map();
+        let (width, height) = map_pixels(&map);
+        let land = |x: usize, y: usize| {
+            map_dot(&map, x, y)
+                .is_some_and(|colour| ![m.stipple, m.grid, m.equator].contains(&colour))
+        };
+        let shore = |x: usize, y: usize| {
+            x == 0
+                || y == 0
+                || x + 1 == width
+                || y + 1 == height
+                || !land(x - 1, y)
+                || !land(x + 1, y)
+                || !land(x, y - 1)
+                || !land(x, y + 1)
         };
 
         // When, then:
         let (mut coast, mut inland) = (0, 0);
-        for y in 1..height - 1 {
-            for x in 1..width - 1 {
-                let colour = map.get(x, y).unwrap();
-                if colour != m.day && colour != coast_colour(m.day, &tc) {
-                    continue;
-                }
-                let shore = sea(x - 1, y) || sea(x + 1, y) || sea(x, y - 1) || sea(x, y + 1);
-                if shore {
-                    assert_eq!(
-                        colour,
-                        coast_colour(m.day, &tc),
-                        "({x}, {y}) is on the coast"
-                    );
-                    coast += 1;
-                } else {
-                    assert_eq!(colour, m.day, "({x}, {y}) is inland");
-                    inland += 1;
-                }
+        for pos in map.area.positions() {
+            let colour = map[pos].fg;
+            if colour != m.day && colour != coast_colour(m.day, &tc) {
+                continue;
+            }
+            let left = usize::from(pos.x) * octant::CELL_WIDTH;
+            let top = usize::from(pos.y) * octant::CELL_HEIGHT;
+            let on_shore = (top..top + octant::CELL_HEIGHT)
+                .flat_map(|y| (left..left + octant::CELL_WIDTH).map(move |x| (x, y)))
+                .any(|(x, y)| land(x, y) && shore(x, y));
+            if on_shore {
+                assert_eq!(colour, coast_colour(m.day, &tc), "{pos:?} is on the coast");
+                coast += 1;
+            } else {
+                assert_eq!(colour, m.day, "{pos:?} is inland");
+                inland += 1;
             }
         }
         assert!(coast > 0 && inland > 0, "coast {coast}, inland {inland}");
@@ -2801,9 +2925,9 @@ mod tests {
     ///
     /// Given: the map at noon UTC on 21 June, when the Atlantic is in day.
     /// When: it is painted.
-    /// Then: the Atlantic pixel on 30°W at 10°N is the graticule colour,
-    /// the pixel on the equator at 20°W is the equator colour, and the
-    /// pixel at 35°W and 15°N, on no line, is clear.
+    /// Then: the Atlantic dot on 30°W at 10°N is in the graticule colour,
+    /// the dot on the equator at 20°W is in the equator colour, and the
+    /// pixel at 35°W and 15°N, on no line, has no dot.
     ///
     /// Why it matters: the lines give the eye a measure of where a city
     /// lies. A line off its degree would mislead that measure.
@@ -2813,12 +2937,12 @@ mod tests {
         let m = map_colours(&test_app().theme.colors());
 
         // When:
-        let (map, pixel) = midsummer_map();
+        let map = midsummer_map();
 
         // Then:
-        assert_eq!(pixel(&map, -30.0, 10.0), m.grid, "30°W");
-        assert_eq!(pixel(&map, -20.0, 0.0), m.equator, "the equator");
-        assert_eq!(pixel(&map, -35.0, 15.0), Color::Reset, "off the lines");
+        assert_eq!(map_dot_at(&map, -30.0, 10.0), Some(m.grid), "30°W");
+        assert_eq!(map_dot_at(&map, -20.0, 0.0), Some(m.equator), "the equator");
+        assert_eq!(map_dot_at(&map, -35.0, 15.0), None, "off the lines");
     }
 
     /// The cities light the night side, and the day side is not lit.
@@ -2826,8 +2950,8 @@ mod tests {
     /// Given: the map at noon UTC on 21 June, 21:00 in Seoul and 14:00 in
     /// Paris.
     /// When: it is painted.
-    /// Then: Seoul's pixel is a city light, lighter than the night land,
-    /// and Paris's pixel is plain day land.
+    /// Then: Seoul's dot is a city light, lighter than the night land, and
+    /// Paris's dot is plain day land.
     ///
     /// Why it matters: the lights show where people live at night. A light
     /// by day would hide which side of the terminator a city is on.
@@ -2838,15 +2962,15 @@ mod tests {
         let m = map_colours(&tc);
 
         // When:
-        let (map, pixel) = midsummer_map();
+        let map = midsummer_map();
 
         // Then:
-        let seoul = pixel(&map, 126.98, 37.57);
+        let seoul = map_dot_at(&map, 126.98, 37.57).unwrap();
         let lit = (1..=LIGHT_STEPS)
             .any(|step| seoul == city_light(m.night, step as f32 / LIGHT_STEPS as f32, &tc));
         assert!(lit, "Seoul is {seoul:?}");
         assert_ne!(seoul, coast_colour(m.night, &tc), "Seoul reads as coast");
-        let paris = pixel(&map, 2.35, 48.86);
+        let paris = map_dot_at(&map, 2.35, 48.86).unwrap();
         assert!(
             paris == m.day || paris == coast_colour(m.day, &tc),
             "Paris is {paris:?}"
