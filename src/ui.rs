@@ -41,6 +41,8 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
 };
 use std::borrow::Cow;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::time::Duration;
 
 use unicode_width::UnicodeWidthStr;
@@ -69,6 +71,7 @@ fn draw_at(frame: &mut Frame, app: &mut App, now: DateTime<Utc>) {
     let tc = app.theme.colors();
 
     let (hero, hero_height) = hero_variant(frame.area());
+    app.set_clock_draws_art(matches!(hero, HeroVariant::Art { .. }));
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -441,6 +444,12 @@ fn draw_hero_clock(
     };
     let top = octant::mix(clock_color, tc.fg, DIGIT_SHADE);
     let bottom = octant::mix(clock_color, tc.border, DIGIT_SHADE);
+    // One shade for each pixel row, mixed once a frame and not once a
+    // pixel. A digit pixel `down` its glyph lies in row `down * tall`.
+    let tall = usize::from(rows) * octant::CELL_HEIGHT;
+    let shades: Vec<Color> = (0..tall)
+        .map(|row| octant::mix(top, bottom, ((row as f64 + 0.5) / tall as f64) as f32))
+        .collect();
     let mut art = octant::Canvas::new(clock_area.width, clock_area.height);
     digits::paint(
         &mut art,
@@ -450,7 +459,7 @@ fn draw_hero_clock(
         progress,
         |part| match part {
             digits::Part::Colon => colon_color,
-            digits::Part::Digit { down } => octant::mix(top, bottom, down as f32),
+            digits::Part::Digit { down } => shades[((down * tall as f64) as usize).min(tall - 1)],
         },
     );
     art.render(clock_area, frame.buffer_mut());
@@ -898,12 +907,7 @@ fn draw_map(
 /// panel always agree on whether it is night.
 fn paint_map(canvas: &mut octant::Canvas, utc_now: &DateTime<Utc>, tc: &ThemeColors) {
     let (width, height) = (canvas.width(), canvas.height());
-    let land = land::mask(
-        width,
-        height,
-        |x| map_longitude(width, x),
-        |y| map_latitude(height, y),
-    );
+    let land = map_land(width, height);
     let latitudes: Vec<f64> = (0..height).map(|y| map_latitude(height, y)).collect();
     let longitudes: Vec<f64> = (0..width).map(|x| map_longitude(width, x)).collect();
     let margins = daylight_margins(&latitudes, &longitudes, &utc_now.with_timezone(&Tz::UTC));
@@ -917,6 +921,36 @@ fn paint_map(canvas: &mut octant::Canvas, utc_now: &DateTime<Utc>, tc: &ThemeCol
             }
         }
     }
+}
+
+/// Whether each pixel of a map is land, row by row, with the size in
+/// pixels it was filled for.
+type SizedLand = ((usize, usize), Rc<[bool]>);
+
+thread_local! {
+    /// The land of the map at the last size it was drawn at. The land
+    /// depends only on the size, and filling it costs about as much as the
+    /// rest of a map frame.
+    static MAP_LAND: RefCell<Option<SizedLand>> = const { RefCell::new(None) };
+}
+
+/// Whether each pixel of a map `width` by `height` pixels is land, row by
+/// row, filled once for each size.
+fn map_land(width: usize, height: usize) -> Rc<[bool]> {
+    MAP_LAND.with_borrow_mut(|kept| match kept {
+        Some((size, land)) if *size == (width, height) => Rc::clone(land),
+        _ => {
+            let land: Rc<[bool]> = land::mask(
+                width,
+                height,
+                |x| map_longitude(width, x),
+                |y| map_latitude(height, y),
+            )
+            .into();
+            *kept = Some(((width, height), Rc::clone(&land)));
+            land
+        }
+    })
 }
 
 /// The longitude of pixel column `x` of a map `width` pixels wide, from
@@ -1948,6 +1982,34 @@ mod tests {
         }
     }
 
+    /// A clock drawn as text waits a whole second between frames.
+    ///
+    /// Given: the clock with its animation on.
+    /// When: it is drawn on a 30-column terminal, where it is a line of
+    /// text, and on an 80-column terminal, where it is art.
+    /// Then: at the start of a second the text clock waits for the next
+    /// second, and the art clock draws its next frame after
+    /// [`MOTION_FRAME`].
+    ///
+    /// Why it matters: a line of text neither rolls nor fades, so motion
+    /// frames there cost battery and show nothing.
+    #[test]
+    fn a_clock_drawn_as_text_waits_a_whole_second_between_frames() {
+        // Given:
+        let mut app = test_app();
+        let start = into_twelve_thirty_four_fifty_seven(0);
+
+        // When:
+        render_buffer_at(&mut app, 30, 24, start);
+        let as_text = until_next_frame(start, app.clock_moves());
+        render_buffer_at(&mut app, 80, 24, start);
+        let as_art = until_next_frame(start, app.clock_moves());
+
+        // Then:
+        assert_eq!(as_text, SECOND);
+        assert_eq!(as_art, MOTION_FRAME);
+    }
+
     /// The next frame comes when the main clock next changes.
     ///
     /// Given: instants across one second.
@@ -2472,6 +2534,41 @@ mod tests {
                 land(colour) && colour != tc.good && colour != tc.accent_secondary
             });
         assert!(twilight, "no land in twilight");
+    }
+
+    /// The map fills its land again when the terminal changes size.
+    ///
+    /// Given: a map painted at 95 by 19 cells.
+    /// When: a map is painted at 60 by 12 cells.
+    /// Then: its land pixels are the land filled fresh for that size.
+    ///
+    /// Why it matters: the map keeps its land for its size, and land kept
+    /// past a resize would draw the continents of the old size.
+    #[test]
+    fn the_map_fills_its_land_again_when_the_size_changes() {
+        // Given:
+        let tc = test_app().theme.colors();
+        paint_map(&mut octant::Canvas::new(95, 19), &midsummer_noon_utc(), &tc);
+
+        // When:
+        let mut map = octant::Canvas::new(60, 12);
+        paint_map(&mut map, &midsummer_noon_utc(), &tc);
+
+        // Then:
+        let (width, height) = (map.width(), map.height());
+        let fresh = land::mask(
+            width,
+            height,
+            |x| map_longitude(width, x),
+            |y| map_latitude(height, y),
+        );
+        for y in 0..height {
+            for x in 0..width {
+                let colour = map.get(x, y).unwrap();
+                let painted = colour != Color::Reset && colour != tc.border;
+                assert_eq!(painted, fresh[y * width + x], "({x}, {y})");
+            }
+        }
     }
 
     /// A favourite south of the map's crop stays on the map.

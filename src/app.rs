@@ -438,6 +438,10 @@ pub struct App {
     pub(crate) wall_view: WallView,
     /// Whether the main clock rolls its digits and pulses its colons.
     pub(crate) clock_animation: bool,
+    /// Whether the last frame drew the main clock as art, reported by the
+    /// renderer, which alone knows the terminal size. A line of text does
+    /// not animate.
+    clock_draws_art: bool,
     /// First visible line of the help popup.
     ///
     /// The overlay carries more lines than an 80x24 terminal can show, so
@@ -550,6 +554,7 @@ impl App {
             show_help: false,
             wall_view,
             clock_animation: cfg.clock_animation,
+            clock_draws_art: true,
             help_scroll: 0,
             startup_messages,
             config_load_failed,
@@ -582,6 +587,16 @@ impl App {
     pub(crate) fn toggle_clock_animation(&mut self) {
         self.clock_animation = !self.clock_animation;
         self.save_config();
+    }
+
+    /// Whether the main clock has motion to draw: its animation is on and
+    /// the last frame drew it as art.
+    pub(crate) fn clock_moves(&self) -> bool {
+        self.clock_animation && self.clock_draws_art
+    }
+
+    pub(crate) fn set_clock_draws_art(&mut self, draws_art: bool) {
+        self.clock_draws_art = draws_art;
     }
 
     pub(crate) fn toggle_help(&mut self) {

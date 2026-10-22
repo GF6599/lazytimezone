@@ -98,7 +98,7 @@ fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
                 ui::draw(frame, &mut app);
             })?;
 
-            let timeout = ui::until_next_frame(chrono::Utc::now(), app.clock_animation);
+            let timeout = ui::until_next_frame(chrono::Utc::now(), app.clock_moves());
             events::handle_events(&mut app, &mut events, timeout)?;
 
             if app.should_quit {

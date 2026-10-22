@@ -4,7 +4,10 @@
 //! at the size the hero asks for, instead of scaling a fixed bitmap,
 //! keeps the curves smooth at every rung of the hero ladder.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::ops::Range;
+use std::rc::Rc;
 
 use ratatui::style::Color;
 
@@ -54,7 +57,8 @@ pub fn paint(
 ) {
     let tall = usize::from(rows) * CELL_HEIGHT;
     let scale = tall as f64;
-    let shift = progress.clamp(0.0, 1.0);
+    let shift = (progress.clamp(0.0, 1.0) * scale).round() as usize;
+    let down = |y: usize| (y as f64 + 0.5) / scale;
     let mut leaving = from.chars();
     for (c, x0, w) in layout(to, rows) {
         let old = leaving.next();
@@ -68,31 +72,56 @@ pub fn paint(
             }
             continue;
         }
-        let entering = strokes(c);
-        let left = old.filter(|&old| old != c).map(strokes);
+        let entering = ink(c, rows, w);
+        let left = old.filter(|&old| old != c).map(|old| ink(old, rows, w));
         for y in 0..tall {
             for x in 0..w {
-                let p = ((x as f64 + 0.5) / scale, (y as f64 + 0.5) / scale);
-                let down = match &left {
-                    None => entering.iter().any(|line| near(line, p)).then_some(p.1),
+                let inked = match &left {
+                    None => entering[y * w + x].then_some(y),
                     Some(old) => {
-                        let up = (p.0, p.1 + shift);
-                        let below = (p.0, up.1 - 1.0);
-                        if up.1 < 1.0 && old.iter().any(|line| near(line, up)) {
-                            Some(up.1)
-                        } else if below.1 >= 0.0 && entering.iter().any(|line| near(line, below)) {
-                            Some(below.1)
+                        let up = y + shift;
+                        if up < tall {
+                            old[up * w + x].then_some(up)
                         } else {
-                            None
+                            entering[(up - tall) * w + x].then_some(up - tall)
                         }
                     }
                 };
-                if let Some(down) = down {
-                    canvas.set(x0 + x, y, colour(Part::Digit { down }));
+                if let Some(row) = inked {
+                    canvas.set(x0 + x, y, colour(Part::Digit { down: down(row) }));
                 }
             }
         }
     }
+}
+
+/// Which pixels of a glyph are inked, row by row.
+type Ink = Rc<[bool]>;
+
+thread_local! {
+    /// Each glyph's ink at each size, drawn once. Sampling the strokes costs
+    /// more than the rest of a frame, and a clock draws the same ten digits
+    /// at one size frame after frame.
+    static INK: RefCell<HashMap<(char, u16), Ink>> = RefCell::new(HashMap::new());
+}
+
+/// Which pixels of glyph `c` are inked when it is drawn `rows` cells tall
+/// in a box `width` pixels wide, row by row.
+fn ink(c: char, rows: u16, width: usize) -> Ink {
+    INK.with_borrow_mut(|drawn| {
+        Rc::clone(drawn.entry((c, rows)).or_insert_with(|| {
+            let tall = usize::from(rows) * CELL_HEIGHT;
+            let scale = tall as f64;
+            let lines = strokes(c);
+            (0..tall)
+                .flat_map(|y| (0..width).map(move |x| (x, y)))
+                .map(|(x, y)| {
+                    let p = ((x as f64 + 0.5) / scale, (y as f64 + 0.5) / scale);
+                    lines.iter().any(|line| near(line, p))
+                })
+                .collect()
+        }))
+    })
 }
 
 /// The two dots of a colon whose box starts at pixel `x0` and is `w`
