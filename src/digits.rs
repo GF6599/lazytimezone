@@ -51,8 +51,17 @@ pub fn render_rolling(from: &str, to: &str, rows: u16, progress: f64) -> Vec<Str
     let mut ink = vec![false; wide * tall];
     let mut leaving = from.chars();
     for &(c, x0, w) in &glyphs {
+        let old = leaving.next();
+        if c == ':' {
+            for (xs, ys) in colon_dots(x0, w, tall) {
+                for y in ys {
+                    ink[y * wide + xs.start..y * wide + xs.end].fill(true);
+                }
+            }
+            continue;
+        }
         let entering = strokes(c);
-        let left = leaving.next().filter(|&old| old != c).map(strokes);
+        let left = old.filter(|&old| old != c).map(strokes);
         for y in 0..tall {
             for x in 0..w {
                 let p = ((x as f64 + 0.5) / scale, (y as f64 + 0.5) / scale);
@@ -100,6 +109,30 @@ pub fn colon_cells(text: &str, rows: u16) -> Vec<Range<usize>> {
         .filter(|&(c, _, _)| c == ':')
         .map(|(_, x0, w)| x0.div_ceil(DOTS_ACROSS)..(x0 + w) / DOTS_ACROSS)
         .collect()
+}
+
+/// The two dots of a colon whose box starts at dot `x0` and is `w` dots
+/// wide, as (columns, rows) of dots, for a glyph `tall` dots tall.
+///
+/// A round dot lands on partial cells and reads as chipped. So each dot
+/// is a square one stroke thick that starts and ends on a cell edge
+/// across and on a half cell down, which the full and half blocks draw
+/// solid.
+fn colon_dots(x0: usize, w: usize, tall: usize) -> [(Range<usize>, Range<usize>); 2] {
+    let snap = |at: f64, step: usize| ((at / step as f64).round().max(0.0) as usize) * step;
+    let half_cell = DOTS_DOWN / 2;
+    let side = half_cell * ((STROKE * tall as f64 / half_cell as f64).round() as usize).max(1);
+    let down_step = if side.is_multiple_of(DOTS_DOWN) {
+        DOTS_DOWN
+    } else {
+        half_cell
+    };
+    let left = snap(x0 as f64 + (w as f64 - side as f64) / 2.0, DOTS_ACROSS);
+    let dot = |centre: f64| {
+        let top = snap(centre * tall as f64 - side as f64 / 2.0, down_step);
+        (left..left + side, top..top + side)
+    };
+    [dot(0.325), dot(0.725)]
 }
 
 /// Places each glyph as (char, first dot, width in dots).
@@ -220,10 +253,6 @@ fn strokes(c: char) -> Vec<Vec<Point>> {
                     .collect()
             })
             .collect(),
-        ':' => {
-            let x = COLON_WIDTH / 2.0;
-            vec![vec![(x, 0.30), (x, 0.35)], vec![(x, 0.70), (x, 0.75)]]
-        }
         _ => Vec::new(),
     }
 }
@@ -377,6 +406,69 @@ mod tests {
         }
         assert_ne!(mid, render(from, rows), "the roll did not move");
         assert_ne!(mid, at_rest, "the roll did not move");
+    }
+
+    /// Each colon dot is a solid square at every clock size.
+    ///
+    /// Given: each rung of the hero ladder.
+    /// When: a time is drawn.
+    /// Then: the first colon is two dots, each a solid rectangle of full
+    /// or half blocks that is as many dots wide as it is tall.
+    ///
+    /// Why it matters: a dot drawn from a round stroke lands on partial
+    /// cells, and reads as chipped next to the solid digit strokes.
+    #[test]
+    fn each_colon_dot_is_a_solid_square_at_every_size() {
+        for rows in [4, 7, 14, 21] {
+            // Given:
+            let colon = colon_cells("00:00:00", rows)[0].clone();
+
+            // When:
+            let art = render("00:00:00", rows);
+
+            // Then:
+            let shown = art.join("\n");
+            let mut halves: Vec<Option<String>> = Vec::new();
+            for row in &art {
+                let cells: String = row.chars().skip(colon.start).take(colon.len()).collect();
+                let ink = cells.trim();
+                let (top, bottom) = match ink.chars().next() {
+                    None => (false, false),
+                    Some('\u{2588}') => (true, true),
+                    Some('\u{2580}') => (true, false),
+                    Some('\u{2584}') => (false, true),
+                    Some(_) => panic!("rows {rows}: chipped:\n{shown}"),
+                };
+                assert!(
+                    ink.chars().all(|c| ink.starts_with(c)),
+                    "rows {rows}: chipped:\n{shown}"
+                );
+                let span = (!ink.is_empty()).then(|| cells.clone());
+                halves.push(span.clone().filter(|_| top));
+                halves.push(span.filter(|_| bottom));
+            }
+            let mut dots: Vec<Vec<String>> = Vec::new();
+            let mut previous_inked = false;
+            for half in halves {
+                let inked = half.is_some();
+                match (half, previous_inked) {
+                    (Some(cells), true) => dots.last_mut().unwrap().push(cells),
+                    (Some(cells), false) => dots.push(vec![cells]),
+                    (None, _) => {}
+                }
+                previous_inked = inked;
+            }
+            assert_eq!(dots.len(), 2, "rows {rows}:\n{shown}");
+            for dot in &dots {
+                let width = dot[0].trim().chars().count() * DOTS_ACROSS;
+                let height = dot.len() * DOTS_DOWN / 2;
+                assert!(
+                    dot.iter().all(|cells| cells == &dot[0]),
+                    "rows {rows}: not a rectangle:\n{shown}"
+                );
+                assert_eq!(width, height, "rows {rows}: not square:\n{shown}");
+            }
+        }
     }
 
     /// The colon cells hold the colons and nothing else.
