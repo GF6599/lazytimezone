@@ -58,6 +58,7 @@ Press `?` in the app for the same key list, plus the search syntax.
 | `K` | Move the panel earlier in the order |
 | `t` | Cycle the theme |
 | `m` | Switch the wall between panels and the world map |
+| `a` | Turn the clock animation off and on |
 | `c` | Copy the big clock's time to the clipboard |
 | `?` | Toggle the help overlay. `Up` and `Down` scroll it |
 | `q` / `Ctrl-c` | Quit |
@@ -107,7 +108,9 @@ A search can match an alias city or a geographic keyword. The table then shows t
 
 Press `t` to cycle the theme. The cycle order is Default, Dracula, Solarized, Nord, Monokai, Gruvbox, and Rose Pine.
 
-The app writes the theme, the favorites, the wall view and the main clock city to `~/.config/lazytimezone/config.toml`. When `$XDG_CONFIG_HOME` is set, the app writes to `$XDG_CONFIG_HOME/lazytimezone/config.toml` instead. Pass `--config <path>` to read and write a different file, for example one file per project or a scratch file for a test run.
+The big clock rolls each changed digit into place and pulses its colons once a second. Press `a` to turn the animation off and on.
+
+The app writes the theme, the favorites, the wall view, the main clock city and the clock animation setting to `~/.config/lazytimezone/config.toml`. When `$XDG_CONFIG_HOME` is set, the app writes to `$XDG_CONFIG_HOME/lazytimezone/config.toml` instead. Pass `--config <path>` to read and write a different file, for example one file per project or a scratch file for a test run.
 
 ## Development
 

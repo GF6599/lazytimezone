@@ -51,6 +51,14 @@ pub struct Config {
     /// The city on the main clock. A file without it opens on UTC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub main_clock: Option<SavedCity>,
+    /// Whether the main clock animates. Only `false` is written, so a
+    /// file that keeps the default stays readable by a release that
+    /// predates the key.
+    #[serde(
+        default = "default_clock_animation",
+        skip_serializing_if = "is_animated"
+    )]
+    pub clock_animation: bool,
 }
 
 /// A city as the config file saves it.
@@ -106,6 +114,14 @@ fn default_theme() -> String {
     "Default".to_string()
 }
 
+fn default_clock_animation() -> bool {
+    true
+}
+
+fn is_animated(clock_animation: &bool) -> bool {
+    *clock_animation
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -113,6 +129,7 @@ impl Default for Config {
             favorites: vec![],
             wall_view: None,
             main_clock: None,
+            clock_animation: default_clock_animation(),
         }
     }
 }
@@ -323,6 +340,7 @@ mod tests {
                 admin1: "Tokyo".to_string(),
                 cc: "JP".to_string(),
             }),
+            clock_animation: false,
         };
 
         try_save(&tmp.config_path(), &cfg).unwrap();
@@ -332,6 +350,7 @@ mod tests {
         assert_eq!(loaded.favorites, cfg.favorites);
         assert_eq!(loaded.wall_view, cfg.wall_view);
         assert_eq!(loaded.main_clock, cfg.main_clock);
+        assert_eq!(loaded.clock_animation, cfg.clock_animation);
     }
 
     /// A config path that does not exist yet loads the defaults and

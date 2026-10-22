@@ -109,6 +109,7 @@ const NORMAL_MODE_HELP: &[(&str, &str)] = &[
     ("J / K", "Move the panel later / earlier in the order"),
     ("t", "Cycle theme"),
     ("m", "Switch the wall between panels and the world map"),
+    ("a", "Turn the clock animation off and on"),
     ("c", "Copy the big clock's time to clipboard"),
     ("?", "Toggle this help"),
     ("q / Ctrl-c", "Quit"),
