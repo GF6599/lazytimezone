@@ -907,50 +907,211 @@ fn draw_map(
 /// panel always agree on whether it is night.
 fn paint_map(canvas: &mut octant::Canvas, utc_now: &DateTime<Utc>, tc: &ThemeColors) {
     let (width, height) = (canvas.width(), canvas.height());
-    let land = map_land(width, height);
+    let m = map_colours(tc);
+    let layers = map_layers(width, height);
     let latitudes: Vec<f64> = (0..height).map(|y| map_latitude(height, y)).collect();
     let longitudes: Vec<f64> = (0..width).map(|x| map_longitude(width, x)).collect();
     let margins = daylight_margins(&latitudes, &longitudes, &utc_now.with_timezone(&Tz::UTC));
     for y in 0..height {
         for x in 0..width {
             let light = light_of(margins[y * width + x]);
-            if land[y * width + x] {
-                canvas.set(x, y, octant::mix(tc.accent_secondary, tc.good, light));
-            } else if light < 0.5 && x % 2 == 0 && y % 2 == 0 {
-                canvas.set(x, y, tc.border);
+            let at = y * width + x;
+            match layers.ground[at] {
+                Ground::Land | Ground::Coast => {
+                    let land = octant::mix(m.night, m.day, light);
+                    let glow = layers.glow[at];
+                    let colour = if light < 0.5 && glow > 0.0 {
+                        city_light(land, glow, tc)
+                    } else if layers.ground[at] == Ground::Coast {
+                        coast_colour(land, tc)
+                    } else {
+                        land
+                    };
+                    canvas.set(x, y, colour);
+                }
+                Ground::Equator => canvas.set(x, y, m.equator),
+                Ground::Graticule => canvas.set(x, y, m.grid),
+                Ground::Sea if light < 0.5 && x % 2 == 0 && y % 2 == 0 => {
+                    canvas.set(x, y, m.stipple);
+                }
+                Ground::Sea => {}
             }
         }
     }
 }
 
-/// Whether each pixel of a map is land, row by row, with the size in
-/// pixels it was filled for.
-type SizedLand = ((usize, usize), Rc<[bool]>);
-
-thread_local! {
-    /// The land of the map at the last size it was drawn at. The land
-    /// depends only on the size, and filling it costs about as much as the
-    /// rest of a map frame.
-    static MAP_LAND: RefCell<Option<SizedLand>> = const { RefCell::new(None) };
+/// The colours of the map, from the theme.
+#[derive(Debug, Clone, Copy)]
+struct MapColours {
+    day: Color,
+    night: Color,
+    /// The sea on the night side, on every other pixel across and down.
+    stipple: Color,
+    /// A line of the graticule, every [`GRATICULE_DEGREES`].
+    grid: Color,
+    equator: Color,
 }
 
-/// Whether each pixel of a map `width` by `height` pixels is land, row by
-/// row, filled once for each size.
-fn map_land(width: usize, height: usize) -> Rc<[bool]> {
-    MAP_LAND.with_borrow_mut(|kept| match kept {
-        Some((size, land)) if *size == (width, height) => Rc::clone(land),
+fn map_colours(tc: &ThemeColors) -> MapColours {
+    MapColours {
+        day: tc.good,
+        night: tc.accent_secondary,
+        stipple: tc.border,
+        grid: octant::mix(tc.border, tc.muted, 0.4),
+        equator: tc.muted,
+    }
+}
+
+/// The degrees between two lines of the map's graticule.
+const GRATICULE_DEGREES: f64 = 30.0;
+/// How far a coast pixel lightens toward the text colour.
+const COAST_LIGHT: f32 = 0.3;
+/// How far the smallest and the largest lit city lighten their pixel
+/// toward the text colour. The smallest lies past [`COAST_LIGHT`], so a
+/// light never reads as coast.
+const CITY_LIGHT: std::ops::RangeInclusive<f32> = 0.45..=0.85;
+
+/// The pixel of each graticule line from `low` to `high` degrees on an
+/// axis of `count` pixels, where `pixel` places a degree on the axis.
+fn graticule_pixels(count: usize, low: f64, high: f64, pixel: impl Fn(f64) -> f64) -> Vec<usize> {
+    let mut lines = Vec::new();
+    let mut degrees = (low / GRATICULE_DEGREES).ceil() * GRATICULE_DEGREES;
+    while degrees <= high {
+        let at = pixel(degrees).round();
+        if at >= 0.0 && (at as usize) < count {
+            lines.push(at as usize);
+        }
+        degrees += GRATICULE_DEGREES;
+    }
+    lines
+}
+
+/// `land` on the coast, a step toward the text colour.
+fn coast_colour(land: Color, tc: &ThemeColors) -> Color {
+    octant::mix(land, tc.fg, COAST_LIGHT)
+}
+
+/// `land` at night under a city that glows `glow`, from just above 0 for
+/// the smallest lit city to 1 for the largest.
+fn city_light(land: Color, glow: f32, tc: &ThemeColors) -> Color {
+    let (low, high) = (*CITY_LIGHT.start(), *CITY_LIGHT.end());
+    octant::mix(land, tc.fg, low + (high - low) * glow)
+}
+
+/// What lies under a pixel of the map, before the time of day colours it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ground {
+    Land,
+    /// Land next to the sea or the map's edge.
+    Coast,
+    /// Sea on the equator.
+    Equator,
+    /// Sea on another line of the graticule.
+    Graticule,
+    Sea,
+}
+
+/// What the map holds at one size: the ground under each pixel, and how
+/// brightly the cities in it glow at night, both row by row.
+#[derive(Debug)]
+struct MapLayers {
+    ground: Vec<Ground>,
+    glow: Vec<f32>,
+}
+
+/// The layers of the map, with the size in pixels they were made for.
+type SizedLayers = ((usize, usize), Rc<MapLayers>);
+
+thread_local! {
+    /// The layers of the map at the last size it was drawn at. They
+    /// depend only on the size, and making them costs more than the rest
+    /// of a map frame.
+    static MAP_LAYERS: RefCell<Option<SizedLayers>> = const { RefCell::new(None) };
+}
+
+/// The layers of a map `width` by `height` pixels, made once for each
+/// size.
+fn map_layers(width: usize, height: usize) -> Rc<MapLayers> {
+    MAP_LAYERS.with_borrow_mut(|kept| match kept {
+        Some((size, layers)) if *size == (width, height) => Rc::clone(layers),
         _ => {
-            let land: Rc<[bool]> = land::mask(
+            let land = land::mask(
                 width,
                 height,
                 |x| map_longitude(width, x),
                 |y| map_latitude(height, y),
-            )
-            .into();
-            *kept = Some(((width, height), Rc::clone(&land)));
-            land
+            );
+            let layers = Rc::new(MapLayers {
+                glow: city_glow(width, height, &land),
+                ground: ground(width, height, &land),
+            });
+            *kept = Some(((width, height), Rc::clone(&layers)));
+            layers
         }
     })
+}
+
+/// The ground under each pixel of a map `width` by `height` pixels, from
+/// whether each is `land`: land next to the sea or the edge is coast, and
+/// sea on a line of the graticule is that line.
+fn ground(width: usize, height: usize, land: &[bool]) -> Vec<Ground> {
+    let meridians = graticule_pixels(width, -180.0, 180.0, |longitude| {
+        (longitude + 180.0) / 360.0 * (width - 1) as f64
+    });
+    let parallels = graticule_pixels(height, MAP_SOUTH, MAP_NORTH, |latitude| {
+        (MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * (height - 1) as f64
+    });
+    let equator = (MAP_NORTH / (MAP_NORTH - MAP_SOUTH) * (height - 1) as f64).round() as usize;
+    let is_land = |x: usize, y: usize| land[y * width + x];
+    (0..height)
+        .flat_map(|y| (0..width).map(move |x| (x, y)))
+        .map(|(x, y)| {
+            if is_land(x, y) {
+                let shore = x == 0
+                    || y == 0
+                    || x + 1 == width
+                    || y + 1 == height
+                    || !is_land(x - 1, y)
+                    || !is_land(x + 1, y)
+                    || !is_land(x, y - 1)
+                    || !is_land(x, y + 1);
+                if shore { Ground::Coast } else { Ground::Land }
+            } else if y == equator {
+                Ground::Equator
+            } else if parallels.contains(&y) || meridians.contains(&x) {
+                Ground::Graticule
+            } else {
+                Ground::Sea
+            }
+        })
+        .collect()
+}
+
+/// How brightly each land pixel of a map `width` by `height` pixels glows
+/// at night: the largest catalogue city in it, from 0 below a hundred
+/// thousand people to 1 at ten million, in [`LIGHT_STEPS`] steps. A city
+/// at sea glows nowhere.
+fn city_glow(width: usize, height: usize, land: &[bool]) -> Vec<f32> {
+    let mut glow = vec![0.0_f32; width * height];
+    let across = (width.max(2) - 1) as f64;
+    let down = (height.max(2) - 1) as f64;
+    for entry in crate::timezone::all_timezones() {
+        let Some(place) = entry.coordinates else {
+            continue;
+        };
+        let latitude = place.latitude.clamp(MAP_SOUTH, MAP_NORTH);
+        let x = ((place.longitude + 180.0) / 360.0 * across).round() as usize;
+        let y = ((MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * down).round() as usize;
+        let index = y * width + x;
+        if x >= width || y >= height || !land[index] {
+            continue;
+        }
+        let size = ((entry.population.max(1) as f64).log10() - 5.0) / 2.0;
+        let steps = f64::from(LIGHT_STEPS);
+        let level = ((size.clamp(0.0, 1.0) * steps).round() / steps) as f32;
+        glow[index] = glow[index].max(level);
+    }
+    glow
 }
 
 /// The longitude of pixel column `x` of a map `width` pixels wide, from
@@ -2548,6 +2709,7 @@ mod tests {
     fn the_map_fills_its_land_again_when_the_size_changes() {
         // Given:
         let tc = test_app().theme.colors();
+        let m = map_colours(&tc);
         paint_map(&mut octant::Canvas::new(95, 19), &midsummer_noon_utc(), &tc);
 
         // When:
@@ -2565,10 +2727,130 @@ mod tests {
         for y in 0..height {
             for x in 0..width {
                 let colour = map.get(x, y).unwrap();
-                let painted = colour != Color::Reset && colour != tc.border;
-                assert_eq!(painted, fresh[y * width + x], "({x}, {y})");
+                let sea = [Color::Reset, m.stipple, m.grid, m.equator];
+                assert_eq!(!sea.contains(&colour), fresh[y * width + x], "({x}, {y})");
             }
         }
+    }
+
+    /// A painted map of 95 by 19 cells at noon UTC on 21 June, with the
+    /// pixel nearest each place.
+    fn midsummer_map() -> (octant::Canvas, impl Fn(&octant::Canvas, f64, f64) -> Color) {
+        let tc = test_app().theme.colors();
+        let mut map = octant::Canvas::new(95, 19);
+        paint_map(&mut map, &midsummer_noon_utc(), &tc);
+        let pixel = |map: &octant::Canvas, longitude: f64, latitude: f64| {
+            let (width, height) = (map.width(), map.height());
+            let x = ((longitude + 180.0) / 360.0 * (width - 1) as f64).round() as usize;
+            let y = ((MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * (height - 1) as f64).round()
+                as usize;
+            map.get(x, y).unwrap()
+        };
+        (map, pixel)
+    }
+
+    /// The coast is lit, and the land inside it is not.
+    ///
+    /// Given: the map at noon UTC on 21 June.
+    /// When: it is painted.
+    /// Then: every day land pixel next to the sea is the coast tint of the
+    /// day colour, every other day land pixel is the day colour, and both
+    /// show.
+    ///
+    /// Why it matters: the coast edge is hard against the terminal
+    /// background, so a lighter rim is what makes a shape read sharp. A
+    /// rim inland would draw false coasts.
+    #[test]
+    fn the_coast_is_lit_and_the_land_inside_it_is_not() {
+        // Given:
+        let tc = test_app().theme.colors();
+        let m = map_colours(&tc);
+        let (map, _) = midsummer_map();
+        let (width, height) = (map.width(), map.height());
+        let sea = |x: usize, y: usize| {
+            let colour = map.get(x, y).unwrap();
+            colour == Color::Reset || colour == m.stipple || colour == m.grid || colour == m.equator
+        };
+
+        // When, then:
+        let (mut coast, mut inland) = (0, 0);
+        for y in 1..height - 1 {
+            for x in 1..width - 1 {
+                let colour = map.get(x, y).unwrap();
+                if colour != m.day && colour != coast_colour(m.day, &tc) {
+                    continue;
+                }
+                let shore = sea(x - 1, y) || sea(x + 1, y) || sea(x, y - 1) || sea(x, y + 1);
+                if shore {
+                    assert_eq!(
+                        colour,
+                        coast_colour(m.day, &tc),
+                        "({x}, {y}) is on the coast"
+                    );
+                    coast += 1;
+                } else {
+                    assert_eq!(colour, m.day, "({x}, {y}) is inland");
+                    inland += 1;
+                }
+            }
+        }
+        assert!(coast > 0 && inland > 0, "coast {coast}, inland {inland}");
+    }
+
+    /// A faint graticule crosses the sea, with the equator a step brighter.
+    ///
+    /// Given: the map at noon UTC on 21 June, when the Atlantic is in day.
+    /// When: it is painted.
+    /// Then: the Atlantic pixel on 30°W at 10°N is the graticule colour,
+    /// the pixel on the equator at 20°W is the equator colour, and the
+    /// pixel at 35°W and 15°N, on no line, is clear.
+    ///
+    /// Why it matters: the lines give the eye a measure of where a city
+    /// lies. A line off its degree would mislead that measure.
+    #[test]
+    fn a_faint_graticule_crosses_the_sea() {
+        // Given:
+        let m = map_colours(&test_app().theme.colors());
+
+        // When:
+        let (map, pixel) = midsummer_map();
+
+        // Then:
+        assert_eq!(pixel(&map, -30.0, 10.0), m.grid, "30°W");
+        assert_eq!(pixel(&map, -20.0, 0.0), m.equator, "the equator");
+        assert_eq!(pixel(&map, -35.0, 15.0), Color::Reset, "off the lines");
+    }
+
+    /// The cities light the night side, and the day side is not lit.
+    ///
+    /// Given: the map at noon UTC on 21 June, 21:00 in Seoul and 14:00 in
+    /// Paris.
+    /// When: it is painted.
+    /// Then: Seoul's pixel is a city light, lighter than the night land,
+    /// and Paris's pixel is plain day land.
+    ///
+    /// Why it matters: the lights show where people live at night. A light
+    /// by day would hide which side of the terminator a city is on.
+    #[test]
+    fn the_cities_light_the_night_side() {
+        // Given:
+        let tc = test_app().theme.colors();
+        let m = map_colours(&tc);
+
+        // When:
+        let (map, pixel) = midsummer_map();
+
+        // Then:
+        let seoul = pixel(&map, 126.98, 37.57);
+        let lit = (1..=LIGHT_STEPS)
+            .any(|step| seoul == city_light(m.night, step as f32 / LIGHT_STEPS as f32, &tc));
+        assert!(lit, "Seoul is {seoul:?}");
+        assert_ne!(seoul, coast_colour(m.night, &tc), "Seoul reads as coast");
+        let paris = pixel(&map, 2.35, 48.86);
+        assert!(
+            paris == m.day || paris == coast_colour(m.day, &tc),
+            "Paris is {paris:?}"
+        );
     }
 
     /// A favourite south of the map's crop stays on the map.
@@ -2904,38 +3186,48 @@ mod tests {
             panic!("dots: {dots:?}");
         };
         assert_eq!(tokyo.2, tc.fg, "Tokyo's dot");
+        let m = map_colours(&tc);
+        let sea = [m.stipple, m.grid, m.equator];
         let land_around = |(x, y, _): (u16, u16, Color)| -> Vec<Color> {
             (y.saturating_sub(1)..=y + 1)
                 .flat_map(|row| (x.saturating_sub(2)..=x + 2).map(move |column| (column, row)))
                 .filter_map(|pos| {
                     let glyph = buffer[pos].symbol().chars().next()?;
                     let colour = buffer[pos].fg;
-                    (is_art_glyph(glyph) && colour != tc.border).then_some(colour)
+                    (is_art_glyph(glyph) && !sea.contains(&colour)).then_some(colour)
                 })
                 .collect()
         };
         let day_land = land_around(london);
         assert!(!day_land.is_empty(), "no land around London");
         assert!(
-            day_land.iter().all(|&c| c == tc.good),
+            day_land
+                .iter()
+                .all(|&c| c == m.day || c == coast_colour(m.day, &tc)),
             "London: {day_land:?}"
         );
+        let shares = || (0..=LIGHT_STEPS).map(|step| step as f32 / LIGHT_STEPS as f32);
+        let lit = |land: Color| -> Vec<Color> {
+            shares().map(|glow| city_light(land, glow, &tc)).collect()
+        };
         let night_land = land_around(tokyo);
         assert!(!night_land.is_empty(), "no land around Tokyo");
         assert!(
-            night_land.iter().all(|&c| c == tc.accent_secondary),
+            night_land
+                .iter()
+                .all(|&c| c == coast_colour(m.night, &tc) || lit(m.night).contains(&c)),
             "Tokyo: {night_land:?}"
         );
-        let on_the_terminator = |colour: Color| {
-            (0..=LIGHT_STEPS).any(|step| {
-                colour
-                    == octant::mix(
-                        tc.accent_secondary,
-                        tc.good,
-                        step as f32 / LIGHT_STEPS as f32,
-                    )
-            })
-        };
+        let terminator: Vec<Color> = shares()
+            .map(|light| octant::mix(m.night, m.day, light))
+            .collect();
+        let mut allowed = vec![Color::Reset, m.stipple, m.grid, m.equator];
+        for &land in &terminator {
+            allowed.push(land);
+            allowed.push(coast_colour(land, &tc));
+            allowed.extend(lit(land));
+        }
+        let on_the_terminator = |colour: Color| allowed.contains(&colour);
         let below_hero = 1 + hero_variant(buffer.area).1;
         for pos in buffer.area.positions() {
             let cell = &buffer[pos];
@@ -2944,7 +3236,7 @@ mod tests {
             }
             for colour in [cell.fg, cell.bg] {
                 assert!(
-                    colour == Color::Reset || colour == tc.border || on_the_terminator(colour),
+                    on_the_terminator(colour),
                     "a map cell at {pos:?} in another colour: {cell:?}"
                 );
             }
