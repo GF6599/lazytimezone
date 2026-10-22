@@ -44,8 +44,7 @@ const MAX_DRAINED_EVENTS: usize = 256;
 /// `timeout`.
 ///
 /// The caller (the event loop in `main`) computes `timeout` so the
-/// poll wakes at the next tick boundary, keeping clock updates tight
-/// (≤ tick) while drawing only once per tick when idle.
+/// poll wakes for the next frame of the main clock.
 ///
 /// Only `KeyEventKind::Press` is handled. Release and repeat events
 /// are ignored to prevent duplicate actions on platforms that emit them.
@@ -159,6 +158,7 @@ fn handle_normal_mode(app: &mut App, key: crossterm::event::KeyEvent) {
         KeyCode::Char('K') => app.move_panel_earlier(),
         KeyCode::Char('t') => app.cycle_theme(),
         KeyCode::Char('m') => app.toggle_map(),
+        KeyCode::Char('a') => app.toggle_clock_animation(),
         KeyCode::Char('c') => app.copy_time(),
         KeyCode::Char('?') => app.toggle_help(),
         _ => {}
@@ -305,6 +305,29 @@ mod tests {
             (after_one_press, app.wall_view),
             (WallView::Map, WallView::Panels)
         );
+    }
+
+    /// `a` turns the clock animation off and on.
+    ///
+    /// Given: the app with its animation on, as it starts by default.
+    /// When: `a` is pressed twice.
+    /// Then: the first press turns the animation off and the second
+    /// turns it on.
+    ///
+    /// Why it matters: the key is the only way to turn the animation
+    /// off without an edit to the config file.
+    #[test]
+    fn a_turns_the_clock_animation_off_and_on() {
+        // Given:
+        let mut app = App::with_config(config::Config::default());
+
+        // When:
+        dispatch_event(&mut app, key('a'));
+        let after_one_press = app.clock_animation;
+        dispatch_event(&mut app, key('a'));
+
+        // Then:
+        assert_eq!((after_one_press, app.clock_animation), (false, true));
     }
 
     /// A Ctrl or Alt chord on the wall runs no command.

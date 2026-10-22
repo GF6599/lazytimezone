@@ -31,6 +31,8 @@ mod clipboard;
 mod config;
 mod digits;
 mod events;
+mod land;
+mod octant;
 mod search;
 mod sky;
 mod theme;
@@ -89,32 +91,15 @@ fn run_tui(config_path: Option<PathBuf>) -> std::io::Result<()> {
         let mut app = app::App::new(config_path);
         let mut events = events::TerminalEvents;
 
-        // Tick rate matches the clock's display granularity (1 s). An
-        // idle loop sleeps until the next second boundary, which keeps
+        // With the animation off the loop wakes once a second, which keeps
         // battery use low, and a key wakes it at once.
-        let tick_rate = std::time::Duration::from_secs(1);
-        let mut last_tick = std::time::Instant::now();
-
         loop {
             terminal.draw(|frame| {
                 ui::draw(frame, &mut app);
             })?;
 
-            let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+            let timeout = ui::until_next_frame(chrono::Utc::now(), app.clock_moves());
             events::handle_events(&mut app, &mut events, timeout)?;
-
-            if last_tick.elapsed() >= tick_rate {
-                // Advance by exactly one tick_rate instead of snapping to
-                // Instant::now(). This preserves alignment to the real
-                // second boundary even if poll wakeup added latency.
-                last_tick += tick_rate;
-                // Catch-up guard: if we fell more than one tick behind
-                // (e.g. the laptop slept), snap forward rather than
-                // spinning to replay missed ticks.
-                if last_tick.elapsed() > tick_rate {
-                    last_tick = std::time::Instant::now();
-                }
-            }
 
             if app.should_quit {
                 break;

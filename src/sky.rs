@@ -1,108 +1,110 @@
-//! An ambient sky for the empty band above the wall: Braille stars by
-//! night, drifting Braille clouds by day.
+//! An ambient sky for the empty band above the wall, on an octant
+//! canvas: stars of three sizes and brightnesses by night, and clouds lit
+//! on top and shaded underneath by day.
 //!
-//! Every cell derives from its position and the frame's second, with no
+//! Every pixel derives from its position and the frame's second, with no
 //! stored state, so a frame drawn at the same instant is the same frame.
-//! The sky moves only on the app's one-second tick.
+//! The sky moves only when the second changes.
 
-/// One lit cell of the sky. A bright cell is a twinkling star at the top
-/// of its beat.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SkyCell {
-    pub glyph: char,
-    pub bright: bool,
+use ratatui::style::Color;
+
+use crate::octant::{CELL_HEIGHT, CELL_WIDTH, Canvas};
+
+/// The colours the sky draws in.
+#[derive(Debug, Clone, Copy)]
+pub struct SkyColours {
+    pub dim: Color,
+    pub middle: Color,
+    /// A twinkling star at the top of its beat.
+    pub bright: Color,
+    pub lit: Color,
+    pub shade: Color,
 }
 
-const STAR_GLYPHS: [char; 8] = [
-    '\u{2803}', '\u{2818}', '\u{2809}', '\u{2812}', '\u{2811}', '\u{280a}', '\u{2814}', '\u{2822}',
-];
-const TWINKLE_GLYPHS: [char; 2] = ['\u{283f}', '\u{2812}'];
 /// Out of every hundred cells: how many hold a star, and how many of
 /// those twinkle.
 const STARS_PER_HUNDRED: u64 = 5;
 const TWINKLERS_PER_HUNDRED: u64 = 1;
 
-const CLOUD_EDGE: char = '\u{28c0}';
-const CLOUD_BODY: char = '\u{28e4}';
 const COLUMNS_PER_CLOUD: u16 = 24;
 const SECONDS_PER_DRIFT: i64 = 4;
 
-/// Lays out a `width` by `height` sky at `unix_seconds`, row by row.
-pub fn render(
-    width: u16,
-    height: u16,
-    unix_seconds: i64,
-    is_day: bool,
-) -> Vec<Vec<Option<SkyCell>>> {
+/// Paints the sky at `unix_seconds` over the whole of `canvas`.
+pub fn paint(canvas: &mut Canvas, unix_seconds: i64, is_day: bool, colours: &SkyColours) {
     if is_day {
-        clouds(width, height, unix_seconds)
+        clouds(canvas, unix_seconds, colours);
     } else {
-        stars(width, height, unix_seconds)
+        stars(canvas, unix_seconds, colours);
     }
 }
 
-fn stars(width: u16, height: u16, unix_seconds: i64) -> Vec<Vec<Option<SkyCell>>> {
-    (0..height)
-        .map(|y| {
-            (0..width)
-                .map(|x| {
-                    let roll = mix(u64::from(x) << 16 | u64::from(y));
-                    let (chance, pick) = (roll % 100, roll / 100);
-                    if chance < TWINKLERS_PER_HUNDRED {
-                        let beat = (pick as i64 + unix_seconds).rem_euclid(2) as usize;
-                        Some(SkyCell {
-                            glyph: TWINKLE_GLYPHS[beat],
-                            bright: beat == 0,
-                        })
-                    } else if chance < STARS_PER_HUNDRED {
-                        Some(SkyCell {
-                            glyph: STAR_GLYPHS[(pick % 8) as usize],
-                            bright: false,
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        })
-        .collect()
-}
-
-/// One cloud for every [`COLUMNS_PER_CLOUD`] columns, each a long mound
-/// with a shorter one under it, all drifting one cell right every
-/// [`SECONDS_PER_DRIFT`] seconds and wrapping at the edge.
-fn clouds(width: u16, height: u16, unix_seconds: i64) -> Vec<Vec<Option<SkyCell>>> {
-    let mut sky = vec![vec![None; usize::from(width)]; usize::from(height)];
-    if width == 0 || height == 0 {
-        return sky;
-    }
-    let drift = unix_seconds.div_euclid(SECONDS_PER_DRIFT);
-    for cloud in 0..(width / COLUMNS_PER_CLOUD).max(1) {
-        let roll = mix(u64::from(cloud) | 1 << 32);
-        let length = 6 + (roll % 9) as i64;
-        let row = ((roll / 16) % u64::from(height)) as usize;
-        let start = (roll / 256 % u64::from(width)) as i64 + drift;
-        lay_mound(&mut sky[row], start, length);
-        if let Some(lower) = sky.get_mut(row + 1) {
-            lay_mound(lower, start + 2, length - 4);
+/// A star in some cells, two pixels wide and one, two or three tall, so
+/// the smallest is still two pixels. A twinkling star turns between bright
+/// and dim each second.
+fn stars(canvas: &mut Canvas, unix_seconds: i64, colours: &SkyColours) {
+    let (columns, rows) = (canvas.width() / CELL_WIDTH, canvas.height() / CELL_HEIGHT);
+    for y in 0..rows {
+        for x in 0..columns {
+            let roll = mix((x as u64) << 16 | y as u64);
+            let (chance, pick) = (roll % 100, roll / 100);
+            let colour = if chance < TWINKLERS_PER_HUNDRED {
+                if (pick as i64 + unix_seconds).rem_euclid(2) == 0 {
+                    colours.bright
+                } else {
+                    colours.dim
+                }
+            } else if chance < STARS_PER_HUNDRED {
+                if pick / 7 % 2 == 0 {
+                    colours.dim
+                } else {
+                    colours.middle
+                }
+            } else {
+                continue;
+            };
+            let tall = 1 + (pick % 3) as usize;
+            let top = y * CELL_HEIGHT + (pick / 3) as usize % (CELL_HEIGHT - tall + 1);
+            for py in top..top + tall {
+                for px in x * CELL_WIDTH..(x + 1) * CELL_WIDTH {
+                    canvas.set(px, py, colour);
+                }
+            }
         }
     }
-    sky
 }
 
-/// Writes `⣀⣤…⣤⣀` from `start`, wrapping at the row's end.
-fn lay_mound(row: &mut [Option<SkyCell>], start: i64, length: i64) {
-    let width = row.len() as i64;
-    for i in 0..length {
-        let glyph = if i == 0 || i == length - 1 {
-            CLOUD_EDGE
-        } else {
-            CLOUD_BODY
-        };
-        row[(start + i).rem_euclid(width) as usize] = Some(SkyCell {
-            glyph,
-            bright: false,
-        });
+/// One cloud for every [`COLUMNS_PER_CLOUD`] columns, each a row of puffs
+/// that rise toward its middle, all drifting one cell right every
+/// [`SECONDS_PER_DRIFT`] seconds and wrapping at the edge. Each puff is
+/// the shade, with a smaller lit puff a pixel higher over it, so the
+/// light covers the top and the shade shows underneath.
+fn clouds(canvas: &mut Canvas, unix_seconds: i64, colours: &SkyColours) {
+    let (width, columns, rows) = (
+        canvas.width(),
+        (canvas.width() / CELL_WIDTH) as u16,
+        (canvas.height() / CELL_HEIGHT) as u64,
+    );
+    if columns == 0 || rows == 0 {
+        return;
+    }
+    let drift = unix_seconds.div_euclid(SECONDS_PER_DRIFT);
+    for cloud in 0..(columns / COLUMNS_PER_CLOUD).max(1) {
+        let roll = mix(u64::from(cloud) | 1 << 32);
+        let length = 6 + (roll % 9) as usize;
+        let row = ((roll / 16) % rows) as usize;
+        let start = ((roll / 256 % u64::from(columns)) as i64 + drift)
+            .rem_euclid(i64::from(columns)) as usize;
+        let base = (row * CELL_HEIGHT + CELL_HEIGHT - 1) as f32;
+        for wrap in [0, width] {
+            for puff in 0..length {
+                let rise = (std::f32::consts::PI * (puff as f32 + 0.5) / length as f32).sin();
+                let radius = 1.6 + 1.2 * rise;
+                let x = ((start + puff) * CELL_WIDTH) as f32 + 0.5 - wrap as f32;
+                let y = base - radius + 0.5;
+                canvas.disc((x, y), radius, colours.shade);
+                canvas.disc((x, y - 0.8), radius - 0.4, colours.lit);
+            }
+        }
     }
 }
 

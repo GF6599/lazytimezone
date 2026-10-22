@@ -36,24 +36,28 @@ use ratatui::{
     Frame,
     buffer::Buffer,
     layout::Alignment,
-    layout::{Constraint, Direction, Layout, Position, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    symbols::Marker,
+    symbols,
     text::{Line, Span},
-    widgets::canvas::{Canvas, Map, MapResolution, Points},
-    widgets::{Block, Borders, Clear, Paragraph, Widget},
+    widgets::{Block, Borders, Clear, Paragraph},
 };
 use std::borrow::Cow;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::Duration;
 
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::{App, CopyStatus, InputMode, WallView};
 use crate::digits;
+use crate::land;
+use crate::octant;
 use crate::sky;
 use crate::theme::ThemeColors;
 use crate::timezone::{
-    Coordinates, TimezoneEntry, format_utc_offset, is_daytime_at, is_daytime_at_coordinates,
-    sun_times,
+    Coordinates, TimezoneEntry, daylight_margin, daylight_margins, format_utc_offset,
+    is_daytime_at, is_daytime_at_coordinates, sun_times,
 };
 
 /// Top-level render entry point. Splits the frame into the title bar,
@@ -69,6 +73,7 @@ fn draw_at(frame: &mut Frame, app: &mut App, now: DateTime<Utc>) {
     let tc = app.theme.colors();
 
     let (hero, hero_height) = hero_variant(frame.area());
+    app.set_clock_draws_art(matches!(hero, HeroVariant::Art { .. }));
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -107,6 +112,7 @@ const NORMAL_MODE_HELP: &[(&str, &str)] = &[
     ("J / K", "Move the panel later / earlier in the order"),
     ("t", "Cycle theme"),
     ("m", "Switch the wall between panels and the world map"),
+    ("a", "Turn the clock animation off and on"),
     ("c", "Copy the big clock's time to clipboard"),
     ("?", "Toggle this help"),
     ("q / Ctrl-c", "Quit"),
@@ -289,6 +295,68 @@ fn hero_variant(area: Rect) -> (HeroVariant, u16) {
     (HeroVariant::Text, 4)
 }
 
+/// How long a changed digit of the main clock takes to roll into place.
+const ROLL: Duration = Duration::from_millis(250);
+/// The frame interval while the main clock moves, 60 frames a second.
+const MOTION_FRAME: Duration = Duration::from_micros(16_667);
+/// How far into each second the colons start to fade to dim.
+const COLON_DIM_AT: Duration = Duration::from_millis(500);
+/// How long the colons take to fade between bright and dim. The fade
+/// back to bright starts with the second, inside the roll.
+const COLON_FADE: Duration = Duration::from_millis(150);
+const SECOND: Duration = Duration::from_secs(1);
+
+/// How far `now` is into its second. A leap second counts as the end of
+/// the second before it.
+fn into_second(now: &DateTime<Utc>) -> Duration {
+    Duration::from_nanos(u64::from(now.timestamp_subsec_nanos()))
+        .min(SECOND - Duration::from_nanos(1))
+}
+
+/// How long the loop can wait at `now` before the main clock looks
+/// different. The frames land on wall-clock second boundaries, so the
+/// clock changes when the second does.
+pub fn until_next_frame(now: DateTime<Utc>, animated: bool) -> Duration {
+    let into = into_second(&now);
+    if animated {
+        for moving in [
+            Duration::ZERO..ROLL,
+            COLON_DIM_AT..COLON_DIM_AT + COLON_FADE,
+        ] {
+            if moving.contains(&into) {
+                return MOTION_FRAME.min(moving.end - into);
+            }
+            if into < moving.start {
+                return moving.start - into;
+            }
+        }
+    }
+    SECOND - into
+}
+
+/// The colour of the colons `into` a second: a fade from `dim` to
+/// `bright` as the second starts, and back to `dim` from
+/// [`COLON_DIM_AT`].
+fn colon_colour(into: Duration, bright: Color, dim: Color) -> Color {
+    let fade = |from, to, since: Duration| {
+        octant::mix(from, to, since.div_duration_f64(COLON_FADE) as f32)
+    };
+    if into < COLON_DIM_AT {
+        fade(dim, bright, into)
+    } else {
+        fade(bright, dim, into - COLON_DIM_AT)
+    }
+}
+
+/// How far the top of each digit shades toward the text colour, and the
+/// bottom toward the border colour, both of the theme.
+const DIGIT_SHADE: f32 = 0.35;
+
+/// Fast at the start and slow into place, the way a wheel settles.
+fn ease_out(t: f64) -> f64 {
+    1.0 - (1.0 - t).powi(3)
+}
+
 fn clock_colour(app: &App, utc_now: &DateTime<Utc>, tc: &ThemeColors) -> Color {
     if is_daytime_at(
         app.main_clock_place(),
@@ -364,13 +432,39 @@ fn draw_hero_clock(
         ..chunks[1]
     };
 
-    let art_style = Style::default().fg(clock_color).bg(tc.bg);
-    let art_lines: Vec<Line> = digits::render(&time_str, rows)
-        .into_iter()
-        .map(|row| Line::from(Span::styled(row, art_style)))
+    let into = into_second(utc_now);
+    let (before, progress) = if app.clock_animation && into < ROLL {
+        let before = (now - TimeDelta::seconds(1)).format("%H:%M:%S").to_string();
+        (before, ease_out(into.div_duration_f64(ROLL)))
+    } else {
+        (time_str.clone(), 0.0)
+    };
+    let colon_color = if app.clock_animation {
+        colon_colour(into, clock_color, tc.muted)
+    } else {
+        clock_color
+    };
+    let top = octant::mix(clock_color, tc.fg, DIGIT_SHADE);
+    let bottom = octant::mix(clock_color, tc.border, DIGIT_SHADE);
+    // One shade for each pixel row, mixed once a frame and not once a
+    // pixel. A digit pixel `down` its glyph lies in row `down * tall`.
+    let tall = usize::from(rows) * octant::CELL_HEIGHT;
+    let shades: Vec<Color> = (0..tall)
+        .map(|row| octant::mix(top, bottom, ((row as f64 + 0.5) / tall as f64) as f32))
         .collect();
-    let art = Paragraph::new(art_lines).style(Style::default().bg(tc.bg));
-    frame.render_widget(art, clock_area);
+    let mut art = octant::Canvas::new(clock_area.width, clock_area.height);
+    digits::paint(
+        &mut art,
+        &before,
+        &time_str,
+        rows,
+        progress,
+        |part| match part {
+            digits::Part::Colon => colon_color,
+            digits::Part::Digit { down } => shades[((down * tall as f64) as usize).min(tall - 1)],
+        },
+    );
+    art.render(clock_area, frame.buffer_mut());
 
     let meta_line = Paragraph::new(Line::from(Span::styled(
         meta,
@@ -491,27 +585,16 @@ fn draw_sky(frame: &mut Frame, app: &App, utc_now: &DateTime<Utc>, band: Rect, t
         app.main_clock_place(),
         &utc_now.with_timezone(&app.selection.tz),
     );
-    let rows = sky::render(band.width, band.height, utc_now.timestamp(), is_day);
-    let lines: Vec<Line> = rows
-        .into_iter()
-        .map(|row| {
-            Line::from(
-                row.into_iter()
-                    .map(|cell| match cell {
-                        Some(cell) => Span::styled(
-                            cell.glyph.to_string(),
-                            Style::default().fg(if cell.bright { tc.fg } else { tc.subtle }),
-                        ),
-                        None => Span::raw(" "),
-                    })
-                    .collect::<Vec<_>>(),
-            )
-        })
-        .collect();
-    frame.render_widget(
-        Paragraph::new(lines).style(Style::default().bg(tc.bg)),
-        band,
-    );
+    let colours = sky::SkyColours {
+        dim: tc.subtle,
+        middle: octant::mix(tc.subtle, tc.fg, 0.5),
+        bright: tc.fg,
+        lit: tc.subtle,
+        shade: tc.muted,
+    };
+    let mut sky = octant::Canvas::new(band.width, band.height);
+    sky::paint(&mut sky, utc_now.timestamp(), is_day, &colours);
+    sky.render(band, frame.buffer_mut());
 }
 
 fn draw_favorite_panel(
@@ -591,14 +674,29 @@ fn draw_favorite_panel(
     }
     // The strip outranks the zone and sun lines, which repeat what it
     // shows, so it takes the last row once the time and offset fit.
-    let strip = (inner.width >= STRIP_HOURS && inner.height >= 3)
-        .then(|| day_strip(entry.coordinates, entry.tz, app.selection.tz, utc_now, tc));
-    body.truncate(usize::from(inner.height) - usize::from(strip.is_some()));
-    body.extend(strip);
+    let has_strip = inner.width >= STRIP_HOURS && inner.height >= 3;
+    body.truncate(usize::from(inner.height) - usize::from(has_strip));
     frame.render_widget(
         Paragraph::new(body).style(Style::default().bg(tc.bg)),
         inner,
     );
+    if has_strip {
+        let mut strip = octant::Canvas::new(STRIP_HOURS, 1);
+        paint_day_strip(
+            &mut strip,
+            entry.coordinates,
+            entry.tz,
+            app.selection.tz,
+            utc_now,
+            tc,
+        );
+        let row = Rect {
+            y: inner.bottom() - 1,
+            height: 1,
+            ..inner
+        };
+        strip.render(row, frame.buffer_mut());
+    }
 
     // Corner marks are the region-scale form of the [ ] marker: the
     // selected panel lights its top-left and bottom-right corners.
@@ -617,43 +715,61 @@ fn draw_favorite_panel(
     }
 }
 
-/// One cell for each hour of the main clock's day, coloured by whether
-/// the sun is up at `place` halfway through that hour. Every panel
-/// samples the same instants, so one column is one moment on the whole
-/// wall. The current hour carries the marker colour, in a heavier glyph
-/// so that a night or no-daylight cell still shows it.
-fn day_strip(
+/// How long the twilight blend takes, centred on sunrise and on sunset.
+const TWILIGHT_HOURS: f64 = 1.0;
+/// The steps of light from night to day, as many as the canvas samples a
+/// pixel's coverage in, so no step between two shows.
+const LIGHT_STEPS: u16 = 16;
+
+/// The light of a place `margin` hours inside the day, from 0 at night to
+/// 1 by day, blended over [`TWILIGHT_HOURS`] round sunrise and sunset in
+/// [`LIGHT_STEPS`] steps.
+fn light_of(margin: f64) -> f32 {
+    let share = (margin / TWILIGHT_HOURS + 0.5).clamp(0.0, 1.0);
+    let steps = f64::from(LIGHT_STEPS);
+    ((share * steps).round() / steps) as f32
+}
+
+/// One cell for each hour of the main clock's day, and one pixel column
+/// for each half hour, coloured by the light at `place` in the middle of
+/// that half hour: the day colour, the night colour, or their blend for
+/// [`TWILIGHT_HOURS`] round sunrise and sunset. Every panel samples the
+/// same instants, so one column is one moment on the whole wall. A place
+/// with no daylight shows one small dot for each hour. The column of now
+/// is in the marker colour.
+fn paint_day_strip(
+    canvas: &mut octant::Canvas,
     place: Option<Coordinates>,
     tz: Tz,
     hero_tz: Tz,
     utc_now: &DateTime<Utc>,
     tc: &ThemeColors,
-) -> Line<'static> {
+) {
     let hero_now = utc_now.with_timezone(&hero_tz);
-    let hero_hour = hero_now.hour();
-    let hour_start = *utc_now
-        - TimeDelta::minutes(i64::from(hero_now.minute()))
-        - TimeDelta::seconds(i64::from(hero_now.second()));
-    let cells: Vec<Span<'static>> = (0..u32::from(STRIP_HOURS))
-        .map(|hour| {
-            let midpoint = hour_start
-                + TimeDelta::hours(i64::from(hour) - i64::from(hero_hour))
-                + TimeDelta::minutes(30);
-            let ((glyph, now_glyph), colour) = match place {
-                None => (("\u{b7}", "\u{2022}"), tc.fg),
-                Some(place) if is_daytime_at_coordinates(place, &midpoint.with_timezone(&tz)) => {
-                    (("\u{2588}", "\u{2588}"), tc.good)
-                }
-                Some(_) => (("\u{2591}", "\u{2593}"), tc.muted),
-            };
-            if hour == hero_hour {
-                Span::styled(now_glyph, Style::default().fg(tc.star))
-            } else {
-                Span::styled(glyph, Style::default().fg(colour))
+    let hero_midnight =
+        *utc_now - TimeDelta::seconds(i64::from(hero_now.num_seconds_from_midnight()));
+    let columns = usize::from(STRIP_HOURS) * octant::CELL_WIDTH;
+    let minutes_per_column = 24 * 60 / columns as i64;
+    for column in 0..columns {
+        let middle = hero_midnight
+            + TimeDelta::minutes(column as i64 * minutes_per_column + minutes_per_column / 2);
+        let Some(place) = place else {
+            if column % octant::CELL_WIDTH == 0 {
+                canvas.set(column, octant::CELL_HEIGHT / 2, tc.fg);
+                canvas.set(column + 1, octant::CELL_HEIGHT / 2, tc.fg);
             }
-        })
-        .collect();
-    Line::from(cells)
+            continue;
+        };
+        let margin = daylight_margin(place, &middle.with_timezone(&tz));
+        let colour = octant::mix(tc.muted, tc.good, light_of(margin));
+        for y in 0..octant::CELL_HEIGHT {
+            canvas.set(column, y, colour);
+        }
+    }
+    let now = (i64::from(hero_now.num_seconds_from_midnight()) / 60 / minutes_per_column) as usize;
+    for y in 0..octant::CELL_HEIGHT {
+        canvas.set(now, y, tc.star);
+    }
 }
 
 /// Bold, in the day colour while the sun is up there and the muted
@@ -670,7 +786,7 @@ fn local_time_style(entry: &TimezoneEntry, local: &DateTime<Tz>, tc: &ThemeColor
 }
 
 /// The map is about 5 cells wide for each row: 360° by 142° drawn in
-/// 2 by 4 Braille dots a cell, with a cell twice as tall as it is wide.
+/// 2 by 4 pixels a cell, with a cell twice as tall as it is wide.
 const MAP_COLUMNS_PER_ROW: u16 = 5;
 /// The map stops at 58°S and 84°N. South of that is Antarctica, which
 /// would take a quarter of the height and holds no city, so a favourite
@@ -759,20 +875,7 @@ fn draw_map(
     // The selected dot is written last, so it stays on top of a
     // neighbour in the same cell.
     marks.sort_by_key(|&(selected, ..)| selected);
-    let night = night_stipple(utc_now, map_width, map_rows);
-    let night_side = Canvas::default()
-        .marker(Marker::Braille)
-        .x_bounds([-180.0, 180.0])
-        .y_bounds([MAP_SOUTH, MAP_NORTH])
-        .background_color(tc.bg)
-        .paint(|ctx| {
-            ctx.draw(&Points {
-                coords: &night,
-                color: tc.border,
-            });
-        });
-    frame.render_widget(night_side, map_area);
-    draw_land(frame.buffer_mut(), map_area, utc_now, tc);
+    paint_map(map_area, frame.buffer_mut(), utc_now, tc);
     if !map_area.is_empty() {
         for &(_, place, glyph, colour) in &marks {
             let latitude = place.latitude.clamp(MAP_SOUTH, MAP_NORTH);
@@ -793,88 +896,304 @@ fn draw_map(
     );
 }
 
-/// A canvas paints a shape in one colour, so the land is painted apart
-/// and each cell then takes the day or the night colour.
-fn draw_land(buffer: &mut Buffer, map_area: Rect, utc_now: &DateTime<Utc>, tc: &ThemeColors) {
-    let mut land = Buffer::empty(map_area);
-    Canvas::default()
-        .marker(Marker::Braille)
-        .x_bounds([-180.0, 180.0])
-        .y_bounds([MAP_SOUTH, MAP_NORTH])
-        .paint(|ctx| {
-            ctx.draw(&Map {
-                resolution: MapResolution::High,
-                color: tc.good,
+/// Paints the map over `area` of `buf` as `utc_now` lights it, as one
+/// Braille dot for each pixel, two across and four down in a cell, so a
+/// gap shows round every dot.
+///
+/// A cell takes one colour, so a cell with land in it draws only its land
+/// dots: in the day colour, the night colour, or a blend of the two at the
+/// terminator, lightened on the coast and lighter still under a city at
+/// night. A cell of sea draws a line of the graticule, or on the night
+/// side a stipple on every other pixel across and down, so night reads
+/// over the terminal's own background and day stays clear.
+///
+/// The light comes from [`daylight_margins`] on the UTC clock, the same
+/// sun model the panels and day strips use, so a city's land and its
+/// panel always agree on whether it is night.
+fn paint_map(area: Rect, buf: &mut Buffer, utc_now: &DateTime<Utc>, tc: &ThemeColors) {
+    let width = usize::from(area.width) * octant::CELL_WIDTH;
+    let height = usize::from(area.height) * octant::CELL_HEIGHT;
+    let m = map_colours(tc);
+    let layers = map_layers(width, height);
+    let latitudes: Vec<f64> = (0..height).map(|y| map_latitude(height, y)).collect();
+    let longitudes: Vec<f64> = (0..width).map(|x| map_longitude(width, x)).collect();
+    let margins = daylight_margins(&latitudes, &longitudes, &utc_now.with_timezone(&Tz::UTC));
+    for row in 0..area.height {
+        for column in 0..area.width {
+            let left = usize::from(column) * octant::CELL_WIDTH;
+            let top = usize::from(row) * octant::CELL_HEIGHT;
+            let pixels: [usize; octant::CELL_WIDTH * octant::CELL_HEIGHT] =
+                std::array::from_fn(|bit| {
+                    (top + bit / octant::CELL_WIDTH) * width + left + bit % octant::CELL_WIDTH
+                });
+            let (dots, colour) = map_cell(&pixels, &layers, &margins, &m, tc);
+            if let Some(cell) = buf.cell_mut((area.x + column, area.y + row)) {
+                let glyph = if dots == 0 {
+                    ' '
+                } else {
+                    symbols::braille::BRAILLE[dots]
+                };
+                cell.set_char(glyph).set_fg(colour).set_bg(Color::Reset);
+            }
+        }
+    }
+}
+
+/// The dots of a map cell on every other pixel across and down: its top
+/// left pixel and the one two rows under it. A cell starts on an even
+/// pixel both ways, so the pattern runs on unbroken from cell to cell.
+const STIPPLE_DOTS: usize = 0b0001_0001;
+
+/// The dots of one map cell and their colour, from the map index of each
+/// of its pixels in Braille order: left to right, then top to bottom.
+fn map_cell(
+    pixels: &[usize],
+    layers: &MapLayers,
+    margins: &[f64],
+    m: &MapColours,
+    tc: &ThemeColors,
+) -> (usize, Color) {
+    let dots = |keep: &dyn Fn(usize) -> bool| {
+        pixels
+            .iter()
+            .enumerate()
+            .filter(|&(_, &at)| keep(at))
+            .fold(0, |dots, (bit, _)| dots | 1 << bit)
+    };
+    let is_land = |at: usize| matches!(layers.ground[at], Ground::Land | Ground::Coast);
+    let land: Vec<usize> = pixels.iter().copied().filter(|&at| is_land(at)).collect();
+    if !land.is_empty() {
+        let mean = land.iter().map(|&at| light_of(margins[at])).sum::<f32>() / land.len() as f32;
+        let steps = f32::from(LIGHT_STEPS);
+        let light = (mean * steps).round() / steps;
+        let colour = octant::mix(m.night, m.day, light);
+        let glow = land.iter().map(|&at| layers.glow[at]).fold(0.0, f32::max);
+        let colour = if light < 0.5 && glow > 0.0 {
+            city_light(colour, glow, tc)
+        } else if land.iter().any(|&at| layers.ground[at] == Ground::Coast) {
+            coast_colour(colour, tc)
+        } else {
+            colour
+        };
+        return (dots(&is_land), colour);
+    }
+    let line_dots = dots(&|at| matches!(layers.ground[at], Ground::Equator | Ground::Graticule));
+    if line_dots != 0 {
+        let equator = pixels
+            .iter()
+            .any(|&at| layers.ground[at] == Ground::Equator);
+        return (line_dots, if equator { m.equator } else { m.grid });
+    }
+    let stipple = dots(&|at| light_of(margins[at]) < 0.5) & STIPPLE_DOTS;
+    (
+        stipple,
+        if stipple == 0 {
+            Color::Reset
+        } else {
+            m.stipple
+        },
+    )
+}
+
+/// The colours of the map, from the theme.
+#[derive(Debug, Clone, Copy)]
+struct MapColours {
+    day: Color,
+    night: Color,
+    /// The sea on the night side, on every other pixel across and down.
+    stipple: Color,
+    /// A line of the graticule, every [`GRATICULE_DEGREES`].
+    grid: Color,
+    equator: Color,
+}
+
+fn map_colours(tc: &ThemeColors) -> MapColours {
+    MapColours {
+        day: tc.good,
+        night: tc.accent_secondary,
+        stipple: tc.border,
+        grid: octant::mix(tc.border, tc.muted, 0.4),
+        equator: tc.muted,
+    }
+}
+
+/// The degrees between two lines of the map's graticule.
+const GRATICULE_DEGREES: f64 = 30.0;
+/// How far a coast pixel lightens toward the text colour.
+const COAST_LIGHT: f32 = 0.3;
+/// How far the smallest and the largest lit city lighten their pixel
+/// toward the text colour. The smallest lies past [`COAST_LIGHT`], so a
+/// light never reads as coast.
+const CITY_LIGHT: std::ops::RangeInclusive<f32> = 0.45..=0.85;
+
+/// The pixel of each graticule line from `low` to `high` degrees on an
+/// axis of `count` pixels, where `pixel` places a degree on the axis.
+fn graticule_pixels(count: usize, low: f64, high: f64, pixel: impl Fn(f64) -> f64) -> Vec<usize> {
+    let mut lines = Vec::new();
+    let mut degrees = (low / GRATICULE_DEGREES).ceil() * GRATICULE_DEGREES;
+    while degrees <= high {
+        let at = pixel(degrees).round();
+        if at >= 0.0 && (at as usize) < count {
+            lines.push(at as usize);
+        }
+        degrees += GRATICULE_DEGREES;
+    }
+    lines
+}
+
+/// `land` on the coast, a step toward the text colour.
+fn coast_colour(land: Color, tc: &ThemeColors) -> Color {
+    octant::mix(land, tc.fg, COAST_LIGHT)
+}
+
+/// `land` at night under a city that glows `glow`, from just above 0 for
+/// the smallest lit city to 1 for the largest.
+fn city_light(land: Color, glow: f32, tc: &ThemeColors) -> Color {
+    let (low, high) = (*CITY_LIGHT.start(), *CITY_LIGHT.end());
+    octant::mix(land, tc.fg, low + (high - low) * glow)
+}
+
+/// What lies under a pixel of the map, before the time of day colours it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ground {
+    Land,
+    /// Land next to the sea or the map's edge.
+    Coast,
+    /// Sea on the equator.
+    Equator,
+    /// Sea on another line of the graticule.
+    Graticule,
+    Sea,
+}
+
+/// What the map holds at one size: the ground under each pixel, and how
+/// brightly the cities in it glow at night, both row by row.
+#[derive(Debug)]
+struct MapLayers {
+    ground: Vec<Ground>,
+    glow: Vec<f32>,
+}
+
+/// The layers of the map, with the size in pixels they were made for.
+type SizedLayers = ((usize, usize), Rc<MapLayers>);
+
+thread_local! {
+    /// The layers of the map at the last size it was drawn at. They
+    /// depend only on the size, and making them costs more than the rest
+    /// of a map frame.
+    static MAP_LAYERS: RefCell<Option<SizedLayers>> = const { RefCell::new(None) };
+}
+
+/// The layers of a map `width` by `height` pixels, made once for each
+/// size.
+fn map_layers(width: usize, height: usize) -> Rc<MapLayers> {
+    MAP_LAYERS.with_borrow_mut(|kept| match kept {
+        Some((size, layers)) if *size == (width, height) => Rc::clone(layers),
+        _ => {
+            let land = land::mask(
+                width,
+                height,
+                |x| map_longitude(width, x),
+                |y| map_latitude(height, y),
+            );
+            let layers = Rc::new(MapLayers {
+                glow: city_glow(width, height, &land),
+                ground: ground(width, height, &land),
             });
+            *kept = Some(((width, height), Rc::clone(&layers)));
+            layers
+        }
+    })
+}
+
+/// The ground under each pixel of a map `width` by `height` pixels, from
+/// whether each is `land`: land next to the sea or the edge is coast, and
+/// sea on a line of the graticule is that line.
+fn ground(width: usize, height: usize, land: &[bool]) -> Vec<Ground> {
+    let across = (width.max(2) - 1) as f64;
+    let down = (height.max(2) - 1) as f64;
+    let meridians = graticule_pixels(width, -180.0, 180.0, |longitude| {
+        (longitude + 180.0) / 360.0 * across
+    });
+    let parallels = graticule_pixels(height, MAP_SOUTH, MAP_NORTH, |latitude| {
+        (MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * down
+    });
+    let equator = (MAP_NORTH / (MAP_NORTH - MAP_SOUTH) * down).round() as usize;
+    let is_land = |x: usize, y: usize| land[y * width + x];
+    (0..height)
+        .flat_map(|y| (0..width).map(move |x| (x, y)))
+        .map(|(x, y)| {
+            if is_land(x, y) {
+                let shore = x == 0
+                    || y == 0
+                    || x + 1 == width
+                    || y + 1 == height
+                    || !is_land(x - 1, y)
+                    || !is_land(x + 1, y)
+                    || !is_land(x, y - 1)
+                    || !is_land(x, y + 1);
+                if shore { Ground::Coast } else { Ground::Land }
+            } else if y == equator {
+                Ground::Equator
+            } else if parallels.contains(&y) || meridians.contains(&x) {
+                Ground::Graticule
+            } else {
+                Ground::Sea
+            }
         })
-        .render(map_area, &mut land);
-    let utc = utc_now.with_timezone(&Tz::UTC);
-    for pos in map_area.positions() {
-        let symbol = land[pos].symbol();
-        if symbol == " " {
+        .collect()
+}
+
+/// How brightly each land pixel of a map `width` by `height` pixels glows
+/// at night: the largest catalogue city in it, from 0 below a hundred
+/// thousand people to 1 at ten million, in [`LIGHT_STEPS`] steps. A city
+/// at sea glows nowhere.
+fn city_glow(width: usize, height: usize, land: &[bool]) -> Vec<f32> {
+    let mut glow = vec![0.0_f32; width * height];
+    let across = (width.max(2) - 1) as f64;
+    let down = (height.max(2) - 1) as f64;
+    for entry in crate::timezone::all_timezones() {
+        let Some(place) = entry.coordinates else {
+            continue;
+        };
+        let latitude = place.latitude.clamp(MAP_SOUTH, MAP_NORTH);
+        let x = ((place.longitude + 180.0) / 360.0 * across).round() as usize;
+        let y = ((MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * down).round() as usize;
+        let index = y * width + x;
+        if x >= width || y >= height || !land[index] {
             continue;
         }
-        let colour = if is_daytime_at_coordinates(map_cell_place(map_area, pos), &utc) {
-            tc.good
-        } else {
-            tc.accent_secondary
-        };
-        if let Some(cell) = buffer.cell_mut(pos) {
-            cell.set_symbol(symbol).set_fg(colour);
-        }
+        let size = ((entry.population.max(1) as f64).log10() - 5.0) / 2.0;
+        let steps = f64::from(LIGHT_STEPS);
+        let level = ((size.clamp(0.0, 1.0) * steps).round() / steps) as f32;
+        glow[index] = glow[index].max(level);
     }
+    glow
 }
 
-fn map_cell_place(map_area: Rect, pos: Position) -> Coordinates {
-    let across = f64::from(pos.x - map_area.x) + 0.5;
-    let down = f64::from(pos.y - map_area.y) + 0.5;
-    Coordinates {
-        latitude: MAP_NORTH - down * (MAP_NORTH - MAP_SOUTH) / f64::from(map_area.height),
-        longitude: -180.0 + across * 360.0 / f64::from(map_area.width),
-    }
+/// The longitude of pixel column `x` of a map `width` pixels wide, from
+/// -180 at the left edge to 180 at the right. [`map_dot_cell`] places a
+/// favourite on the same grid, so its dot sits on its own land.
+fn map_longitude(width: usize, x: usize) -> f64 {
+    -180.0 + x as f64 * 360.0 / (width.max(2) - 1) as f64
 }
 
-/// The cell of `map_area` that holds the Braille dot the canvas paints
-/// for (longitude, latitude), so a favourite's dot sits on the same
-/// coastline cell as its place. The canvas's own `print` places text by
-/// cells and truncates, which drifts it up to a cell north-west.
+/// The latitude of pixel row `y` of a map `height` pixels tall, from
+/// [`MAP_NORTH`] at the top edge to [`MAP_SOUTH`] at the bottom.
+fn map_latitude(height: usize, y: usize) -> f64 {
+    MAP_NORTH - y as f64 * (MAP_NORTH - MAP_SOUTH) / (height.max(2) - 1) as f64
+}
+
+/// The cell of `map_area` that holds the map pixel for (longitude,
+/// latitude), on the grid of [`map_longitude`] and [`map_latitude`], so a
+/// favourite's dot sits on its own land. Placing text by cells and
+/// truncating drifts it up to a cell north-west.
 fn map_dot_cell(map_area: Rect, longitude: f64, latitude: f64) -> (u16, u16) {
     let dots_across = f64::from(map_area.width) * 2.0;
     let dots_down = f64::from(map_area.height) * 4.0;
     let dot_x = ((longitude + 180.0) * (dots_across - 1.0) / 360.0).round();
     let dot_y = ((MAP_NORTH - latitude) * (dots_down - 1.0) / (MAP_NORTH - MAP_SOUTH)).round();
     (map_area.x + dot_x as u16 / 2, map_area.y + dot_y as u16 / 4)
-}
-
-/// The night side of a map `columns` cells wide and `rows` tall, as
-/// (longitude, latitude) points on every other Braille dot across and
-/// down, so night reads as a stipple and day stays clear.
-///
-/// Each point asks [`is_daytime_at_coordinates`] at `utc_now` on the UTC
-/// clock, the same sun model the panels and day strips use, so a
-/// city's dot and its panel always agree on whether it is night.
-fn night_stipple(utc_now: &DateTime<Utc>, columns: u16, rows: u16) -> Vec<(f64, f64)> {
-    let utc = utc_now.with_timezone(&Tz::UTC);
-    let across = u32::from(columns);
-    let down = u32::from(rows) * 2;
-    let step_x = 360.0 / f64::from(across);
-    let step_y = (MAP_NORTH - MAP_SOUTH) / f64::from(down);
-    (0..down)
-        .flat_map(|j| (0..across).map(move |i| (i, j)))
-        .map(|(i, j)| {
-            (
-                -180.0 + (f64::from(i) + 0.25) * step_x,
-                MAP_SOUTH + (f64::from(j) + 0.25) * step_y,
-            )
-        })
-        .filter(|&(longitude, latitude)| {
-            let place = Coordinates {
-                latitude,
-                longitude,
-            };
-            !is_daytime_at_coordinates(place, &utc)
-        })
-        .collect()
 }
 
 /// Every favourite as `City HH:MM`, wrapped onto as many lines as
@@ -1233,6 +1552,7 @@ mod tests {
 
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::buffer::Buffer;
 
     use super::*;
     use crate::config;
@@ -1264,21 +1584,26 @@ mod tests {
             .collect()
     }
 
-    /// Whether `c` is a block or octant glyph, the characters the hero
-    /// art is drawn in. No text or border uses them, but a panel's day
-    /// strip draws its day cells as full blocks.
+    /// Whether `c` is a block, octant or Braille glyph, the characters the
+    /// hero art and the map are drawn in. No text or border uses them, but
+    /// a panel's day strip draws its day cells as full blocks.
     fn is_art_glyph(c: char) -> bool {
-        c != ' ' && ratatui::symbols::pixel::OCTANTS.contains(&c)
+        c != ' '
+            && (ratatui::symbols::pixel::OCTANTS.contains(&c)
+                || ratatui::symbols::braille::BRAILLE.contains(&c))
     }
 
     /// Measures the hero art as (rows with art glyphs, widest ink span
-    /// in cells), so a test can tell one art scale from another. Rows
-    /// with a panel border are skipped, so a day strip is not art.
+    /// in cells), so a test can tell one art scale from another. Only the
+    /// rows of the hero zone count, so the sky and a day strip are not art.
     fn hero_ink(rows: &[String]) -> (usize, usize) {
+        let width = rows.first().map_or(0, |row| row.chars().count());
+        let area = Rect::new(0, 0, width as u16, rows.len() as u16);
+        let hero_rows = 1 + usize::from(hero_variant(area).1);
         let mut ink_rows = 0;
         let mut min_col = usize::MAX;
         let mut max_col = 0;
-        for row in rows.iter().filter(|row| !row.contains('\u{2502}')) {
+        for row in rows.iter().take(hero_rows) {
             let mut inked = false;
             for (col, c) in row.chars().enumerate() {
                 if is_art_glyph(c) {
@@ -1565,11 +1890,7 @@ mod tests {
 
         let rows = render_app(&mut app, 100, 40);
 
-        let ink_rows = rows
-            .iter()
-            .take(13)
-            .filter(|row| row.contains('\u{2588}'))
-            .count();
+        let (ink_rows, _) = hero_ink(&rows);
         assert!(
             ink_rows >= 6,
             "the hero art spans only {ink_rows} rows:\n{}",
@@ -1673,6 +1994,276 @@ mod tests {
         );
     }
 
+    /// 12:34:57 UTC, `millis` into the second.
+    fn into_twelve_thirty_four_fifty_seven(millis: i64) -> DateTime<Utc> {
+        use chrono::TimeZone;
+        Utc.with_ymd_and_hms(2026, 6, 21, 12, 34, 57).unwrap() + TimeDelta::milliseconds(millis)
+    }
+
+    /// The symbols of the whole frame, one string per row.
+    fn symbols(buffer: &Buffer) -> Vec<String> {
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol().to_string())
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// Each hero art cell with its place and foreground. At 80x24 the art
+    /// is 7 rows tall and starts under the title bar and one gap row.
+    fn hero_art_cells(buffer: &Buffer) -> Vec<((u16, u16), Color)> {
+        let mut cells = Vec::new();
+        for y in 2..9 {
+            for x in 0..buffer.area.width {
+                let cell = &buffer[(x, y)];
+                if cell.symbol().chars().any(is_art_glyph) {
+                    cells.push(((x, y), cell.fg));
+                }
+            }
+        }
+        cells
+    }
+
+    /// The foreground of each hero art cell.
+    fn hero_art_colours(buffer: &Buffer) -> Vec<Color> {
+        hero_art_cells(buffer)
+            .into_iter()
+            .map(|(_, colour)| colour)
+            .collect()
+    }
+
+    /// How light `colour` looks, from its sRGB channels.
+    fn luma(colour: Color) -> f32 {
+        let Color::Rgb(r, g, b) = colour else {
+            panic!("{colour:?} has no RGB value");
+        };
+        0.2126 * f32::from(r) + 0.7152 * f32::from(g) + 0.0722 * f32::from(b)
+    }
+
+    /// The main clock rolls a changed digit into place.
+    ///
+    /// Given: the clock with its animation on, and the same clock with
+    /// its animation off.
+    /// When: both are drawn 100 ms after the seconds change, and again
+    /// 400 ms after.
+    /// Then: the two differ at 100 ms, and draw the same digits at
+    /// 400 ms.
+    ///
+    /// Why it matters: the roll must finish well inside its second, so
+    /// the clock is still for most of the time and easy to read.
+    #[test]
+    fn the_main_clock_rolls_a_changed_digit_into_place() {
+        // Given:
+        let mut animated = test_app();
+        let mut still = test_app();
+        still.clock_animation = false;
+
+        // When:
+        let draw = |app: &mut App, millis| {
+            symbols(&render_buffer_at(
+                app,
+                80,
+                24,
+                into_twelve_thirty_four_fifty_seven(millis),
+            ))
+        };
+        let (rolling, at_rest) = (draw(&mut animated, 100), draw(&mut still, 100));
+        let (rolled, settled) = (draw(&mut animated, 400), draw(&mut still, 400));
+
+        // Then:
+        assert_ne!(rolling, at_rest, "no roll:\n{}", rolling.join("\n"));
+        assert_eq!(rolled, settled, "the roll did not settle");
+    }
+
+    /// The colons dim in the second half of each second.
+    ///
+    /// Given: the clock with its animation on, and the same clock with
+    /// its animation off.
+    /// When: each is drawn 200 ms and 700 ms into a second.
+    /// Then: only the animated clock at 700 ms draws art in the muted
+    /// colour, and its digits keep their own colour.
+    ///
+    /// Why it matters: the pulse marks the seconds passing. A clock
+    /// with its animation off must hold still.
+    #[test]
+    fn the_colons_dim_in_the_second_half_of_each_second() {
+        // Given:
+        let mut animated = test_app();
+        let mut still = test_app();
+        still.clock_animation = false;
+        let muted = animated.theme.colors().muted;
+
+        // When:
+        let colours = |app: &mut App, millis| {
+            hero_art_colours(&render_buffer_at(
+                app,
+                80,
+                24,
+                into_twelve_thirty_four_fifty_seven(millis),
+            ))
+        };
+        let bright = colours(&mut animated, 200);
+        let pulsed = colours(&mut animated, 700);
+        let held = colours(&mut still, 700);
+
+        // Then:
+        assert!(!pulsed.is_empty(), "no hero art at 80x24");
+        assert!(!bright.contains(&muted), "the colons dimmed early");
+        assert!(pulsed.contains(&muted), "the colons did not dim");
+        assert!(
+            pulsed.iter().any(|&c| c != muted),
+            "the digits dimmed with the colons"
+        );
+        assert!(!held.contains(&muted), "a still clock pulsed");
+    }
+
+    /// The colons fade between bright and dim.
+    ///
+    /// Given: the clock with its animation on, and its colon cells, the
+    /// cells in the muted colour 700 ms into a second.
+    /// When: it is drawn half way through the fade to dim, and half way
+    /// through the fade back to bright.
+    /// Then: each time every colon cell is in a colour between the clock
+    /// colour and the muted colour.
+    ///
+    /// Why it matters: a colour that switches in one frame blinks. A fade
+    /// reads as a pulse.
+    #[test]
+    fn the_colons_fade_between_bright_and_dim() {
+        // Given:
+        let mut app = test_app();
+        let tc = app.theme.colors();
+        let mut cells = |millis| {
+            let at = into_twelve_thirty_four_fifty_seven(millis);
+            (
+                clock_colour(&app, &at, &tc),
+                hero_art_cells(&render_buffer_at(&mut app, 80, 24, at)),
+            )
+        };
+        let (_, dim) = cells(700);
+        let colons: Vec<(u16, u16)> = dim
+            .into_iter()
+            .filter(|(_, c)| *c == tc.muted)
+            .map(|(at, _)| at)
+            .collect();
+        assert!(!colons.is_empty(), "no colon dims at 700 ms");
+
+        for millis in [575, 75] {
+            // When:
+            let (clock, drawn) = cells(millis);
+
+            // Then:
+            for (at, colour) in drawn.into_iter().filter(|(at, _)| colons.contains(at)) {
+                assert!(
+                    colour != clock && colour != tc.muted,
+                    "{millis} ms: colon cell {at:?} is {colour:?}"
+                );
+            }
+        }
+    }
+
+    /// The digits shade from a lighter top to a deeper bottom.
+    ///
+    /// Given: the clock at rest, with its animation on and off.
+    /// When: each is drawn 400 ms into a second, after the roll.
+    /// Then: every digit cell in the top row of the art is lighter than
+    /// every digit cell in the bottom row.
+    ///
+    /// Why it matters: the shade gives the digits depth, and a still clock
+    /// keeps it, because it is no motion.
+    #[test]
+    fn the_digits_shade_from_a_lighter_top_to_a_deeper_bottom() {
+        for animated in [true, false] {
+            // Given:
+            let mut app = test_app();
+            app.clock_animation = animated;
+
+            // When:
+            let at = into_twelve_thirty_four_fifty_seven(400);
+            let cells = hero_art_cells(&render_buffer_at(&mut app, 80, 24, at));
+
+            // Then:
+            let row = |y| {
+                cells
+                    .iter()
+                    .filter(move |((_, cy), _)| *cy == y)
+                    .map(|(_, c)| luma(*c))
+            };
+            let top = cells.iter().map(|((_, y), _)| *y).min().unwrap();
+            let bottom = cells.iter().map(|((_, y), _)| *y).max().unwrap();
+            let darkest_top = row(top).fold(f32::INFINITY, f32::min);
+            let lightest_bottom = row(bottom).fold(0.0, f32::max);
+            assert!(
+                darkest_top > lightest_bottom,
+                "animated {animated}: top {darkest_top} is not lighter than bottom {lightest_bottom}"
+            );
+        }
+    }
+
+    /// A clock drawn as text waits a whole second between frames.
+    ///
+    /// Given: the clock with its animation on.
+    /// When: it is drawn on a 30-column terminal, where it is a line of
+    /// text, and on an 80-column terminal, where it is art.
+    /// Then: at the start of a second the text clock waits for the next
+    /// second, and the art clock draws its next frame after
+    /// [`MOTION_FRAME`].
+    ///
+    /// Why it matters: a line of text neither rolls nor fades, so motion
+    /// frames there cost battery and show nothing.
+    #[test]
+    fn a_clock_drawn_as_text_waits_a_whole_second_between_frames() {
+        // Given:
+        let mut app = test_app();
+        let start = into_twelve_thirty_four_fifty_seven(0);
+
+        // When:
+        render_buffer_at(&mut app, 30, 24, start);
+        let as_text = until_next_frame(start, app.clock_moves());
+        render_buffer_at(&mut app, 80, 24, start);
+        let as_art = until_next_frame(start, app.clock_moves());
+
+        // Then:
+        assert_eq!(as_text, SECOND);
+        assert_eq!(as_art, MOTION_FRAME);
+    }
+
+    /// The next frame comes when the main clock next changes.
+    ///
+    /// Given: instants across one second.
+    /// When: the delay to the next frame is asked for, with the
+    /// animation on and off.
+    /// Then: an animated clock draws a frame every [`MOTION_FRAME`] while
+    /// the digits roll and while the colons fade, one when each ends, and
+    /// one when the seconds change. A still clock draws only when the
+    /// seconds change.
+    ///
+    /// Why it matters: an idle clock wakes the process once a second, to
+    /// keep battery use low. The extra frames come only while something
+    /// moves.
+    #[test]
+    fn the_next_frame_comes_when_the_main_clock_next_changes() {
+        // Given:
+        let at = into_twelve_thirty_four_fifty_seven;
+        let ms = std::time::Duration::from_millis;
+
+        // When:
+        let animated = |millis| until_next_frame(at(millis), true);
+        let still = |millis| until_next_frame(at(millis), false);
+
+        // Then:
+        assert_eq!(animated(0), MOTION_FRAME);
+        assert_eq!(animated(240), ms(10), "the frame that ends the roll");
+        assert_eq!(animated(300), ms(200), "the frame that starts the fade");
+        assert_eq!(animated(500), MOTION_FRAME);
+        assert_eq!(animated(640), ms(10), "the frame that ends the fade");
+        assert_eq!(animated(700), ms(300));
+        assert_eq!(still(100), ms(900));
+        assert_eq!(still(700), ms(300));
+    }
+
     #[test]
     fn the_hero_digits_double_on_a_large_terminal() {
         let mut app = wall_app(&["tokyo"]);
@@ -1723,27 +2314,34 @@ mod tests {
         assert!(found, "no panel corner lands beside the right edge");
     }
 
-    fn is_day_cell(c: char) -> bool {
-        c == '\u{2588}'
-    }
+    /// One cell of a day strip: its glyph, foreground and background.
+    type StripCell = (char, Color, Color);
 
-    fn is_night_cell(c: char) -> bool {
-        matches!(c, '\u{2591}' | '\u{2593}')
+    /// Whether a strip cell draws in `colour`, in front or behind.
+    fn shows(cell: &StripCell, colour: Color) -> bool {
+        cell.1 == colour || cell.2 == colour
     }
 
     /// Finds each panel's day strip as (row, first column, cells), in
-    /// reading order. A strip is 24 day, night or no-daylight cells
-    /// right after a panel's left border.
-    fn day_strips(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, u16, Vec<char>)> {
-        let is_cell =
-            |c: char| is_day_cell(c) || is_night_cell(c) || matches!(c, '\u{b7}' | '\u{2022}');
+    /// reading order. A strip is 24 art cells right after a panel's left
+    /// border.
+    fn day_strips(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, u16, Vec<StripCell>)> {
         let mut strips = Vec::new();
         for y in 0..buffer.area.height {
-            let row: Vec<char> = (0..buffer.area.width)
-                .map(|x| buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
+            let row: Vec<StripCell> = (0..buffer.area.width)
+                .map(|x| {
+                    let cell = &buffer[(x, y)];
+                    (
+                        cell.symbol().chars().next().unwrap_or(' '),
+                        cell.fg,
+                        cell.bg,
+                    )
+                })
                 .collect();
             for x in 0..row.len().saturating_sub(24) {
-                if row[x] == '\u{2502}' && row[x + 1..x + 25].iter().all(|&c| is_cell(c)) {
+                if row[x].0 == '\u{2502}'
+                    && row[x + 1..x + 25].iter().all(|cell| is_art_glyph(cell.0))
+                {
                     strips.push((y, x as u16 + 1, row[x + 1..x + 25].to_vec()));
                 }
             }
@@ -1778,21 +2376,25 @@ mod tests {
         let buffer = render_buffer_at(&mut app, 80, 40, midsummer_noon_utc());
 
         // Then:
+        let tc = app.theme.colors();
         let strips = day_strips(&buffer);
         assert_eq!(strips.len(), 2, "strips: {strips:?}");
         let (_, _, london) = &strips[0];
         let (_, _, tokyo) = &strips[1];
         assert!(
-            is_day_cell(london[21]) && is_night_cell(london[8]),
+            shows(&london[21], tc.good) && shows(&london[8], tc.muted),
             "London: {london:?}"
         );
         assert!(
-            is_night_cell(tokyo[21]) && is_day_cell(tokyo[8]),
+            shows(&tokyo[21], tc.muted) && shows(&tokyo[8], tc.good),
             "Tokyo: {tokyo:?}"
         );
-        let marker = app.theme.colors().star;
-        for (y, x, _) in &strips {
-            assert_eq!(buffer[(x + 21, *y)].fg, marker, "now cell at row {y}");
+        for (y, _, cells) in &strips {
+            assert!(
+                shows(&cells[21], tc.star),
+                "now cell at row {y}: {:?}",
+                cells[21]
+            );
         }
     }
 
@@ -1814,16 +2416,49 @@ mod tests {
         let buffer = render_buffer_at(&mut app, 80, 40, midsummer_noon_utc());
 
         // Then:
+        let tc = app.theme.colors();
         let strips = day_strips(&buffer);
         assert_eq!(strips.len(), 1, "strips: {strips:?}");
         assert!(
             !strips[0]
                 .2
                 .iter()
-                .any(|&c| is_day_cell(c) || is_night_cell(c)),
+                .any(|cell| shows(cell, tc.good) || shows(cell, tc.muted)),
             "cells: {:?}",
             strips[0].2
         );
+    }
+
+    /// A day strip blends through twilight from night to day.
+    ///
+    /// Given: London on the wall at noon UTC on 21 June.
+    /// When: the wall is drawn with room for the strip.
+    /// Then: some cell of London's strip, away from the now column, is a
+    /// colour between the night colour and the day colour in lightness.
+    ///
+    /// Why it matters: a strip that steps straight from night to day puts
+    /// sunrise on a whole hour, up to half an hour from where it is.
+    #[test]
+    fn a_day_strip_blends_through_twilight() {
+        // Given:
+        let mut app = wall_app(&["london"]);
+        let tc = app.theme.colors();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 80, 40, midsummer_noon_utc());
+
+        // Then:
+        let strips = day_strips(&buffer);
+        let london = &strips.first().expect("no strip").2;
+        let (night, day) = (luma(tc.muted), luma(tc.good));
+        let twilight = london
+            .iter()
+            .filter(|cell| !shows(cell, tc.star))
+            .any(|cell| {
+                let light = luma(cell.1);
+                cell.1 != tc.muted && cell.1 != tc.good && night < light && light < day
+            });
+        assert!(twilight, "no twilight cell: {london:?}");
     }
 
     /// A short panel keeps its strip and drops the zone name first.
@@ -1950,13 +2585,133 @@ mod tests {
         }
     }
 
+    /// A map of `columns` by `rows` cells painted at `utc_now`.
+    fn painted_map(utc_now: DateTime<Utc>, columns: u16, rows: u16) -> ratatui::buffer::Buffer {
+        let mut buffer = ratatui::buffer::Buffer::empty(Rect::new(0, 0, columns, rows));
+        paint_map(
+            buffer.area,
+            &mut buffer,
+            &utc_now,
+            &test_app().theme.colors(),
+        );
+        buffer
+    }
+
+    /// The colour of the dot at pixel (x, y) of a painted map, or none
+    /// where the pixel has no dot.
+    fn map_dot(map: &ratatui::buffer::Buffer, x: usize, y: usize) -> Option<Color> {
+        let cell = &map[(
+            u16::try_from(x / octant::CELL_WIDTH).unwrap(),
+            u16::try_from(y / octant::CELL_HEIGHT).unwrap(),
+        )];
+        let glyph = cell.symbol().chars().next()?;
+        let bits = ratatui::symbols::braille::BRAILLE
+            .iter()
+            .position(|&dots| dots == glyph)?;
+        let bit = y % octant::CELL_HEIGHT * octant::CELL_WIDTH + x % octant::CELL_WIDTH;
+        (bits & 1 << bit != 0).then_some(cell.fg)
+    }
+
+    /// The pixels across and down of a painted map.
+    fn map_pixels(map: &ratatui::buffer::Buffer) -> (usize, usize) {
+        (
+            usize::from(map.area.width) * octant::CELL_WIDTH,
+            usize::from(map.area.height) * octant::CELL_HEIGHT,
+        )
+    }
+
+    /// The colour of the dot nearest (longitude, latitude) on a painted
+    /// map, or none where it has no dot.
+    fn map_dot_at(map: &ratatui::buffer::Buffer, longitude: f64, latitude: f64) -> Option<Color> {
+        let (width, height) = map_pixels(map);
+        let x = ((longitude + 180.0) / 360.0 * (width - 1) as f64).round() as usize;
+        let y = ((MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * (height - 1) as f64).round()
+            as usize;
+        map_dot(map, x, y)
+    }
+
+    /// A terminal too short for the map still draws the map view.
+    ///
+    /// Given: London in the map view on a terminal 100 columns wide and
+    /// 8 rows tall, which leaves the map no rows.
+    /// When: the frame is drawn.
+    /// Then: it draws, with no map dots.
+    ///
+    /// Why it matters: the size of the terminal is the user's to choose,
+    /// so the app must draw at every size, and the graticule of a map of
+    /// no rows has no pixel to fall on.
+    #[test]
+    fn a_terminal_too_short_for_the_map_still_draws_the_map_view() {
+        // Given:
+        let mut app = favorites_app(&[("London", "England", "GB")]);
+        app.toggle_map();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 100, 8, midsummer_noon_utc());
+
+        // Then:
+        let text = buffer_text(&buffer);
+        assert!(
+            !text
+                .chars()
+                .any(|c| c != '\u{2800}' && ratatui::symbols::braille::BRAILLE.contains(&c)),
+            "map dots:\n{text}"
+        );
+    }
+
+    /// The map draws its land as Braille dots, not as solid blocks.
+    ///
+    /// Given: a map of 95 by 19 cells at noon UTC on 21 June.
+    /// When: it is painted.
+    /// Then: every cell is blank or a Braille pattern, and the cells over
+    /// Chad and Brazil hold all eight dots.
+    ///
+    /// Why it matters: a dot leaves a gap round each pixel, so the land
+    /// reads as a dotted map. A block fills the whole cell and reads as a
+    /// solid sheet of colour.
+    #[test]
+    fn the_map_draws_its_land_as_braille_dots() {
+        // Given, when:
+        let map = painted_map(midsummer_noon_utc(), 95, 19);
+
+        // Then:
+        for pos in map.area.positions() {
+            let glyph = map[pos].symbol().chars().next().unwrap();
+            assert!(
+                glyph == ' ' || ratatui::symbols::braille::BRAILLE.contains(&glyph),
+                "{glyph:?} at {pos:?}"
+            );
+        }
+        let area = map.area;
+        for (name, longitude, latitude) in [("Chad", 19.0, 15.0), ("Brazil", -50.0, -10.0)] {
+            let cell = &map[map_dot_cell(area, longitude, latitude)];
+            assert_eq!(cell.symbol(), "\u{28ff}", "{name}");
+        }
+    }
+
+    /// The places of the night stipple on a map of `columns` by `rows`
+    /// cells painted at `utc_now`.
+    fn stipple_places(utc_now: DateTime<Utc>, columns: u16, rows: u16) -> Vec<Coordinates> {
+        let tc = test_app().theme.colors();
+        let map = painted_map(utc_now, columns, rows);
+        let (width, height) = map_pixels(&map);
+        (0..height)
+            .flat_map(|y| (0..width).map(move |x| (x, y)))
+            .filter(|&(x, y)| map_dot(&map, x, y) == Some(tc.border))
+            .map(|(x, y)| Coordinates {
+                latitude: map_latitude(height, y),
+                longitude: map_longitude(width, x),
+            })
+            .collect()
+    }
+
     /// At an equinox noon UTC the night side is the half of the world
     /// around the date line.
     ///
     /// Given: 20 March 2026 at 12:00 UTC, when the sun is overhead near
     /// 0° longitude.
-    /// When: the night stipple is laid out for a map.
-    /// Then: every night point lies more than 80° from the prime
+    /// When: the map is painted.
+    /// Then: every night stipple pixel lies more than 80° from the prime
     /// meridian, and some lie within 10° of the date line.
     ///
     /// Why it matters: the shading is the map's answer to "where is it
@@ -1968,15 +2723,15 @@ mod tests {
         let equinox_noon = Utc.with_ymd_and_hms(2026, 3, 20, 12, 0, 0).unwrap();
 
         // When:
-        let night = night_stipple(&equinox_noon, 60, 12);
+        let night = stipple_places(equinox_noon, 60, 12);
 
         // Then:
         assert!(
-            night.iter().all(|&(longitude, _)| longitude.abs() > 80.0),
+            night.iter().all(|place| place.longitude.abs() > 80.0),
             "night near the prime meridian: {night:?}"
         );
         assert!(
-            night.iter().any(|&(longitude, _)| longitude.abs() > 170.0),
+            night.iter().any(|place| place.longitude.abs() > 170.0),
             "no night at the date line: {night:?}"
         );
     }
@@ -1984,9 +2739,9 @@ mod tests {
     /// At midsummer midnight UTC the far north is still in daylight.
     ///
     /// Given: 21 June 2026 at 00:00 UTC.
-    /// When: the night stipple is laid out for a map.
-    /// Then: no night point lies north of 70°, and night does reach
-    /// the far south.
+    /// When: the map is painted.
+    /// Then: no night stipple pixel lies north of 70°, and night does
+    /// reach the far south.
     ///
     /// Why it matters: the midnight sun is the case a plain "dark side
     /// of the globe" drawing gets wrong.
@@ -1997,35 +2752,32 @@ mod tests {
         let midsummer_midnight = Utc.with_ymd_and_hms(2026, 6, 21, 0, 0, 0).unwrap();
 
         // When:
-        let night = night_stipple(&midsummer_midnight, 60, 12);
+        let night = stipple_places(midsummer_midnight, 60, 12);
 
         // Then:
         assert!(
-            night.iter().all(|&(_, latitude)| latitude < 70.0),
+            night.iter().all(|place| place.latitude < 70.0),
             "night in the Arctic: {night:?}"
         );
         assert!(
-            night.iter().any(|&(_, latitude)| latitude < -40.0),
+            night.iter().any(|place| place.latitude < -40.0),
             "no night in the far south: {night:?}"
         );
     }
 
-    /// A favourite's dot sits in the cell where the canvas draws its
-    /// place.
+    /// A favourite's dot sits on the grid the land is painted on.
     ///
-    /// Given: cities spread over the map, north and south, east and
-    /// west, at three map sizes, and the cell where ratatui's canvas
-    /// paints a Braille dot for each city's coordinates.
-    /// When: the map dot's cell is computed for the same coordinates.
-    /// Then: it is that same cell.
+    /// Given: cities spread over the map, north and south, east and west,
+    /// at three map sizes.
+    /// When: each city's dot cell is computed.
+    /// Then: the cell holds a pixel whose place on the land grid lies
+    /// within half a pixel of the city in each direction.
     ///
-    /// Why it matters: the coastline is drawn in Braille dots, so a
-    /// city's dot must follow the same placement. A text label placed
-    /// by cells drifted up to a cell north-west of its coast, which
-    /// put Sydney off Australia.
+    /// Why it matters: a dot placed by another grid than the land drifts
+    /// off its coast. A text label placed by cells drifted up to a cell
+    /// north-west, which put Sydney off Australia.
     #[test]
-    fn a_favourites_dot_sits_where_the_canvas_draws_its_place() {
-        use ratatui::widgets::canvas::Points;
+    fn a_favourites_dot_sits_on_the_grid_of_the_land() {
         let places = [
             ("London", -0.13, 51.51),
             ("Sydney", 151.21, -33.87),
@@ -2035,39 +2787,225 @@ mod tests {
             ("Tabwakea Village", -157.49, 2.02),
         ];
         for (columns, rows) in [(95_u16, 19_u16), (60, 12), (40, 8)] {
+            // Given:
             let area = Rect::new(0, 0, columns, rows);
-            for (name, longitude, latitude) in places {
-                // Given:
-                let mut terminal = Terminal::new(TestBackend::new(columns, rows)).unwrap();
-                terminal
-                    .draw(|frame| {
-                        let canvas = Canvas::default()
-                            .marker(Marker::Braille)
-                            .x_bounds([-180.0, 180.0])
-                            .y_bounds([MAP_SOUTH, MAP_NORTH])
-                            .paint(|ctx| {
-                                ctx.draw(&Points {
-                                    coords: &[(longitude, latitude)],
-                                    color: Color::White,
-                                });
-                            });
-                        frame.render_widget(canvas, area);
-                    })
-                    .unwrap();
-                let buffer = terminal.backend().buffer();
-                let painted: Vec<(u16, u16)> = (0..rows)
-                    .flat_map(|y| (0..columns).map(move |x| (x, y)))
-                    .filter(|&pos| buffer[pos].symbol() != " ")
-                    .collect();
-                assert_eq!(painted.len(), 1, "{name}: {painted:?}");
+            let (width, height) = (
+                usize::from(columns) * octant::CELL_WIDTH,
+                usize::from(rows) * octant::CELL_HEIGHT,
+            );
+            let across = 360.0 / (width - 1) as f64;
+            let down = (MAP_NORTH - MAP_SOUTH) / (height - 1) as f64;
 
+            for (name, longitude, latitude) in places {
                 // When:
-                let dot = map_dot_cell(area, longitude, latitude);
+                let (column, row) = map_dot_cell(area, longitude, latitude);
 
                 // Then:
-                assert_eq!(dot, painted[0], "{name} on a {columns}x{rows} map");
+                let left = usize::from(column) * octant::CELL_WIDTH;
+                let top = usize::from(row) * octant::CELL_HEIGHT;
+                let near = (top..top + octant::CELL_HEIGHT).any(|y| {
+                    (left..left + octant::CELL_WIDTH).any(|x| {
+                        (map_longitude(width, x) - longitude).abs() <= across / 2.0
+                            && (map_latitude(height, y) - latitude).abs() <= down / 2.0
+                    })
+                });
+                assert!(
+                    near,
+                    "{name} on a {columns}x{rows} map is off the land grid"
+                );
             }
         }
+    }
+
+    /// The land is solid inside a continent, a sea stays open, and the
+    /// terminator blends on land.
+    ///
+    /// Given: a map of 95 by 19 cells at noon UTC on 21 June.
+    /// When: it is painted.
+    /// Then: the dot over Chad and the dot over Brazil are land, the pixel
+    /// over the Ionian Sea has no land dot, and some land dot is a blend
+    /// strictly between the night and the day colour.
+    ///
+    /// Why it matters: an outline gives no area to colour by day and
+    /// night, a fill that leaked through a strait paints a sea as land, and
+    /// a hard terminator steps across a continent.
+    #[test]
+    fn the_land_is_solid_a_sea_stays_open_and_the_terminator_blends() {
+        // Given:
+        let tc = test_app().theme.colors();
+        let m = map_colours(&tc);
+
+        // When:
+        let map = painted_map(midsummer_noon_utc(), 95, 19);
+
+        // Then:
+        let (width, height) = map_pixels(&map);
+        let land = |dot: Option<Color>| {
+            dot.is_some_and(|colour| ![m.stipple, m.grid, m.equator].contains(&colour))
+        };
+        assert!(land(map_dot_at(&map, 19.0, 15.0)), "Chad is not land");
+        assert!(land(map_dot_at(&map, -50.0, -10.0)), "Brazil is not land");
+        assert!(
+            !land(map_dot_at(&map, 18.0, 35.0)),
+            "the Ionian Sea is land"
+        );
+        let twilight = (0..height)
+            .flat_map(|y| (0..width).map(move |x| (x, y)))
+            .filter_map(|(x, y)| map_dot(&map, x, y).filter(|&c| land(Some(c))))
+            .any(|colour| colour != tc.good && colour != tc.accent_secondary);
+        assert!(twilight, "no land in twilight");
+    }
+
+    /// The map fills its land again when the terminal changes size.
+    ///
+    /// Given: a map painted at 95 by 19 cells.
+    /// When: a map is painted at 60 by 12 cells.
+    /// Then: its land dots are the land filled fresh for that size.
+    ///
+    /// Why it matters: the map keeps its land for its size, and land kept
+    /// past a resize would draw the continents of the old size.
+    #[test]
+    fn the_map_fills_its_land_again_when_the_size_changes() {
+        // Given:
+        let tc = test_app().theme.colors();
+        let m = map_colours(&tc);
+        painted_map(midsummer_noon_utc(), 95, 19);
+
+        // When:
+        let map = painted_map(midsummer_noon_utc(), 60, 12);
+
+        // Then:
+        let (width, height) = map_pixels(&map);
+        let fresh = land::mask(
+            width,
+            height,
+            |x| map_longitude(width, x),
+            |y| map_latitude(height, y),
+        );
+        for y in 0..height {
+            for x in 0..width {
+                let land = map_dot(&map, x, y)
+                    .is_some_and(|colour| ![m.stipple, m.grid, m.equator].contains(&colour));
+                assert_eq!(land, fresh[y * width + x], "({x}, {y})");
+            }
+        }
+    }
+
+    /// A painted map of 95 by 19 cells at noon UTC on 21 June.
+    fn midsummer_map() -> ratatui::buffer::Buffer {
+        painted_map(midsummer_noon_utc(), 95, 19)
+    }
+
+    /// The coast is lit, and the land inside it is not.
+    ///
+    /// Given: the map at noon UTC on 21 June.
+    /// When: it is painted.
+    /// Then: every day cell with a land dot next to the sea or the edge
+    /// is the coast tint of the day colour, every other day cell is the
+    /// day colour, and both show.
+    ///
+    /// Why it matters: the coast edge is hard against the terminal
+    /// background, so a lighter rim is what makes a shape read sharp. A
+    /// rim inland would draw false coasts.
+    #[test]
+    fn the_coast_is_lit_and_the_land_inside_it_is_not() {
+        // Given:
+        let tc = test_app().theme.colors();
+        let m = map_colours(&tc);
+        let map = midsummer_map();
+        let (width, height) = map_pixels(&map);
+        let land = |x: usize, y: usize| {
+            map_dot(&map, x, y)
+                .is_some_and(|colour| ![m.stipple, m.grid, m.equator].contains(&colour))
+        };
+        let shore = |x: usize, y: usize| {
+            x == 0
+                || y == 0
+                || x + 1 == width
+                || y + 1 == height
+                || !land(x - 1, y)
+                || !land(x + 1, y)
+                || !land(x, y - 1)
+                || !land(x, y + 1)
+        };
+
+        // When, then:
+        let (mut coast, mut inland) = (0, 0);
+        for pos in map.area.positions() {
+            let colour = map[pos].fg;
+            if colour != m.day && colour != coast_colour(m.day, &tc) {
+                continue;
+            }
+            let left = usize::from(pos.x) * octant::CELL_WIDTH;
+            let top = usize::from(pos.y) * octant::CELL_HEIGHT;
+            let on_shore = (top..top + octant::CELL_HEIGHT)
+                .flat_map(|y| (left..left + octant::CELL_WIDTH).map(move |x| (x, y)))
+                .any(|(x, y)| land(x, y) && shore(x, y));
+            if on_shore {
+                assert_eq!(colour, coast_colour(m.day, &tc), "{pos:?} is on the coast");
+                coast += 1;
+            } else {
+                assert_eq!(colour, m.day, "{pos:?} is inland");
+                inland += 1;
+            }
+        }
+        assert!(coast > 0 && inland > 0, "coast {coast}, inland {inland}");
+    }
+
+    /// A faint graticule crosses the sea, with the equator a step brighter.
+    ///
+    /// Given: the map at noon UTC on 21 June, when the Atlantic is in day.
+    /// When: it is painted.
+    /// Then: the Atlantic dot on 30°W at 10°N is in the graticule colour,
+    /// the dot on the equator at 20°W is in the equator colour, and the
+    /// pixel at 35°W and 15°N, on no line, has no dot.
+    ///
+    /// Why it matters: the lines give the eye a measure of where a city
+    /// lies. A line off its degree would mislead that measure.
+    #[test]
+    fn a_faint_graticule_crosses_the_sea() {
+        // Given:
+        let m = map_colours(&test_app().theme.colors());
+
+        // When:
+        let map = midsummer_map();
+
+        // Then:
+        assert_eq!(map_dot_at(&map, -30.0, 10.0), Some(m.grid), "30°W");
+        assert_eq!(map_dot_at(&map, -20.0, 0.0), Some(m.equator), "the equator");
+        assert_eq!(map_dot_at(&map, -35.0, 15.0), None, "off the lines");
+    }
+
+    /// The cities light the night side, and the day side is not lit.
+    ///
+    /// Given: the map at noon UTC on 21 June, 21:00 in Seoul and 14:00 in
+    /// Paris.
+    /// When: it is painted.
+    /// Then: Seoul's dot is a city light, lighter than the night land, and
+    /// Paris's dot is plain day land.
+    ///
+    /// Why it matters: the lights show where people live at night. A light
+    /// by day would hide which side of the terminator a city is on.
+    #[test]
+    fn the_cities_light_the_night_side() {
+        // Given:
+        let tc = test_app().theme.colors();
+        let m = map_colours(&tc);
+
+        // When:
+        let map = midsummer_map();
+
+        // Then:
+        let seoul = map_dot_at(&map, 126.98, 37.57).unwrap();
+        let lit = (1..=LIGHT_STEPS)
+            .any(|step| seoul == city_light(m.night, step as f32 / LIGHT_STEPS as f32, &tc));
+        assert!(lit, "Seoul is {seoul:?}");
+        assert_ne!(seoul, coast_colour(m.night, &tc), "Seoul reads as coast");
+        let paris = map_dot_at(&map, 2.35, 48.86).unwrap();
+        assert!(
+            paris == m.day || paris == coast_colour(m.day, &tc),
+            "Paris is {paris:?}"
+        );
     }
 
     /// A favourite south of the map's crop stays on the map.
@@ -2092,12 +3030,10 @@ mod tests {
         let dots = map_dots(&buffer);
         assert_eq!(dots.len(), 2, "dots: {dots:?}\n{}", buffer_text(&buffer));
         let lowest = dots.iter().map(|d| d.1).max().unwrap();
-        let map_bottom = (0..buffer.area.height)
+        let below_hero = 1 + hero_variant(buffer.area).1;
+        let map_bottom = (below_hero..buffer.area.height)
             .filter(|&y| {
-                (0..buffer.area.width).any(|x| {
-                    ('\u{2801}'..='\u{28ff}')
-                        .contains(&buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
-                })
+                (0..buffer.area.width).any(|x| buffer[(x, y)].symbol().chars().any(is_art_glyph))
             })
             .max()
             .unwrap();
@@ -2137,17 +3073,51 @@ mod tests {
         }
     }
 
-    /// The rows of a frame that hold the sky: any row with a Braille
-    /// glyph, since in the panel view nothing else draws in Braille.
-    fn sky_rows(buffer: &ratatui::buffer::Buffer) -> Vec<String> {
-        (0..buffer.area.height)
+    /// The rows of the sky band: rows under the hero with art and no
+    /// panel border, as (row, glyphs).
+    fn sky_band(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, String)> {
+        let below_hero = 1 + hero_variant(buffer.area).1;
+        (below_hero..buffer.area.height)
             .map(|y| {
-                (0..buffer.area.width)
+                let glyphs: String = (0..buffer.area.width)
                     .map(|x| buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
-                    .collect::<String>()
+                    .collect();
+                (y, glyphs)
             })
-            .filter(|row| row.chars().any(|c| ('\u{2801}'..='\u{28ff}').contains(&c)))
+            .take_while(|(_, glyphs)| {
+                !glyphs.contains('\u{2502}')
+                    && !glyphs.contains('\u{256d}')
+                    && !glyphs.contains('\u{250c}')
+            })
+            .filter(|(_, glyphs)| glyphs.chars().any(is_art_glyph))
             .collect()
+    }
+
+    /// The glyphs of each sky row.
+    fn sky_rows(buffer: &ratatui::buffer::Buffer) -> Vec<String> {
+        sky_band(buffer)
+            .into_iter()
+            .map(|(_, glyphs)| glyphs)
+            .collect()
+    }
+
+    /// Each inked sky cell as (row, glyph, foreground, background).
+    fn sky_cells(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, char, Color, Color)> {
+        sky_band(buffer)
+            .into_iter()
+            .flat_map(|(y, _)| {
+                (0..buffer.area.width).filter_map(move |x| {
+                    let cell = &buffer[(x, y)];
+                    let glyph = cell.symbol().chars().next()?;
+                    is_art_glyph(glyph).then_some((y, glyph, cell.fg, cell.bg))
+                })
+            })
+            .collect()
+    }
+
+    /// Whether a sky cell draws in `colour`, in front or behind.
+    fn draws_in(cell: &(u16, char, Color, Color), colour: Color) -> bool {
+        cell.2 == colour || cell.3 == colour
     }
 
     /// A night sky fills the band between the clock and the panels.
@@ -2164,15 +3134,16 @@ mod tests {
         // Given:
         let mut app = wall_app(&["tokyo"]);
 
+        let tc = app.theme.colors();
+
         // When:
-        let rows = sky_rows(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
+        let cells = sky_cells(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
 
         // Then:
-        assert!(!rows.is_empty(), "no sky");
+        assert!(!cells.is_empty(), "no sky");
         assert!(
-            rows.iter().all(|row| !row.contains('\u{28e4}')),
-            "a cloud at night:\n{}",
-            rows.join("\n")
+            !cells.iter().any(|cell| draws_in(cell, tc.muted)),
+            "a cloud underside at night: {cells:?}"
         );
     }
 
@@ -2202,15 +3173,14 @@ mod tests {
         let tc = app.theme.colors();
 
         // When:
-        let sky = sky_rows(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
+        let sky = sky_cells(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
         app.toggle_map();
         let map = render_buffer_at(&mut app, 100, 40, midsummer_noon_utc());
 
         // Then:
         assert!(
-            sky.iter().any(|row| row.contains('\u{28e4}')),
-            "no cloud by day:\n{}",
-            sky.join("\n")
+            sky.iter().any(|cell| draws_in(cell, tc.muted)),
+            "no cloud by day: {sky:?}"
         );
         let ring_colours: Vec<Color> = map_marks(&map, MAIN_CLOCK_RING)
             .into_iter()
@@ -2236,8 +3206,11 @@ mod tests {
         let mut app = wall_app(&["london"]);
         let noon = midsummer_noon_utc();
 
+        let tc = app.theme.colors();
+
         // When:
-        let before = sky_rows(&render_buffer_at(&mut app, 100, 48, noon));
+        let before_buffer = render_buffer_at(&mut app, 100, 48, noon);
+        let before = sky_rows(&before_buffer);
         let after = sky_rows(&render_buffer_at(
             &mut app,
             100,
@@ -2247,7 +3220,9 @@ mod tests {
 
         // Then:
         assert!(
-            before.iter().any(|row| row.contains('\u{28e4}')),
+            sky_cells(&before_buffer)
+                .iter()
+                .any(|cell| draws_in(cell, tc.muted)),
             "no cloud by day:\n{}",
             before.join("\n")
         );
@@ -2269,8 +3244,8 @@ mod tests {
     /// one after.
     /// Then: the sky changes after one second and returns after two.
     ///
-    /// Why it matters: the sky moves only on the one-second tick the
-    /// app already has, so it costs no extra frames, and a star that
+    /// Why it matters: the sky moves only when the second changes, which
+    /// already draws a frame, so it costs no extra frames, and a star that
     /// returned at random would read as noise.
     #[test]
     fn stars_twinkle_on_a_two_second_beat() {
@@ -2280,7 +3255,7 @@ mod tests {
 
         // When:
         let mut at = |seconds| {
-            sky_rows(&render_buffer_at(
+            sky_cells(&render_buffer_at(
                 &mut app,
                 100,
                 48,
@@ -2333,19 +3308,6 @@ mod tests {
         );
     }
 
-    /// The colour of every Braille cell in a frame, with its glyph.
-    fn braille_cells(buffer: &ratatui::buffer::Buffer) -> Vec<(char, Color)> {
-        (0..buffer.area.height)
-            .flat_map(|y| (0..buffer.area.width).map(move |x| (x, y)))
-            .filter_map(|pos| {
-                let glyph = buffer[pos].symbol().chars().next()?;
-                ('\u{2801}'..='\u{28ff}')
-                    .contains(&glyph)
-                    .then_some((glyph, buffer[pos].fg))
-            })
-            .collect()
-    }
-
     /// The map draws land on the day side in the day colour, land on the
     /// night side in the night colour, and a plain favourite's dot in
     /// the text colour.
@@ -2355,7 +3317,8 @@ mod tests {
     /// When: the frame is drawn.
     /// Then: the land around London's dot is in the day colour, the land
     /// around Tokyo's dot is in the night colour, Tokyo's dot is in the
-    /// text colour, and every other Braille cell is the dim night stipple.
+    /// text colour, and every other map cell is the dim night stipple or a
+    /// land colour on the way from night to day.
     ///
     /// Why it matters: the land colour shows where it is day, with the
     /// same colours as the day strip and the clock. A plain dot in the
@@ -2378,102 +3341,174 @@ mod tests {
             panic!("dots: {dots:?}");
         };
         assert_eq!(tokyo.2, tc.fg, "Tokyo's dot");
+        let m = map_colours(&tc);
+        let sea = [m.stipple, m.grid, m.equator];
         let land_around = |(x, y, _): (u16, u16, Color)| -> Vec<Color> {
             (y.saturating_sub(1)..=y + 1)
                 .flat_map(|row| (x.saturating_sub(2)..=x + 2).map(move |column| (column, row)))
                 .filter_map(|pos| {
                     let glyph = buffer[pos].symbol().chars().next()?;
                     let colour = buffer[pos].fg;
-                    (('\u{2801}'..='\u{28ff}').contains(&glyph) && colour != tc.border)
-                        .then_some(colour)
+                    (is_art_glyph(glyph) && !sea.contains(&colour)).then_some(colour)
                 })
                 .collect()
         };
         let day_land = land_around(london);
         assert!(!day_land.is_empty(), "no land around London");
         assert!(
-            day_land.iter().all(|&c| c == tc.good),
+            day_land
+                .iter()
+                .all(|&c| c == m.day || c == coast_colour(m.day, &tc)),
             "London: {day_land:?}"
         );
+        let shares = || (0..=LIGHT_STEPS).map(|step| step as f32 / LIGHT_STEPS as f32);
+        let lit = |land: Color| -> Vec<Color> {
+            shares().map(|glow| city_light(land, glow, &tc)).collect()
+        };
         let night_land = land_around(tokyo);
         assert!(!night_land.is_empty(), "no land around Tokyo");
         assert!(
-            night_land.iter().all(|&c| c == tc.accent_secondary),
+            night_land
+                .iter()
+                .all(|&c| c == coast_colour(m.night, &tc) || lit(m.night).contains(&c)),
             "Tokyo: {night_land:?}"
         );
-        let cells = braille_cells(&buffer);
-        assert!(
-            cells
-                .iter()
-                .all(|&(_, c)| c == tc.good || c == tc.accent_secondary || c == tc.border),
-            "a map cell in another colour: {cells:?}"
-        );
+        let terminator: Vec<Color> = shares()
+            .map(|light| octant::mix(m.night, m.day, light))
+            .collect();
+        let mut allowed = vec![Color::Reset, m.stipple, m.grid, m.equator];
+        for &land in &terminator {
+            allowed.push(land);
+            allowed.push(coast_colour(land, &tc));
+            allowed.extend(lit(land));
+        }
+        let on_the_terminator = |colour: Color| allowed.contains(&colour);
+        let below_hero = 1 + hero_variant(buffer.area).1;
+        for pos in buffer.area.positions() {
+            let cell = &buffer[pos];
+            if !cell.symbol().chars().any(is_art_glyph) || pos.y < below_hero {
+                continue;
+            }
+            for colour in [cell.fg, cell.bg] {
+                assert!(
+                    on_the_terminator(colour),
+                    "a map cell at {pos:?} in another colour: {cell:?}"
+                );
+            }
+        }
     }
 
-    /// The night sky draws its stars in the subtle colour, and a
-    /// twinkling star at its peak in the text colour.
+    /// The stars shine at three brightnesses, and a twinkle peaks in the
+    /// text colour.
     ///
     /// Given: Tokyo on the main clock at night.
     /// When: the panel view is drawn at one second and the next.
-    /// Then: every peak glyph is in the text colour, every other star is
-    /// subtle, and a peak glyph is drawn at least once.
+    /// Then: every star is in the subtle colour, half way from subtle to
+    /// the text colour, or the text colour, and each of the three shows.
     ///
-    /// Why it matters: a sky in a dim colour is close to invisible, and
-    /// the twinkle reads only when the peak is a step brighter than the
-    /// other stars.
+    /// Why it matters: stars of one brightness read as a flat pattern, and
+    /// a sky in a dim colour is close to invisible.
     #[test]
-    fn night_stars_are_subtle_and_a_twinkle_peaks_in_text_colour() {
+    fn the_stars_shine_at_three_brightnesses() {
         // Given:
         let mut app = wall_app(&["tokyo"]);
         let tc = app.theme.colors();
         let night = midsummer_noon_utc();
+        let middle = octant::mix(tc.subtle, tc.fg, 0.5);
 
         // When:
-        let cells: Vec<(char, Color)> = [night, night + TimeDelta::seconds(1)]
+        let cells: Vec<_> = [night, night + TimeDelta::seconds(1)]
             .into_iter()
-            .flat_map(|now| braille_cells(&render_buffer_at(&mut app, 100, 48, now)))
+            .flat_map(|now| sky_cells(&render_buffer_at(&mut app, 100, 48, now)))
             .collect();
 
         // Then:
-        let peak = '\u{283f}';
-        assert!(
-            cells.iter().any(|&(glyph, _)| glyph == peak),
-            "no twinkle peak"
-        );
-        for (glyph, colour) in cells {
-            let expected = if glyph == peak { tc.fg } else { tc.subtle };
-            assert_eq!(colour, expected, "star {glyph:?}");
+        for brightness in [tc.subtle, middle, tc.fg] {
+            assert!(
+                cells.iter().any(|cell| cell.2 == brightness),
+                "no star in {brightness:?}"
+            );
+        }
+        for cell in &cells {
+            assert!(
+                [tc.subtle, middle, tc.fg].contains(&cell.2),
+                "star {cell:?}"
+            );
         }
     }
 
-    /// Every star lights at least two Braille dots.
+    /// Every star is one of three sizes, and none is smaller than two
+    /// pixels.
     ///
     /// Given: Tokyo on the main clock at night.
     /// When: the panel view is drawn at one second and the next.
-    /// Then: every star glyph has two or more of its eight dots raised.
+    /// Then: every star cell lights two, four or six of its eight pixels,
+    /// and each of the three sizes shows.
     ///
-    /// Why it matters: a one-dot glyph is about two pixels wide at a
-    /// normal font size, so no colour makes it easy to see.
+    /// Why it matters: a one-pixel star is too small to see at a normal
+    /// font size, and stars of one size read as a flat pattern.
     #[test]
-    fn every_star_lights_at_least_two_dots() {
+    fn every_star_is_one_of_three_sizes() {
         // Given:
         let mut app = wall_app(&["tokyo"]);
         let night = midsummer_noon_utc();
 
         // When:
-        let cells: Vec<(char, Color)> = [night, night + TimeDelta::seconds(1)]
+        let cells: Vec<_> = [night, night + TimeDelta::seconds(1)]
             .into_iter()
-            .flat_map(|now| braille_cells(&render_buffer_at(&mut app, 100, 48, now)))
+            .flat_map(|now| sky_cells(&render_buffer_at(&mut app, 100, 48, now)))
             .collect();
 
         // Then:
-        assert!(!cells.is_empty(), "no sky");
-        let faint: Vec<char> = cells
-            .iter()
-            .map(|&(glyph, _)| glyph)
-            .filter(|&glyph| (u32::from(glyph) - 0x2800).count_ones() < 2)
-            .collect();
-        assert!(faint.is_empty(), "one-dot stars: {faint:?}");
+        let lit = |glyph: char| {
+            ratatui::symbols::pixel::OCTANTS
+                .iter()
+                .position(|&each| each == glyph)
+                .map_or(0, |bits| bits.count_ones())
+        };
+        let sizes: Vec<u32> = cells.iter().map(|cell| lit(cell.1)).collect();
+        for size in [2, 4, 6] {
+            assert!(sizes.contains(&size), "no star of {size} pixels: {sizes:?}");
+        }
+        assert!(
+            sizes.iter().all(|size| [2, 4, 6].contains(size)),
+            "{sizes:?}"
+        );
+    }
+
+    /// A cloud is lit on top and shaded underneath.
+    ///
+    /// Given: London on the main clock at noon UTC on 21 June.
+    /// When: the panel view is drawn.
+    /// Then: the highest cloud row draws in the subtle colour, and the
+    /// lowest cloud row draws in the muted colour.
+    ///
+    /// Why it matters: the light on the top and the shade underneath give
+    /// a cloud its volume. A flat cloud reads as a stripe.
+    #[test]
+    fn a_cloud_is_lit_on_top_and_shaded_underneath() {
+        // Given:
+        let mut app = wall_app(&["london"]);
+        let tc = app.theme.colors();
+
+        // When:
+        let cells = sky_cells(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
+
+        // Then:
+        let top = cells.iter().map(|cell| cell.0).min().expect("no cloud");
+        let bottom = cells.iter().map(|cell| cell.0).max().expect("no cloud");
+        assert!(
+            cells
+                .iter()
+                .any(|cell| cell.0 == top && draws_in(cell, tc.subtle)),
+            "the top row is not lit: {cells:?}"
+        );
+        assert!(
+            cells
+                .iter()
+                .any(|cell| cell.0 == bottom && draws_in(cell, tc.muted)),
+            "the bottom row is not shaded: {cells:?}"
+        );
     }
 
     /// A main clock city that is not a favourite gets a ring where it is,

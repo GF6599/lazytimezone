@@ -9,7 +9,7 @@ A terminal world clock browser. Search by city, region, country, or UTC offset, 
 ## Features
 
 - **Large clock.** The time, the city, and the date, in block digits. The digits scale up with the terminal size.
-- **Favorite wall.** Each favorite city is a framed panel with its own time, date, and offset from the main clock. The panels stretch to the terminal width. A day strip shows when the sun is up in each city, one cell for each hour of the main clock's day, with the current hour marked. A tall terminal adds the timezone and the sunrise and sunset times. Move between panels, promote one to the main clock, and reorder them. The app saves the wall.
+- **Favorite wall.** Each favorite city is a framed panel with its own time, date, and offset from the main clock. The panels stretch to the terminal width. A day strip shows when the sun is up in each city, one cell for each hour of the main clock's day, with a blend through twilight at sunrise and sunset and the current half hour marked. A tall terminal adds the timezone and the sunrise and sunset times. Move between panels, promote one to the main clock, and reorder them. The app saves the wall.
 - **34,000 cities.** Every GeoNames place above 15,000 people, with its state and country.
 - **Add-city search.** Press `/`, type a city, a state, a country, or a UTC offset, and pick a result. Examples: `+5:30`, `UTC-8`, `portland maine`, `asia +9`.
 - **7 themes.** The app saves your choice.
@@ -58,6 +58,7 @@ Press `?` in the app for the same key list, plus the search syntax.
 | `K` | Move the panel earlier in the order |
 | `t` | Cycle the theme |
 | `m` | Switch the wall between panels and the world map |
+| `a` | Turn the clock animation off and on |
 | `c` | Copy the big clock's time to the clipboard |
 | `?` | Toggle the help overlay. `Up` and `Down` scroll it |
 | `q` / `Ctrl-c` | Quit |
@@ -107,7 +108,9 @@ A search can match an alias city or a geographic keyword. The table then shows t
 
 Press `t` to cycle the theme. The cycle order is Default, Dracula, Solarized, Nord, Monokai, Gruvbox, and Rose Pine.
 
-The app writes the theme, the favorites, the wall view and the main clock city to `~/.config/lazytimezone/config.toml`. When `$XDG_CONFIG_HOME` is set, the app writes to `$XDG_CONFIG_HOME/lazytimezone/config.toml` instead. Pass `--config <path>` to read and write a different file, for example one file per project or a scratch file for a test run.
+The big clock rolls each changed digit into place and pulses its colons once a second. Press `a` to turn the animation off and on.
+
+The app writes the theme, the favorites, the wall view, the main clock city and the clock animation setting to `~/.config/lazytimezone/config.toml`. When `$XDG_CONFIG_HOME` is set, the app writes to `$XDG_CONFIG_HOME/lazytimezone/config.toml` instead. Pass `--config <path>` to read and write a different file, for example one file per project or a scratch file for a test run.
 
 ## Development
 
@@ -121,4 +124,4 @@ just check    # the quality gate: clippy, the tests, cargo deny, then a format c
 
 ## License
 
-MIT. The city catalogue in `data/cities.tsv` derives from [GeoNames](https://www.geonames.org/), licensed CC BY 4.0.
+MIT. The city catalogue in `data/cities.tsv` derives from [GeoNames](https://www.geonames.org/), licensed CC BY 4.0. The land of the world map in `data/land.tsv` derives from [Natural Earth](https://www.naturalearthdata.com/), which is in the public domain.

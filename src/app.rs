@@ -436,6 +436,12 @@ pub struct App {
     /// Toggled by `?`, scrolled with the arrows, dismissed by any other key.
     pub(crate) show_help: bool,
     pub(crate) wall_view: WallView,
+    /// Whether the main clock rolls its digits and pulses its colons.
+    pub(crate) clock_animation: bool,
+    /// Whether the last frame drew the main clock as art, reported by the
+    /// renderer, which alone knows the terminal size. A line of text does
+    /// not animate.
+    clock_draws_art: bool,
     /// First visible line of the help popup.
     ///
     /// The overlay carries more lines than an 80x24 terminal can show, so
@@ -547,6 +553,8 @@ impl App {
             copy_flash: None,
             show_help: false,
             wall_view,
+            clock_animation: cfg.clock_animation,
+            clock_draws_art: true,
             help_scroll: 0,
             startup_messages,
             config_load_failed,
@@ -574,6 +582,21 @@ impl App {
             WallView::Map => WallView::Panels,
         };
         self.save_config();
+    }
+
+    pub(crate) fn toggle_clock_animation(&mut self) {
+        self.clock_animation = !self.clock_animation;
+        self.save_config();
+    }
+
+    /// Whether the main clock has motion to draw: its animation is on and
+    /// the last frame drew it as art.
+    pub(crate) fn clock_moves(&self) -> bool {
+        self.clock_animation && self.clock_draws_art
+    }
+
+    pub(crate) fn set_clock_draws_art(&mut self, draws_art: bool) {
+        self.clock_draws_art = draws_art;
     }
 
     pub(crate) fn toggle_help(&mut self) {
@@ -1037,6 +1060,7 @@ impl App {
                 Some(idx) => self.catalogue.get(idx).map(config::SavedCity::of),
                 None => self.unmatched_main_clock.clone(),
             },
+            clock_animation: self.clock_animation,
         };
         // The alternate screen hides stderr, so the status bar is the
         // only place a failure can show.
@@ -1721,6 +1745,82 @@ mod tests {
 
         // Then:
         assert_eq!(app.theme.label(), "Rose Pine");
+    }
+
+    // ── Clock animation ─────────────────────────────────────────────
+
+    /// The main clock opens still when the user turned its animation off.
+    ///
+    /// Given: the app with its animation on and a config file.
+    /// When: the user turns the animation off, and the app starts again
+    /// on that file.
+    /// Then: the new start has the animation off.
+    ///
+    /// Why it matters: a user who finds the motion a distraction must
+    /// not turn it off again at every start.
+    #[test]
+    fn turning_the_clock_animation_off_opens_the_next_start_still() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let mut app = App::new(Some(tmp.path()));
+        assert!(app.clock_animation);
+
+        // When:
+        app.toggle_clock_animation();
+        let restarted = App::new(Some(tmp.path()));
+
+        // Then:
+        assert!(!restarted.clock_animation);
+    }
+
+    /// A config file with no clock animation key opens animated.
+    ///
+    /// Given: a config file that names a theme and no clock animation.
+    /// When: the app starts with that file.
+    /// Then: the animation is on, and no warning shows.
+    ///
+    /// Why it matters: the animation is on by default, and every config
+    /// file written before the setting existed has no such key.
+    #[test]
+    fn a_config_file_without_a_clock_animation_opens_animated() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        fs::write(tmp.path(), "theme = \"Nord\"\n").unwrap();
+
+        // When:
+        let app = App::new(Some(tmp.path()));
+
+        // Then:
+        assert!(app.clock_animation);
+        assert!(
+            app.startup_messages.is_empty(),
+            "{:?}",
+            app.startup_messages
+        );
+    }
+
+    /// An animated clock saves no clock animation key.
+    ///
+    /// Given: the app with a config file.
+    /// When: the user turns the animation off and on again.
+    /// Then: the file has no clock animation key.
+    ///
+    /// Why it matters: an earlier release refuses a config file with a
+    /// key it does not know. A user who keeps the default can still
+    /// open the same file with that release.
+    #[test]
+    fn an_animated_clock_saves_no_clock_animation_key() {
+        // Given:
+        let tmp = TempConfigPath::new();
+        let mut app = App::new(Some(tmp.path()));
+
+        // When:
+        app.toggle_clock_animation();
+        app.toggle_clock_animation();
+
+        // Then:
+        let saved = fs::read_to_string(tmp.path()).unwrap();
+        assert!(!saved.contains("clock_animation"), "{saved}");
     }
 
     // ── Wall view ───────────────────────────────────────────────────
