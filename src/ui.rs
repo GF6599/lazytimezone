@@ -1110,13 +1110,15 @@ fn map_layers(width: usize, height: usize) -> Rc<MapLayers> {
 /// whether each is `land`: land next to the sea or the edge is coast, and
 /// sea on a line of the graticule is that line.
 fn ground(width: usize, height: usize, land: &[bool]) -> Vec<Ground> {
+    let across = (width.max(2) - 1) as f64;
+    let down = (height.max(2) - 1) as f64;
     let meridians = graticule_pixels(width, -180.0, 180.0, |longitude| {
-        (longitude + 180.0) / 360.0 * (width - 1) as f64
+        (longitude + 180.0) / 360.0 * across
     });
     let parallels = graticule_pixels(height, MAP_SOUTH, MAP_NORTH, |latitude| {
-        (MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * (height - 1) as f64
+        (MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * down
     });
-    let equator = (MAP_NORTH / (MAP_NORTH - MAP_SOUTH) * (height - 1) as f64).round() as usize;
+    let equator = (MAP_NORTH / (MAP_NORTH - MAP_SOUTH) * down).round() as usize;
     let is_land = |x: usize, y: usize| land[y * width + x];
     (0..height)
         .flat_map(|y| (0..width).map(move |x| (x, y)))
@@ -2626,6 +2628,35 @@ mod tests {
         let y = ((MAP_NORTH - latitude) / (MAP_NORTH - MAP_SOUTH) * (height - 1) as f64).round()
             as usize;
         map_dot(map, x, y)
+    }
+
+    /// A terminal too short for the map still draws the map view.
+    ///
+    /// Given: London in the map view on a terminal 100 columns wide and
+    /// 8 rows tall, which leaves the map no rows.
+    /// When: the frame is drawn.
+    /// Then: it draws, with no map dots.
+    ///
+    /// Why it matters: the size of the terminal is the user's to choose,
+    /// so the app must draw at every size, and the graticule of a map of
+    /// no rows has no pixel to fall on.
+    #[test]
+    fn a_terminal_too_short_for_the_map_still_draws_the_map_view() {
+        // Given:
+        let mut app = favorites_app(&[("London", "England", "GB")]);
+        app.toggle_map();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 100, 8, midsummer_noon_utc());
+
+        // Then:
+        let text = buffer_text(&buffer);
+        assert!(
+            !text
+                .chars()
+                .any(|c| c != '\u{2800}' && ratatui::symbols::braille::BRAILLE.contains(&c)),
+            "map dots:\n{text}"
+        );
     }
 
     /// The map draws its land as Braille dots, not as solid blocks.
