@@ -54,8 +54,8 @@ use crate::octant;
 use crate::sky;
 use crate::theme::ThemeColors;
 use crate::timezone::{
-    Coordinates, TimezoneEntry, format_utc_offset, is_daytime_at, is_daytime_at_coordinates,
-    sun_times,
+    Coordinates, TimezoneEntry, daylight_margin, format_utc_offset, is_daytime_at,
+    is_daytime_at_coordinates, sun_times,
 };
 
 /// Top-level render entry point. Splits the frame into the title bar,
@@ -665,14 +665,29 @@ fn draw_favorite_panel(
     }
     // The strip outranks the zone and sun lines, which repeat what it
     // shows, so it takes the last row once the time and offset fit.
-    let strip = (inner.width >= STRIP_HOURS && inner.height >= 3)
-        .then(|| day_strip(entry.coordinates, entry.tz, app.selection.tz, utc_now, tc));
-    body.truncate(usize::from(inner.height) - usize::from(strip.is_some()));
-    body.extend(strip);
+    let has_strip = inner.width >= STRIP_HOURS && inner.height >= 3;
+    body.truncate(usize::from(inner.height) - usize::from(has_strip));
     frame.render_widget(
         Paragraph::new(body).style(Style::default().bg(tc.bg)),
         inner,
     );
+    if has_strip {
+        let mut strip = octant::Canvas::new(STRIP_HOURS, 1);
+        paint_day_strip(
+            &mut strip,
+            entry.coordinates,
+            entry.tz,
+            app.selection.tz,
+            utc_now,
+            tc,
+        );
+        let row = Rect {
+            y: inner.bottom() - 1,
+            height: 1,
+            ..inner
+        };
+        strip.render(row, frame.buffer_mut());
+    }
 
     // Corner marks are the region-scale form of the [ ] marker: the
     // selected panel lights its top-left and bottom-right corners.
@@ -691,43 +706,50 @@ fn draw_favorite_panel(
     }
 }
 
-/// One cell for each hour of the main clock's day, coloured by whether
-/// the sun is up at `place` halfway through that hour. Every panel
-/// samples the same instants, so one column is one moment on the whole
-/// wall. The current hour carries the marker colour, in a heavier glyph
-/// so that a night or no-daylight cell still shows it.
-fn day_strip(
+/// How long the twilight blend takes, centred on sunrise and on sunset.
+const TWILIGHT_HOURS: f64 = 1.0;
+
+/// One cell for each hour of the main clock's day, and one pixel column
+/// for each half hour, coloured by the light at `place` in the middle of
+/// that half hour: the day colour, the night colour, or their blend for
+/// [`TWILIGHT_HOURS`] round sunrise and sunset. Every panel samples the
+/// same instants, so one column is one moment on the whole wall. A place
+/// with no daylight shows one small dot for each hour. The column of now
+/// is in the marker colour.
+fn paint_day_strip(
+    canvas: &mut octant::Canvas,
     place: Option<Coordinates>,
     tz: Tz,
     hero_tz: Tz,
     utc_now: &DateTime<Utc>,
     tc: &ThemeColors,
-) -> Line<'static> {
+) {
     let hero_now = utc_now.with_timezone(&hero_tz);
-    let hero_hour = hero_now.hour();
-    let hour_start = *utc_now
-        - TimeDelta::minutes(i64::from(hero_now.minute()))
-        - TimeDelta::seconds(i64::from(hero_now.second()));
-    let cells: Vec<Span<'static>> = (0..u32::from(STRIP_HOURS))
-        .map(|hour| {
-            let midpoint = hour_start
-                + TimeDelta::hours(i64::from(hour) - i64::from(hero_hour))
-                + TimeDelta::minutes(30);
-            let ((glyph, now_glyph), colour) = match place {
-                None => (("\u{b7}", "\u{2022}"), tc.fg),
-                Some(place) if is_daytime_at_coordinates(place, &midpoint.with_timezone(&tz)) => {
-                    (("\u{2588}", "\u{2588}"), tc.good)
-                }
-                Some(_) => (("\u{2591}", "\u{2593}"), tc.muted),
-            };
-            if hour == hero_hour {
-                Span::styled(now_glyph, Style::default().fg(tc.star))
-            } else {
-                Span::styled(glyph, Style::default().fg(colour))
+    let hero_midnight =
+        *utc_now - TimeDelta::seconds(i64::from(hero_now.num_seconds_from_midnight()));
+    let columns = usize::from(STRIP_HOURS) * octant::CELL_WIDTH;
+    let minutes_per_column = 24 * 60 / columns as i64;
+    for column in 0..columns {
+        let middle = hero_midnight
+            + TimeDelta::minutes(column as i64 * minutes_per_column + minutes_per_column / 2);
+        let Some(place) = place else {
+            if column % octant::CELL_WIDTH == 0 {
+                canvas.set(column, octant::CELL_HEIGHT / 2, tc.fg);
+                canvas.set(column + 1, octant::CELL_HEIGHT / 2, tc.fg);
             }
-        })
-        .collect();
-    Line::from(cells)
+            continue;
+        };
+        let margin = daylight_margin(place, &middle.with_timezone(&tz));
+        let light = (margin / TWILIGHT_HOURS + 0.5).clamp(0.0, 1.0) as f32;
+        let colour = octant::mix(tc.muted, tc.good, light);
+        for y in 0..octant::CELL_HEIGHT {
+            canvas.set(column, y, colour);
+        }
+    }
+    let now = (i64::from(hero_now.num_seconds_from_midnight()) / 60 / minutes_per_column) as usize;
+    for y in 0..octant::CELL_HEIGHT {
+        canvas.set(now, y, tc.star);
+    }
 }
 
 /// Bold, in the day colour while the sun is up there and the muted
@@ -2038,27 +2060,34 @@ mod tests {
         assert!(found, "no panel corner lands beside the right edge");
     }
 
-    fn is_day_cell(c: char) -> bool {
-        c == '\u{2588}'
-    }
+    /// One cell of a day strip: its glyph, foreground and background.
+    type StripCell = (char, Color, Color);
 
-    fn is_night_cell(c: char) -> bool {
-        matches!(c, '\u{2591}' | '\u{2593}')
+    /// Whether a strip cell draws in `colour`, in front or behind.
+    fn shows(cell: &StripCell, colour: Color) -> bool {
+        cell.1 == colour || cell.2 == colour
     }
 
     /// Finds each panel's day strip as (row, first column, cells), in
-    /// reading order. A strip is 24 day, night or no-daylight cells
-    /// right after a panel's left border.
-    fn day_strips(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, u16, Vec<char>)> {
-        let is_cell =
-            |c: char| is_day_cell(c) || is_night_cell(c) || matches!(c, '\u{b7}' | '\u{2022}');
+    /// reading order. A strip is 24 art cells right after a panel's left
+    /// border.
+    fn day_strips(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, u16, Vec<StripCell>)> {
         let mut strips = Vec::new();
         for y in 0..buffer.area.height {
-            let row: Vec<char> = (0..buffer.area.width)
-                .map(|x| buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
+            let row: Vec<StripCell> = (0..buffer.area.width)
+                .map(|x| {
+                    let cell = &buffer[(x, y)];
+                    (
+                        cell.symbol().chars().next().unwrap_or(' '),
+                        cell.fg,
+                        cell.bg,
+                    )
+                })
                 .collect();
             for x in 0..row.len().saturating_sub(24) {
-                if row[x] == '\u{2502}' && row[x + 1..x + 25].iter().all(|&c| is_cell(c)) {
+                if row[x].0 == '\u{2502}'
+                    && row[x + 1..x + 25].iter().all(|cell| is_art_glyph(cell.0))
+                {
                     strips.push((y, x as u16 + 1, row[x + 1..x + 25].to_vec()));
                 }
             }
@@ -2093,21 +2122,25 @@ mod tests {
         let buffer = render_buffer_at(&mut app, 80, 40, midsummer_noon_utc());
 
         // Then:
+        let tc = app.theme.colors();
         let strips = day_strips(&buffer);
         assert_eq!(strips.len(), 2, "strips: {strips:?}");
         let (_, _, london) = &strips[0];
         let (_, _, tokyo) = &strips[1];
         assert!(
-            is_day_cell(london[21]) && is_night_cell(london[8]),
+            shows(&london[21], tc.good) && shows(&london[8], tc.muted),
             "London: {london:?}"
         );
         assert!(
-            is_night_cell(tokyo[21]) && is_day_cell(tokyo[8]),
+            shows(&tokyo[21], tc.muted) && shows(&tokyo[8], tc.good),
             "Tokyo: {tokyo:?}"
         );
-        let marker = app.theme.colors().star;
-        for (y, x, _) in &strips {
-            assert_eq!(buffer[(x + 21, *y)].fg, marker, "now cell at row {y}");
+        for (y, _, cells) in &strips {
+            assert!(
+                shows(&cells[21], tc.star),
+                "now cell at row {y}: {:?}",
+                cells[21]
+            );
         }
     }
 
@@ -2129,16 +2162,49 @@ mod tests {
         let buffer = render_buffer_at(&mut app, 80, 40, midsummer_noon_utc());
 
         // Then:
+        let tc = app.theme.colors();
         let strips = day_strips(&buffer);
         assert_eq!(strips.len(), 1, "strips: {strips:?}");
         assert!(
             !strips[0]
                 .2
                 .iter()
-                .any(|&c| is_day_cell(c) || is_night_cell(c)),
+                .any(|cell| shows(cell, tc.good) || shows(cell, tc.muted)),
             "cells: {:?}",
             strips[0].2
         );
+    }
+
+    /// A day strip blends through twilight from night to day.
+    ///
+    /// Given: London on the wall at noon UTC on 21 June.
+    /// When: the wall is drawn with room for the strip.
+    /// Then: some cell of London's strip, away from the now column, is a
+    /// colour between the night colour and the day colour in lightness.
+    ///
+    /// Why it matters: a strip that steps straight from night to day puts
+    /// sunrise on a whole hour, up to half an hour from where it is.
+    #[test]
+    fn a_day_strip_blends_through_twilight() {
+        // Given:
+        let mut app = wall_app(&["london"]);
+        let tc = app.theme.colors();
+
+        // When:
+        let buffer = render_buffer_at(&mut app, 80, 40, midsummer_noon_utc());
+
+        // Then:
+        let strips = day_strips(&buffer);
+        let london = &strips.first().expect("no strip").2;
+        let (night, day) = (luma(tc.muted), luma(tc.good));
+        let twilight = london
+            .iter()
+            .filter(|cell| !shows(cell, tc.star))
+            .any(|cell| {
+                let light = luma(cell.1);
+                cell.1 != tc.muted && cell.1 != tc.good && night < light && light < day
+            });
+        assert!(twilight, "no twilight cell: {london:?}");
     }
 
     /// A short panel keeps its strip and drops the zone name first.

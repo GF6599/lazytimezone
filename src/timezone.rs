@@ -350,15 +350,35 @@ pub fn is_daytime_at(place: Option<Coordinates>, local: &DateTime<Tz>) -> bool {
     }
 }
 
-/// Measures the time from solar noon around the 24-hour clock, so a
-/// solar noon that wraps past midnight still holds midday inside the
-/// window.
-pub fn is_daytime_at_coordinates(place: Coordinates, local: &DateTime<Tz>) -> bool {
+/// Half the length of the day at `place` on `local`'s date, and how far
+/// `local` lies from solar noon, both in hours. The distance is measured
+/// around the 24-hour clock, so a solar noon that wraps past midnight
+/// still holds midday inside the window.
+fn day_position(place: Coordinates, local: &DateTime<Tz>) -> (f64, f64) {
     let (sunrise, sunset) = sun_window(place.latitude, local.ordinal());
-    let half_day = (sunset - sunrise) / 2.0;
-    let hour = local.hour() as f64 + local.minute() as f64 / 60.0;
+    let hour = f64::from(local.num_seconds_from_midnight()) / 3600.0;
     let from_noon = (hour - solar_noon(place.longitude, local) + 12.0).rem_euclid(24.0) - 12.0;
+    ((sunset - sunrise) / 2.0, from_noon)
+}
+
+pub fn is_daytime_at_coordinates(place: Coordinates, local: &DateTime<Tz>) -> bool {
+    let (half_day, from_noon) = day_position(place, local);
     -half_day <= from_noon && from_noon < half_day
+}
+
+/// The hours from `local` to the nearer sunrise or sunset at `place`:
+/// above 0 inside the day and below 0 inside the night. A polar day has
+/// no edge and gives positive infinity, and a polar night gives negative
+/// infinity.
+pub(crate) fn daylight_margin(place: Coordinates, local: &DateTime<Tz>) -> f64 {
+    let (half_day, from_noon) = day_position(place, local);
+    if half_day >= 12.0 {
+        f64::INFINITY
+    } else if half_day <= 0.0 {
+        f64::NEG_INFINITY
+    } else {
+        half_day - from_noon.abs()
+    }
 }
 
 /// Formats a UTC offset in seconds to a human-readable string like
@@ -491,6 +511,74 @@ mod tests {
         // Then:
         assert!(noon, "local noon reads as night");
         assert!(!midnight, "local midnight reads as day");
+    }
+
+    /// The daylight margin counts the hours from the nearer sunrise or
+    /// sunset, inside the day above 0 and inside the night below.
+    ///
+    /// Given: London on 21 June 2026, with its almanac sunrise at 04:43.
+    /// When: the margin is read every quarter hour, and 30 minutes after
+    /// sunrise.
+    /// Then: its sign agrees with the daytime test at every quarter hour,
+    /// it is about 0.5 at 30 minutes after sunrise, and it is larger at
+    /// 13:00 than at 09:00.
+    ///
+    /// Why it matters: the day strip blends through twilight by the
+    /// margin. A margin that disagreed with the daytime test would shade a
+    /// night hour as day.
+    #[test]
+    fn the_daylight_margin_counts_hours_from_sunrise_and_sunset() {
+        // Given:
+        let london = Coordinates {
+            latitude: 51.51,
+            longitude: -0.13,
+        };
+        let at = |hour, minute| {
+            Tz::Europe__London
+                .with_ymd_and_hms(2026, 6, 21, hour, minute, 0)
+                .unwrap()
+        };
+
+        // When, then:
+        for quarter in 0..96 {
+            let local = at(quarter / 4, quarter % 4 * 15);
+            let margin = daylight_margin(london, &local);
+            assert_eq!(
+                margin > 0.0,
+                is_daytime_at_coordinates(london, &local),
+                "{local}: margin {margin:.2}"
+            );
+        }
+        let after_sunrise = daylight_margin(london, &at(5, 13));
+        assert!(approx(after_sunrise, 0.5, 0.1), "{after_sunrise:.2}");
+        assert!(daylight_margin(london, &at(13, 0)) > daylight_margin(london, &at(9, 0)));
+    }
+
+    /// A polar day and a polar night have no edge to count from.
+    ///
+    /// Given: Longyearbyen at 78°N at midsummer and at midwinter.
+    /// When: the margin is read at local midnight.
+    /// Then: midsummer gives positive infinity and midwinter negative
+    /// infinity.
+    ///
+    /// Why it matters: a finite margin at a polar midnight would shade
+    /// the hours round it as twilight when the sun never sets.
+    #[test]
+    fn a_polar_day_and_night_have_no_edge() {
+        // Given:
+        let place = Coordinates {
+            latitude: 78.22,
+            longitude: 15.65,
+        };
+        let tz = Tz::Arctic__Longyearbyen;
+
+        // When:
+        let summer = daylight_margin(place, &tz.with_ymd_and_hms(2026, 6, 21, 0, 0, 0).unwrap());
+        let winter = daylight_margin(place, &tz.with_ymd_and_hms(2026, 12, 21, 0, 0, 0).unwrap());
+
+        // Then:
+        assert_eq!(summer, f64::INFINITY);
+        assert_eq!(winter, f64::NEG_INFINITY);
     }
 
     #[test]
