@@ -7,6 +7,7 @@
 //! no colour ever mixes with it.
 
 use std::cmp::Reverse;
+use std::ops::Range;
 use std::sync::LazyLock;
 
 use ratatui::buffer::Buffer;
@@ -131,6 +132,16 @@ pub fn mix(from: Color, to: Color, share: f32) -> Color {
     }
 }
 
+/// The colour `over` gives a pixel of `under` at `share`. Where either is
+/// the background, the colour is the nearer end and never a mix.
+fn blend_colours(under: Color, over: Color, share: f32) -> Color {
+    if under == BACKGROUND || over == BACKGROUND {
+        if share >= 0.5 { over } else { under }
+    } else {
+        mix(under, over, share)
+    }
+}
+
 /// Each colour of `pixels` once, in the order of its first pixel, with the
 /// count of its pixels, and how many colours there are.
 fn tally(pixels: [Color; 8]) -> ([(Color, u8); 8], usize) {
@@ -244,6 +255,26 @@ fn cell(pixels: [Color; 8], cache: &mut Labs) -> (char, Color, Color) {
     (OCTANTS[bits], fore, back)
 }
 
+/// The points across each side of a pixel that sample its coverage. Four
+/// give 17 steps of coverage, enough that the step between two is not seen
+/// in a mix of two theme colours.
+const SAMPLES: usize = 4;
+
+/// Where each sample lies from the centre of its pixel, across or down.
+const OFFSETS: [f32; SAMPLES] = [-0.375, -0.125, 0.125, 0.375];
+
+/// The furthest a sample lies from the centre of its pixel.
+const REACH: f32 = 0.375 * std::f32::consts::SQRT_2;
+
+/// Every pixel along one side that a shape from `low` to `high` can touch,
+/// cut to the `count` pixels of the canvas, so a shape past an edge draws
+/// only the part inside.
+fn span(low: f32, high: f32, count: usize) -> Range<usize> {
+    let start = (low - 1.0).floor().max(0.0) as usize;
+    let end = (high + 2.0).ceil().max(0.0) as usize;
+    start.min(count)..end.min(count)
+}
+
 /// The pixels of a frame, `CELL_WIDTH` across and `CELL_HEIGHT` down in
 /// each cell, that draw into a buffer one glyph to a cell.
 #[derive(Debug, Clone)]
@@ -279,11 +310,71 @@ impl Canvas {
         (x < self.width() && y < self.height()).then(|| y * self.width() + x)
     }
 
+    /// The colour of the pixel at (x, y), or none past an edge. Only a test
+    /// reads a pixel, before the cell of two colours reduces it.
+    #[cfg(test)]
+    pub fn get(&self, x: usize, y: usize) -> Option<Color> {
+        self.index(x, y).map(|index| self.pixels[index])
+    }
+
     /// Paints the pixel at (x, y). A pixel past an edge is dropped, so a
     /// shape can cross the edge of the frame.
     pub fn set(&mut self, x: usize, y: usize, colour: Color) {
         if let Some(index) = self.index(x, y) {
             self.pixels[index] = colour;
+        }
+    }
+
+    /// Mixes `colour` into the pixel at (x, y) by `coverage`, the share of
+    /// the pixel a shape covers, from 0 to 1. Where the pixel or `colour`
+    /// is the background, the pixel takes `colour` from a coverage of a
+    /// half on and keeps its own colour below, so the edge stays hard. A
+    /// pixel past an edge is dropped.
+    pub fn blend(&mut self, x: usize, y: usize, colour: Color, coverage: f32) {
+        if let Some(index) = self.index(x, y) {
+            self.pixels[index] = blend_colours(self.pixels[index], colour, coverage);
+        }
+    }
+
+    /// Fills the disc of `radius` round `centre`. As for every shape, a
+    /// point is in pixels, and the centre of the pixel at (x, y) lies at
+    /// (x, y), so a shape on whole numbers centres on whole pixels.
+    pub fn disc(&mut self, centre: (f32, f32), radius: f32, colour: Color) {
+        let (x, y) = centre;
+        let bounds = [x - radius, y - radius, x + radius, y + radius];
+        self.fill(bounds, colour, |px, py| (px - x).hypot(py - y) - radius);
+    }
+
+    /// Blends `colour` into each pixel by its coverage of the shape whose
+    /// signed distance is `edge`: how far a point lies outside the shape,
+    /// and below 0 inside. `bounds` holds the shape: left, top, right and
+    /// bottom.
+    ///
+    /// The coverage of a pixel is the share of `SAMPLES` by `SAMPLES`
+    /// points evenly spread over it that lie inside. Each shape takes the
+    /// same points, so a frame draws the same each time. A pixel whose
+    /// centre lies further than `REACH` from the edge has every point on
+    /// one side, so it needs one distance and no samples.
+    fn fill(&mut self, bounds: [f32; 4], colour: Color, edge: impl Fn(f32, f32) -> f32) {
+        let [left, top, right, bottom] = bounds;
+        for y in span(top, bottom, self.height()) {
+            for x in span(left, right, self.width()) {
+                let (cx, cy) = (x as f32, y as f32);
+                let centre = edge(cx, cy);
+                let coverage = if centre <= -REACH {
+                    1.0
+                } else if centre >= REACH {
+                    continue;
+                } else {
+                    let inside = OFFSETS
+                        .iter()
+                        .flat_map(|dy| OFFSETS.iter().map(move |dx| (dx, dy)))
+                        .filter(|(dx, dy)| edge(cx + *dx, cy + *dy) < 0.0)
+                        .count();
+                    inside as f32 / (SAMPLES * SAMPLES) as f32
+                };
+                self.blend(x, y, colour, coverage);
+            }
         }
     }
 
@@ -317,6 +408,7 @@ mod tests {
 
     use super::*;
     use ratatui::buffer::Cell;
+    use std::ops::Range;
 
     const BLACK: Color = Color::Rgb(0, 0, 0);
     const WHITE: Color = Color::Rgb(255, 255, 255);
@@ -425,6 +517,35 @@ mod tests {
                 cell.bg
             }
         })
+    }
+
+    /// Each row of `canvas` from `rows`, pixel by pixel.
+    fn canvas_rows(canvas: &Canvas, rows: Range<usize>) -> Vec<Vec<Color>> {
+        rows.map(|y| {
+            (0..canvas.width())
+                .map(|x| canvas.get(x, y).unwrap())
+                .collect()
+        })
+        .collect()
+    }
+
+    /// A canvas of `columns` by `rows` cells with every pixel in `colour`.
+    fn filled(columns: u16, rows: u16, colour: Color) -> Canvas {
+        let mut canvas = Canvas::new(columns, rows);
+        for y in 0..canvas.height() {
+            for x in 0..canvas.width() {
+                canvas.set(x, y, colour);
+            }
+        }
+        canvas
+    }
+
+    /// The share of the way from `from` to `to` whose mix is `colour`, to
+    /// the nearest 1/256, or none for a colour off the line between them.
+    fn share_of(from: Color, to: Color, colour: Color) -> Option<f32> {
+        (0..=256)
+            .map(|step| step as f32 / 256.0)
+            .find(|share| mix(from, to, *share) == colour)
     }
 
     /// Each pixel of a cell of two colours shows its own colour.
@@ -693,5 +814,142 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A colour blends into a pixel by its coverage.
+    ///
+    /// Given: a canvas of foam with one pixel of ink.
+    /// When: rose blends into pixels of foam at coverage 0, a quarter and
+    /// 1, into the ink at a half, and into a pixel past an edge.
+    /// Then: coverage 0 leaves foam, a quarter gives the mix of foam and
+    /// rose at a quarter, 1 gives rose, and a half on the ink gives the mix
+    /// of the ink and rose at a half. No other pixel changes.
+    ///
+    /// Why it matters: every soft edge is a blend. A blend that ignored the
+    /// colour already there would draw a halo round a shape that lies over
+    /// another.
+    #[test]
+    fn a_colour_blends_into_a_pixel_by_its_coverage() {
+        // Given:
+        let mut canvas = filled(2, 1, OTHER);
+        canvas.set(3, 3, INK);
+
+        // When:
+        canvas.blend(0, 0, ROSE, 0.0);
+        canvas.blend(1, 0, ROSE, 0.25);
+        canvas.blend(2, 0, ROSE, 1.0);
+        canvas.blend(3, 3, ROSE, 0.5);
+        canvas.blend(4, 0, ROSE, 1.0);
+
+        // Then:
+        let mut expected = vec![vec![OTHER; 4]; 4];
+        expected[0][1] = mix(OTHER, ROSE, 0.25);
+        expected[0][2] = ROSE;
+        expected[3][3] = mix(INK, ROSE, 0.5);
+        assert_eq!(canvas_rows(&canvas, 0..4), expected);
+    }
+
+    /// A disc fills its inside, and blends its edge by the share of each
+    /// pixel it covers.
+    ///
+    /// Given: a canvas of foam.
+    /// When: a disc of ink with radius 2.5 is drawn round the centre of
+    /// pixel (5, 6).
+    /// Then: the pixels whose whole square lies inside show the ink, the
+    /// pixels whose whole square lies outside show foam, the pixel at
+    /// (7, 8) on the edge shows a mix strictly between them, and the shares
+    /// of all pixels add up to the disc's area within half a pixel.
+    ///
+    /// Why it matters: a disc drawn whole pixel by pixel has a ragged rim,
+    /// and a rim that covered too much would make a sun grow as it moves.
+    #[test]
+    fn a_disc_blends_its_edge_by_coverage() {
+        // Given:
+        let mut canvas = filled(6, 3, OTHER);
+        let (centre, radius) = ((5.0, 6.0), 2.5);
+
+        // When:
+        canvas.disc(centre, radius, INK);
+
+        // Then:
+        let mut area = 0.0;
+        for y in 0..canvas.height() {
+            for x in 0..canvas.width() {
+                let colour = canvas.get(x, y).unwrap();
+                let share = share_of(OTHER, INK, colour)
+                    .unwrap_or_else(|| panic!("({x}, {y}) is {colour:?}, no mix of foam and ink"));
+                area += share;
+                let (dx, dy) = (x as f32 - centre.0, y as f32 - centre.1);
+                let far = (dx.abs() + 0.5).hypot(dy.abs() + 0.5);
+                let near = (dx.abs() - 0.5).max(0.0).hypot((dy.abs() - 0.5).max(0.0));
+                if far <= radius {
+                    assert_eq!(colour, INK, "({x}, {y}) lies inside");
+                } else if near >= radius {
+                    assert_eq!(colour, OTHER, "({x}, {y}) lies outside");
+                }
+            }
+        }
+        let edge = canvas.get(7, 8).unwrap();
+        assert_ne!(edge, INK, "the edge at (7, 8)");
+        assert_ne!(edge, OTHER, "the edge at (7, 8)");
+        let disc = std::f32::consts::PI * radius * radius;
+        assert!(
+            (area - disc).abs() < 0.5,
+            "the shares add up to {area}, not {disc}"
+        );
+    }
+
+    /// Over the terminal's own background an edge stays hard, and over
+    /// another colour it blends.
+    ///
+    /// Given: a canvas with foam over its right half.
+    /// When: a disc of ink is drawn across both halves, and the background
+    /// blends into a pixel of foam at a quarter and at three quarters.
+    /// Then: each pixel over the background is the background or the ink,
+    /// never a mix. Over foam the disc's edge shows a mix of foam and the
+    /// ink. The background at a quarter leaves the foam, and at three
+    /// quarters replaces it.
+    ///
+    /// Why it matters: the app cannot know the colour of the terminal's
+    /// background. A guessed mix would draw a dark or light ring round each
+    /// shape.
+    #[test]
+    fn an_edge_over_the_background_stays_hard() {
+        // Given:
+        let mut canvas = Canvas::new(8, 4);
+        let half = canvas.width() / 2;
+        for y in 0..canvas.height() {
+            for x in half..canvas.width() {
+                canvas.set(x, y, OTHER);
+            }
+        }
+        let foam = |x: usize| x >= half;
+
+        // When:
+        canvas.disc((8.0, 8.0), 5.3, INK);
+        canvas.blend(12, 0, BACK, 0.25);
+        canvas.blend(13, 0, BACK, 0.75);
+
+        // Then:
+        let mut soft = 0;
+        for y in 0..canvas.height() {
+            for x in 0..canvas.width() {
+                let colour = canvas.get(x, y).unwrap();
+                if (x, y) == (12, 0) {
+                    assert_eq!(colour, OTHER, "the background at a quarter over foam");
+                } else if (x, y) == (13, 0) {
+                    assert_eq!(colour, BACK, "the background at three quarters over foam");
+                } else if !foam(x) {
+                    assert!(colour == BACK || colour == INK, "({x}, {y}) is {colour:?}");
+                } else if colour != OTHER && colour != INK {
+                    assert!(
+                        share_of(OTHER, INK, colour).is_some(),
+                        "({x}, {y}) is {colour:?}"
+                    );
+                    soft += 1;
+                }
+            }
+        }
+        assert!(soft > 0, "no pixel over foam blends");
     }
 }

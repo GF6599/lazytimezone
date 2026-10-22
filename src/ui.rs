@@ -576,27 +576,16 @@ fn draw_sky(frame: &mut Frame, app: &App, utc_now: &DateTime<Utc>, band: Rect, t
         app.main_clock_place(),
         &utc_now.with_timezone(&app.selection.tz),
     );
-    let rows = sky::render(band.width, band.height, utc_now.timestamp(), is_day);
-    let lines: Vec<Line> = rows
-        .into_iter()
-        .map(|row| {
-            Line::from(
-                row.into_iter()
-                    .map(|cell| match cell {
-                        Some(cell) => Span::styled(
-                            cell.glyph.to_string(),
-                            Style::default().fg(if cell.bright { tc.fg } else { tc.subtle }),
-                        ),
-                        None => Span::raw(" "),
-                    })
-                    .collect::<Vec<_>>(),
-            )
-        })
-        .collect();
-    frame.render_widget(
-        Paragraph::new(lines).style(Style::default().bg(tc.bg)),
-        band,
-    );
+    let colours = sky::SkyColours {
+        dim: tc.subtle,
+        middle: octant::mix(tc.subtle, tc.fg, 0.5),
+        bright: tc.fg,
+        lit: tc.subtle,
+        shade: tc.muted,
+    };
+    let mut sky = octant::Canvas::new(band.width, band.height);
+    sky::paint(&mut sky, utc_now.timestamp(), is_day, &colours);
+    sky.render(band, frame.buffer_mut());
 }
 
 fn draw_favorite_panel(
@@ -1357,13 +1346,16 @@ mod tests {
     }
 
     /// Measures the hero art as (rows with art glyphs, widest ink span
-    /// in cells), so a test can tell one art scale from another. Rows
-    /// with a panel border are skipped, so a day strip is not art.
+    /// in cells), so a test can tell one art scale from another. Only the
+    /// rows of the hero zone count, so the sky and a day strip are not art.
     fn hero_ink(rows: &[String]) -> (usize, usize) {
+        let width = rows.first().map_or(0, |row| row.chars().count());
+        let area = Rect::new(0, 0, width as u16, rows.len() as u16);
+        let hero_rows = 1 + usize::from(hero_variant(area).1);
         let mut ink_rows = 0;
         let mut min_col = usize::MAX;
         let mut max_col = 0;
-        for row in rows.iter().filter(|row| !row.contains('\u{2502}')) {
+        for row in rows.iter().take(hero_rows) {
             let mut inked = false;
             for (col, c) in row.chars().enumerate() {
                 if is_art_glyph(c) {
@@ -1650,7 +1642,7 @@ mod tests {
 
         let rows = render_app(&mut app, 100, 40);
 
-        let (ink_rows, _) = hero_ink(&rows[..13]);
+        let (ink_rows, _) = hero_ink(&rows);
         assert!(
             ink_rows >= 6,
             "the hero art spans only {ink_rows} rows:\n{}",
@@ -2460,17 +2452,51 @@ mod tests {
         }
     }
 
-    /// The rows of a frame that hold the sky: any row with a Braille
-    /// glyph, since in the panel view nothing else draws in Braille.
-    fn sky_rows(buffer: &ratatui::buffer::Buffer) -> Vec<String> {
-        (0..buffer.area.height)
+    /// The rows of the sky band: rows under the hero with art and no
+    /// panel border, as (row, glyphs).
+    fn sky_band(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, String)> {
+        let below_hero = 1 + hero_variant(buffer.area).1;
+        (below_hero..buffer.area.height)
             .map(|y| {
-                (0..buffer.area.width)
+                let glyphs: String = (0..buffer.area.width)
                     .map(|x| buffer[(x, y)].symbol().chars().next().unwrap_or(' '))
-                    .collect::<String>()
+                    .collect();
+                (y, glyphs)
             })
-            .filter(|row| row.chars().any(|c| ('\u{2801}'..='\u{28ff}').contains(&c)))
+            .take_while(|(_, glyphs)| {
+                !glyphs.contains('\u{2502}')
+                    && !glyphs.contains('\u{256d}')
+                    && !glyphs.contains('\u{250c}')
+            })
+            .filter(|(_, glyphs)| glyphs.chars().any(is_art_glyph))
             .collect()
+    }
+
+    /// The glyphs of each sky row.
+    fn sky_rows(buffer: &ratatui::buffer::Buffer) -> Vec<String> {
+        sky_band(buffer)
+            .into_iter()
+            .map(|(_, glyphs)| glyphs)
+            .collect()
+    }
+
+    /// Each inked sky cell as (row, glyph, foreground, background).
+    fn sky_cells(buffer: &ratatui::buffer::Buffer) -> Vec<(u16, char, Color, Color)> {
+        sky_band(buffer)
+            .into_iter()
+            .flat_map(|(y, _)| {
+                (0..buffer.area.width).filter_map(move |x| {
+                    let cell = &buffer[(x, y)];
+                    let glyph = cell.symbol().chars().next()?;
+                    is_art_glyph(glyph).then_some((y, glyph, cell.fg, cell.bg))
+                })
+            })
+            .collect()
+    }
+
+    /// Whether a sky cell draws in `colour`, in front or behind.
+    fn draws_in(cell: &(u16, char, Color, Color), colour: Color) -> bool {
+        cell.2 == colour || cell.3 == colour
     }
 
     /// A night sky fills the band between the clock and the panels.
@@ -2487,15 +2513,16 @@ mod tests {
         // Given:
         let mut app = wall_app(&["tokyo"]);
 
+        let tc = app.theme.colors();
+
         // When:
-        let rows = sky_rows(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
+        let cells = sky_cells(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
 
         // Then:
-        assert!(!rows.is_empty(), "no sky");
+        assert!(!cells.is_empty(), "no sky");
         assert!(
-            rows.iter().all(|row| !row.contains('\u{28e4}')),
-            "a cloud at night:\n{}",
-            rows.join("\n")
+            !cells.iter().any(|cell| draws_in(cell, tc.muted)),
+            "a cloud underside at night: {cells:?}"
         );
     }
 
@@ -2525,15 +2552,14 @@ mod tests {
         let tc = app.theme.colors();
 
         // When:
-        let sky = sky_rows(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
+        let sky = sky_cells(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
         app.toggle_map();
         let map = render_buffer_at(&mut app, 100, 40, midsummer_noon_utc());
 
         // Then:
         assert!(
-            sky.iter().any(|row| row.contains('\u{28e4}')),
-            "no cloud by day:\n{}",
-            sky.join("\n")
+            sky.iter().any(|cell| draws_in(cell, tc.muted)),
+            "no cloud by day: {sky:?}"
         );
         let ring_colours: Vec<Color> = map_marks(&map, MAIN_CLOCK_RING)
             .into_iter()
@@ -2559,8 +2585,11 @@ mod tests {
         let mut app = wall_app(&["london"]);
         let noon = midsummer_noon_utc();
 
+        let tc = app.theme.colors();
+
         // When:
-        let before = sky_rows(&render_buffer_at(&mut app, 100, 48, noon));
+        let before_buffer = render_buffer_at(&mut app, 100, 48, noon);
+        let before = sky_rows(&before_buffer);
         let after = sky_rows(&render_buffer_at(
             &mut app,
             100,
@@ -2570,7 +2599,9 @@ mod tests {
 
         // Then:
         assert!(
-            before.iter().any(|row| row.contains('\u{28e4}')),
+            sky_cells(&before_buffer)
+                .iter()
+                .any(|cell| draws_in(cell, tc.muted)),
             "no cloud by day:\n{}",
             before.join("\n")
         );
@@ -2603,7 +2634,7 @@ mod tests {
 
         // When:
         let mut at = |seconds| {
-            sky_rows(&render_buffer_at(
+            sky_cells(&render_buffer_at(
                 &mut app,
                 100,
                 48,
@@ -2733,70 +2764,117 @@ mod tests {
         );
     }
 
-    /// The night sky draws its stars in the subtle colour, and a
-    /// twinkling star at its peak in the text colour.
+    /// The stars shine at three brightnesses, and a twinkle peaks in the
+    /// text colour.
     ///
     /// Given: Tokyo on the main clock at night.
     /// When: the panel view is drawn at one second and the next.
-    /// Then: every peak glyph is in the text colour, every other star is
-    /// subtle, and a peak glyph is drawn at least once.
+    /// Then: every star is in the subtle colour, half way from subtle to
+    /// the text colour, or the text colour, and each of the three shows.
     ///
-    /// Why it matters: a sky in a dim colour is close to invisible, and
-    /// the twinkle reads only when the peak is a step brighter than the
-    /// other stars.
+    /// Why it matters: stars of one brightness read as a flat pattern, and
+    /// a sky in a dim colour is close to invisible.
     #[test]
-    fn night_stars_are_subtle_and_a_twinkle_peaks_in_text_colour() {
+    fn the_stars_shine_at_three_brightnesses() {
         // Given:
         let mut app = wall_app(&["tokyo"]);
         let tc = app.theme.colors();
         let night = midsummer_noon_utc();
+        let middle = octant::mix(tc.subtle, tc.fg, 0.5);
 
         // When:
-        let cells: Vec<(char, Color)> = [night, night + TimeDelta::seconds(1)]
+        let cells: Vec<_> = [night, night + TimeDelta::seconds(1)]
             .into_iter()
-            .flat_map(|now| braille_cells(&render_buffer_at(&mut app, 100, 48, now)))
+            .flat_map(|now| sky_cells(&render_buffer_at(&mut app, 100, 48, now)))
             .collect();
 
         // Then:
-        let peak = '\u{283f}';
-        assert!(
-            cells.iter().any(|&(glyph, _)| glyph == peak),
-            "no twinkle peak"
-        );
-        for (glyph, colour) in cells {
-            let expected = if glyph == peak { tc.fg } else { tc.subtle };
-            assert_eq!(colour, expected, "star {glyph:?}");
+        for brightness in [tc.subtle, middle, tc.fg] {
+            assert!(
+                cells.iter().any(|cell| cell.2 == brightness),
+                "no star in {brightness:?}"
+            );
+        }
+        for cell in &cells {
+            assert!(
+                [tc.subtle, middle, tc.fg].contains(&cell.2),
+                "star {cell:?}"
+            );
         }
     }
 
-    /// Every star lights at least two Braille dots.
+    /// Every star is one of three sizes, and none is smaller than two
+    /// pixels.
     ///
     /// Given: Tokyo on the main clock at night.
     /// When: the panel view is drawn at one second and the next.
-    /// Then: every star glyph has two or more of its eight dots raised.
+    /// Then: every star cell lights two, four or six of its eight pixels,
+    /// and each of the three sizes shows.
     ///
-    /// Why it matters: a one-dot glyph is about two pixels wide at a
-    /// normal font size, so no colour makes it easy to see.
+    /// Why it matters: a one-pixel star is too small to see at a normal
+    /// font size, and stars of one size read as a flat pattern.
     #[test]
-    fn every_star_lights_at_least_two_dots() {
+    fn every_star_is_one_of_three_sizes() {
         // Given:
         let mut app = wall_app(&["tokyo"]);
         let night = midsummer_noon_utc();
 
         // When:
-        let cells: Vec<(char, Color)> = [night, night + TimeDelta::seconds(1)]
+        let cells: Vec<_> = [night, night + TimeDelta::seconds(1)]
             .into_iter()
-            .flat_map(|now| braille_cells(&render_buffer_at(&mut app, 100, 48, now)))
+            .flat_map(|now| sky_cells(&render_buffer_at(&mut app, 100, 48, now)))
             .collect();
 
         // Then:
-        assert!(!cells.is_empty(), "no sky");
-        let faint: Vec<char> = cells
-            .iter()
-            .map(|&(glyph, _)| glyph)
-            .filter(|&glyph| (u32::from(glyph) - 0x2800).count_ones() < 2)
-            .collect();
-        assert!(faint.is_empty(), "one-dot stars: {faint:?}");
+        let lit = |glyph: char| {
+            ratatui::symbols::pixel::OCTANTS
+                .iter()
+                .position(|&each| each == glyph)
+                .map_or(0, |bits| bits.count_ones())
+        };
+        let sizes: Vec<u32> = cells.iter().map(|cell| lit(cell.1)).collect();
+        for size in [2, 4, 6] {
+            assert!(sizes.contains(&size), "no star of {size} pixels: {sizes:?}");
+        }
+        assert!(
+            sizes.iter().all(|size| [2, 4, 6].contains(size)),
+            "{sizes:?}"
+        );
+    }
+
+    /// A cloud is lit on top and shaded underneath.
+    ///
+    /// Given: London on the main clock at noon UTC on 21 June.
+    /// When: the panel view is drawn.
+    /// Then: the highest cloud row draws in the subtle colour, and the
+    /// lowest cloud row draws in the muted colour.
+    ///
+    /// Why it matters: the light on the top and the shade underneath give
+    /// a cloud its volume. A flat cloud reads as a stripe.
+    #[test]
+    fn a_cloud_is_lit_on_top_and_shaded_underneath() {
+        // Given:
+        let mut app = wall_app(&["london"]);
+        let tc = app.theme.colors();
+
+        // When:
+        let cells = sky_cells(&render_buffer_at(&mut app, 100, 48, midsummer_noon_utc()));
+
+        // Then:
+        let top = cells.iter().map(|cell| cell.0).min().expect("no cloud");
+        let bottom = cells.iter().map(|cell| cell.0).max().expect("no cloud");
+        assert!(
+            cells
+                .iter()
+                .any(|cell| cell.0 == top && draws_in(cell, tc.subtle)),
+            "the top row is not lit: {cells:?}"
+        );
+        assert!(
+            cells
+                .iter()
+                .any(|cell| cell.0 == bottom && draws_in(cell, tc.muted)),
+            "the bottom row is not shaded: {cells:?}"
+        );
     }
 
     /// A main clock city that is not a favourite gets a ring where it is,
