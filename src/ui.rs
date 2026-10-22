@@ -44,6 +44,8 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 use std::borrow::Cow;
+use std::ops::Range;
+use std::time::Duration;
 
 use unicode_width::UnicodeWidthStr;
 
@@ -289,6 +291,68 @@ fn hero_variant(area: Rect) -> (HeroVariant, u16) {
     (HeroVariant::Text, 4)
 }
 
+/// How long a changed digit of the main clock takes to roll into place.
+const ROLL: Duration = Duration::from_millis(250);
+/// The frame interval during a roll, about 30 frames a second.
+const ROLL_FRAME: Duration = Duration::from_millis(33);
+/// How far into each second the colons dim.
+const COLON_DIM_AT: Duration = Duration::from_millis(500);
+const SECOND: Duration = Duration::from_secs(1);
+
+/// How far `now` is into its second. A leap second counts as the end of
+/// the second before it.
+fn into_second(now: &DateTime<Utc>) -> Duration {
+    Duration::from_nanos(u64::from(now.timestamp_subsec_nanos()))
+        .min(SECOND - Duration::from_nanos(1))
+}
+
+/// How long the loop can wait at `now` before the main clock looks
+/// different. The frames land on wall-clock second boundaries, so the
+/// clock changes when the second does.
+pub fn until_next_frame(now: DateTime<Utc>, animated: bool) -> Duration {
+    let into = into_second(&now);
+    if !animated {
+        return SECOND - into;
+    }
+    if into < ROLL {
+        ROLL_FRAME.min(ROLL - into)
+    } else if into < COLON_DIM_AT {
+        COLON_DIM_AT - into
+    } else {
+        SECOND - into
+    }
+}
+
+/// Fast at the start and slow into place, the way a wheel settles.
+fn ease_out(t: f64) -> f64 {
+    1.0 - (1.0 - t).powi(3)
+}
+
+/// One row of hero art, with the cells in `colons` in `colon_style`.
+/// `colons` runs left to right, as [`digits::colon_cells`] gives them.
+fn art_line(
+    row: &str,
+    colons: &[Range<usize>],
+    digit_style: Style,
+    colon_style: Style,
+) -> Line<'static> {
+    let cells: Vec<char> = row.chars().collect();
+    let run = |range: Range<usize>| -> String {
+        cells[range.start.min(cells.len())..range.end.min(cells.len())]
+            .iter()
+            .collect()
+    };
+    let mut spans = Vec::new();
+    let mut start = 0;
+    for colon in colons {
+        spans.push(Span::styled(run(start..colon.start), digit_style));
+        spans.push(Span::styled(run(colon.clone()), colon_style));
+        start = colon.end;
+    }
+    spans.push(Span::styled(run(start..cells.len()), digit_style));
+    Line::from(spans)
+}
+
 fn clock_colour(app: &App, utc_now: &DateTime<Utc>, tc: &ThemeColors) -> Color {
     if is_daytime_at(
         app.main_clock_place(),
@@ -364,10 +428,29 @@ fn draw_hero_clock(
         ..chunks[1]
     };
 
-    let art_style = Style::default().fg(clock_color).bg(tc.bg);
-    let art_lines: Vec<Line> = digits::render(&time_str, rows)
+    let into = into_second(utc_now);
+    let art = if app.clock_animation && into < ROLL {
+        let before = (now - TimeDelta::seconds(1)).format("%H:%M:%S").to_string();
+        digits::render_rolling(
+            &before,
+            &time_str,
+            rows,
+            ease_out(into.div_duration_f64(ROLL)),
+        )
+    } else {
+        digits::render(&time_str, rows)
+    };
+    let colon_color = if app.clock_animation && into >= COLON_DIM_AT {
+        tc.muted
+    } else {
+        clock_color
+    };
+    let digit_style = Style::default().fg(clock_color).bg(tc.bg);
+    let colon_style = digit_style.fg(colon_color);
+    let colons = digits::colon_cells(&time_str, rows);
+    let art_lines: Vec<Line> = art
         .into_iter()
-        .map(|row| Line::from(Span::styled(row, art_style)))
+        .map(|row| art_line(&row, &colons, digit_style, colon_style))
         .collect();
     let art = Paragraph::new(art_lines).style(Style::default().bg(tc.bg));
     frame.render_widget(art, clock_area);
@@ -1671,6 +1754,147 @@ mod tests {
                 .any(|c| is_art_glyph(c) && !half_blocks.contains(&c)),
             "no glyph finer than a half block:\n{rendered}"
         );
+    }
+
+    /// 12:34:57 UTC, `millis` into the second.
+    fn into_twelve_thirty_four_fifty_seven(millis: i64) -> DateTime<Utc> {
+        use chrono::TimeZone;
+        Utc.with_ymd_and_hms(2026, 6, 21, 12, 34, 57).unwrap() + TimeDelta::milliseconds(millis)
+    }
+
+    /// The symbols of the whole frame, one string per row.
+    fn symbols(buffer: &Buffer) -> Vec<String> {
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol().to_string())
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// The foreground of each hero art cell. At 80x24 the art is 7 rows
+    /// tall and starts under the title bar and one gap row.
+    fn hero_art_colours(buffer: &Buffer) -> Vec<Color> {
+        let mut colours = Vec::new();
+        for y in 2..9 {
+            for x in 0..buffer.area.width {
+                let cell = &buffer[(x, y)];
+                if cell.symbol().chars().any(is_art_glyph) {
+                    colours.push(cell.fg);
+                }
+            }
+        }
+        colours
+    }
+
+    /// The main clock rolls a changed digit into place.
+    ///
+    /// Given: the clock with its animation on, and the same clock with
+    /// its animation off.
+    /// When: both are drawn 100 ms after the seconds change, and again
+    /// 400 ms after.
+    /// Then: the two differ at 100 ms, and draw the same digits at
+    /// 400 ms.
+    ///
+    /// Why it matters: the roll must finish well inside its second, so
+    /// the clock is still for most of the time and easy to read.
+    #[test]
+    fn the_main_clock_rolls_a_changed_digit_into_place() {
+        // Given:
+        let mut animated = test_app();
+        let mut still = test_app();
+        still.clock_animation = false;
+
+        // When:
+        let draw = |app: &mut App, millis| {
+            symbols(&render_buffer_at(
+                app,
+                80,
+                24,
+                into_twelve_thirty_four_fifty_seven(millis),
+            ))
+        };
+        let (rolling, at_rest) = (draw(&mut animated, 100), draw(&mut still, 100));
+        let (rolled, settled) = (draw(&mut animated, 400), draw(&mut still, 400));
+
+        // Then:
+        assert_ne!(rolling, at_rest, "no roll:\n{}", rolling.join("\n"));
+        assert_eq!(rolled, settled, "the roll did not settle");
+    }
+
+    /// The colons dim in the second half of each second.
+    ///
+    /// Given: the clock with its animation on, and the same clock with
+    /// its animation off.
+    /// When: each is drawn 200 ms and 700 ms into a second.
+    /// Then: only the animated clock at 700 ms draws art in the muted
+    /// colour, and its digits keep their own colour.
+    ///
+    /// Why it matters: the pulse marks the seconds passing. A clock
+    /// with its animation off must hold still.
+    #[test]
+    fn the_colons_dim_in_the_second_half_of_each_second() {
+        // Given:
+        let mut animated = test_app();
+        let mut still = test_app();
+        still.clock_animation = false;
+        let muted = animated.theme.colors().muted;
+
+        // When:
+        let colours = |app: &mut App, millis| {
+            hero_art_colours(&render_buffer_at(
+                app,
+                80,
+                24,
+                into_twelve_thirty_four_fifty_seven(millis),
+            ))
+        };
+        let bright = colours(&mut animated, 200);
+        let pulsed = colours(&mut animated, 700);
+        let held = colours(&mut still, 700);
+
+        // Then:
+        assert!(!pulsed.is_empty(), "no hero art at 80x24");
+        assert!(!bright.contains(&muted), "the colons dimmed early");
+        assert!(pulsed.contains(&muted), "the colons did not dim");
+        assert!(
+            pulsed.iter().any(|&c| c != muted),
+            "the digits dimmed with the colons"
+        );
+        assert!(!held.contains(&muted), "a still clock pulsed");
+    }
+
+    /// The next frame comes when the main clock next changes.
+    ///
+    /// Given: instants across one second.
+    /// When: the delay to the next frame is asked for, with the
+    /// animation on and off.
+    /// Then: an animated clock draws a frame every [`ROLL_FRAME`] during
+    /// the roll, one when the roll ends, one when the colons dim, and
+    /// one when the seconds change. A still clock draws only when the
+    /// seconds change.
+    ///
+    /// Why it matters: an idle clock wakes the process once a second, to
+    /// keep battery use low. The extra frames come only while something
+    /// moves.
+    #[test]
+    fn the_next_frame_comes_when_the_main_clock_next_changes() {
+        // Given:
+        let at = into_twelve_thirty_four_fifty_seven;
+        let ms = std::time::Duration::from_millis;
+
+        // When:
+        let animated = |millis| until_next_frame(at(millis), true);
+        let still = |millis| until_next_frame(at(millis), false);
+
+        // Then:
+        assert_eq!(animated(0), ROLL_FRAME);
+        assert_eq!(animated(240), ms(10), "the frame that ends the roll");
+        assert_eq!(animated(300), ms(200), "the frame that dims the colons");
+        assert_eq!(animated(700), ms(300));
+        assert_eq!(still(100), ms(900));
+        assert_eq!(still(700), ms(300));
     }
 
     #[test]

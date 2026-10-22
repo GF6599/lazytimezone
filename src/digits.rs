@@ -4,6 +4,8 @@
 //! at the size the hero asks for, instead of scaling a fixed bitmap,
 //! keeps the curves smooth at every rung of the hero ladder.
 
+use std::ops::Range;
+
 use ratatui::symbols::pixel::OCTANTS;
 
 /// An octant cell holds 2 by 4 dots. A terminal cell is about twice as
@@ -31,18 +33,38 @@ pub fn width(text: &str, rows: u16) -> u16 {
 /// Draws `text` as one string per cell row, `rows` rows tall. Every
 /// row has [`width`] cells.
 pub fn render(text: &str, rows: u16) -> Vec<String> {
+    render_rolling(text, text, rows, 0.0)
+}
+
+/// Draws the change from `from` to `to` at `progress`, from 0 at the
+/// start to 1 at the end. Each glyph of `to` that differs from the glyph
+/// of `from` at the same place rolls: the old glyph leaves upward and
+/// the new glyph enters from below. Both texts must share one layout,
+/// as two times of day do.
+pub fn render_rolling(from: &str, to: &str, rows: u16, progress: f64) -> Vec<String> {
     let tall = usize::from(rows) * DOTS_DOWN;
-    let glyphs = layout(text, rows);
+    let glyphs = layout(to, rows);
     let wide = glyphs.last().map_or(0, |&(_, x, w)| x + w);
     let scale = tall as f64;
+    let shift = progress.clamp(0.0, 1.0);
 
     let mut ink = vec![false; wide * tall];
+    let mut leaving = from.chars();
     for &(c, x0, w) in &glyphs {
-        let lines = strokes(c);
+        let entering = strokes(c);
+        let left = leaving.next().filter(|&old| old != c).map(strokes);
         for y in 0..tall {
             for x in 0..w {
                 let p = ((x as f64 + 0.5) / scale, (y as f64 + 0.5) / scale);
-                ink[y * wide + x0 + x] = lines.iter().any(|line| near(line, p));
+                ink[y * wide + x0 + x] = match &left {
+                    None => entering.iter().any(|line| near(line, p)),
+                    Some(old) => {
+                        let up = (p.0, p.1 + shift);
+                        let below = (p.0, up.1 - 1.0);
+                        (up.1 < 1.0 && old.iter().any(|line| near(line, up)))
+                            || (below.1 >= 0.0 && entering.iter().any(|line| near(line, below)))
+                    }
+                };
             }
         }
     }
@@ -66,6 +88,17 @@ pub fn render(text: &str, rows: u16) -> Vec<String> {
                 })
                 .collect()
         })
+        .collect()
+}
+
+/// The cell columns of each colon in `text` drawn `rows` cells tall.
+/// A colon's ink sits clear of its box edges, so the cells inside the
+/// box hold no digit ink.
+pub fn colon_cells(text: &str, rows: u16) -> Vec<Range<usize>> {
+    layout(text, rows)
+        .into_iter()
+        .filter(|&(c, _, _)| c == ':')
+        .map(|(_, x0, w)| x0.div_ceil(DOTS_ACROSS)..(x0 + w) / DOTS_ACROSS)
         .collect()
 }
 
@@ -268,6 +301,117 @@ mod tests {
                     art.join("\n")
                 );
             }
+        }
+    }
+
+    /// A roll starts on the old time and ends on the new one.
+    ///
+    /// Given: a change from 12:34:56 to 12:34:57.
+    /// When: the roll is drawn at its start and at its end.
+    /// Then: the start is the old time and the end is the new time.
+    ///
+    /// Why it matters: a roll that jumps at either end makes the clock
+    /// flicker once a second.
+    #[test]
+    fn a_roll_starts_on_the_old_time_and_ends_on_the_new() {
+        // Given:
+        let (from, to, rows) = ("12:34:56", "12:34:57", 7);
+
+        // When:
+        let start = render_rolling(from, to, rows, 0.0);
+        let end = render_rolling(from, to, rows, 1.0);
+
+        // Then:
+        assert_eq!(start, render(from, rows), "start:\n{}", start.join("\n"));
+        assert_eq!(end, render(to, rows), "end:\n{}", end.join("\n"));
+    }
+
+    /// The old digit leaves upward and the new digit enters from below.
+    ///
+    /// Given: a change from 6 to 7 at a height of 8 rows.
+    /// When: the roll is drawn half way.
+    /// Then: the top 4 rows are the lower half of the 6, and the bottom
+    /// 4 rows are the upper half of the 7.
+    ///
+    /// Why it matters: an odometer rolls one way. A digit that came in
+    /// from the top, or that scrolled half a step, would read as a
+    /// glitch.
+    #[test]
+    fn the_old_digit_leaves_upward_and_the_new_digit_enters_from_below() {
+        // Given:
+        let rows = 8;
+        let half = usize::from(rows / 2);
+
+        // When:
+        let mid = render_rolling("6", "7", rows, 0.5);
+
+        // Then:
+        assert_eq!(mid[..half], render("6", rows)[half..], "top half");
+        assert_eq!(mid[half..], render("7", rows)[..half], "bottom half");
+    }
+
+    /// Only the digits that change roll.
+    ///
+    /// Given: a change from 12:34:56 to 12:34:57.
+    /// When: the roll is drawn half way.
+    /// Then: the cells of 12:34:5 are the same as at rest, and the
+    /// drawing is neither the old nor the new time.
+    ///
+    /// Why it matters: a clock that rolls every digit each second is
+    /// noise. Only the seconds digit changes most of the time.
+    #[test]
+    fn only_the_digits_that_change_roll() {
+        // Given:
+        let (from, to, rows) = ("12:34:56", "12:34:57", 7);
+        let still = usize::from(width("12:34:5", rows));
+
+        // When:
+        let mid = render_rolling(from, to, rows, 0.5);
+
+        // Then:
+        let at_rest = render(to, rows);
+        for (row, rest) in mid.iter().zip(&at_rest) {
+            let prefix: String = row.chars().take(still).collect();
+            let rest_prefix: String = rest.chars().take(still).collect();
+            assert_eq!(prefix, rest_prefix, "mid:\n{}", mid.join("\n"));
+        }
+        assert_ne!(mid, render(from, rows), "the roll did not move");
+        assert_ne!(mid, at_rest, "the roll did not move");
+    }
+
+    /// The colon cells hold the colons and nothing else.
+    ///
+    /// Given: two times with the thinnest and the widest digits.
+    /// When: the colon cells of each are read.
+    /// Then: there are two runs of cells, each holds ink, and the two
+    /// times hold the same ink there.
+    ///
+    /// Why it matters: the hero colours the colon cells apart from the
+    /// digits. A cell that also held part of a digit would dim that
+    /// digit with the colons.
+    #[test]
+    fn the_colon_cells_hold_the_colons_and_nothing_else() {
+        // Given:
+        let rows = 7;
+        let (thin, wide) = (render("11:11:11", rows), render("88:88:88", rows));
+
+        // When:
+        let cells = colon_cells("88:88:88", rows);
+
+        // Then:
+        assert_eq!(cells.len(), 2, "{cells:?}");
+        let slice = |art: &[String], run: &std::ops::Range<usize>| -> Vec<String> {
+            art.iter()
+                .map(|row| row.chars().skip(run.start).take(run.len()).collect())
+                .collect()
+        };
+        for run in &cells {
+            let colon = slice(&wide, run);
+            assert!(
+                colon.iter().any(|row| row.chars().any(|c| c != ' ')),
+                "no ink in {run:?}"
+            );
+            assert_eq!(colon, slice(&thin, run), "digit ink in {run:?}");
         }
     }
 }

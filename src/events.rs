@@ -44,8 +44,8 @@ const MAX_DRAINED_EVENTS: usize = 256;
 /// `timeout`.
 ///
 /// The caller (the event loop in `main`) computes `timeout` so the
-/// poll wakes at the next tick boundary, keeping clock updates tight
-/// (≤ tick) while drawing only once per tick when idle.
+/// poll wakes when the main clock next changes, and draws no frame
+/// while nothing moves.
 ///
 /// Only `KeyEventKind::Press` is handled. Release and repeat events
 /// are ignored to prevent duplicate actions on platforms that emit them.

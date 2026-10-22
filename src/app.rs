@@ -436,6 +436,8 @@ pub struct App {
     /// Toggled by `?`, scrolled with the arrows, dismissed by any other key.
     pub(crate) show_help: bool,
     pub(crate) wall_view: WallView,
+    /// Whether the main clock rolls its digits and pulses its colons.
+    pub(crate) clock_animation: bool,
     /// First visible line of the help popup.
     ///
     /// The overlay carries more lines than an 80x24 terminal can show, so
@@ -547,6 +549,7 @@ impl App {
             copy_flash: None,
             show_help: false,
             wall_view,
+            clock_animation: true,
             help_scroll: 0,
             startup_messages,
             config_load_failed,
